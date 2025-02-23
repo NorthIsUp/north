@@ -1,18 +1,19 @@
 [tool.poetry]
-name = "SOME_PROJECT_NAME"
-version = "0.1.0"
+name        = "SOME_PROJECT_NAME"
+version     = "0.1.0"
 description = ""
-authors = ["Adam Hitchcock <adam+python@northisup.com>"]
+authors     = ["Adam Hitchcock <adam+python@northisup.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.13"
 
 [tool.poetry.dev-dependencies]
 
 [tool.poetry.extras]
-str = ["north.str"]
-all = ['str']
+str        = ["north.str"]
+exceptions = ["north.exceptions"]
+all        = ['str', 'exceptions']
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires      = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
