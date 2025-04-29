@@ -1,7 +1,7 @@
 import difflib
 
 
-def diff_strings(a: str, b: str, *, rich_colors: bool = False) -> str:
+def colordiff(a: str, b: str, *, rich_colors: bool = False) -> str:
     output: list[str] = []
     matcher = difflib.SequenceMatcher(None, a, b)
     if rich_colors:

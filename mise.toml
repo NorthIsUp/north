@@ -1,5 +1,44 @@
 [tools]
-uv = "latest"
+python = "3.13"
+uv     = "latest"
 
 [env]
 UV_PREVIEW = "1"
+
+[tasks.list-projects]
+run = """
+for project in src/north-*; do
+    echo $project | cut -d- -f2
+done
+"""
+
+[tasks.sync-project]
+run = """
+project="{{arg()}}"
+cd src/north-$project
+mise run northctl $project --update
+uv sync
+"""
+
+
+[tasks.sync-projects]
+description = "Update pyproject.toml files for all sub-packages"
+run = """
+for project in $(mise run list-projects); do
+    mise run sync-project $project
+done
+"""
+
+[tasks.northctl]
+dir = "src/northctl"
+run = ["uv run northctl.py"]
+
+[tasks.test-projects]
+run = """
+for project in $(mise run list-projects); do
+    mise run test-project $project
+done
+"""
+
+[tasks.test-project]
+run = ["cd src/north-{{arg()}} && uv run pytest -vvv"]
