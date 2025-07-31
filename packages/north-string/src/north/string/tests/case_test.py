@@ -1,7 +1,5 @@
 import pytest
-from pytest import FixtureRequest
-
-from ..case import (
+from north.string.case import (
     alphanumcase,
     backslashcase,
     camelcase,
@@ -18,6 +16,7 @@ from ..case import (
     trimcase,
     uppercase,
 )
+from pytest import FixtureRequest
 
 # --- Test Data ---
 # Input string variations
@@ -611,28 +610,28 @@ def alphanumcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
 # --- Test Functions ---
 
 
-def test_camelcase(camelcase_scenario: tuple[str, str]):
-    input_str, expected = camelcase_scenario
+def test_camelcase(camelcase_scenarios: tuple[str, str]):
+    input_str, expected = camelcase_scenarios
     assert camelcase(input_str) == expected
 
 
-def test_capitalcase(capitalcase_scenario: tuple[str, str]):
-    input_str, expected = capitalcase_scenario
+def test_capitalcase(capitalcase_scenarios: tuple[str, str]):
+    input_str, expected = capitalcase_scenarios
     assert capitalcase(input_str) == expected
 
 
-def test_constcase(constcase_scenario: tuple[str, str]):
-    input_str, expected = constcase_scenario
+def test_constcase(constcase_scenarios: tuple[str, str]):
+    input_str, expected = constcase_scenarios
     assert constcase(input_str) == expected
 
 
-def test_lowercase(lowercase_scenario: tuple[str, str]):
-    input_str, expected = lowercase_scenario
+def test_lowercase(lowercase_scenarios: tuple[str, str]):
+    input_str, expected = lowercase_scenarios
     assert lowercase(input_str) == expected
 
 
-def test_pascalcase(pascalcase_scenario: tuple[str, str]):
-    input_str, expected = pascalcase_scenario
+def test_pascalcase(pascalcase_scenarios: tuple[str, str]):
+    input_str, expected = pascalcase_scenarios
     assert pascalcase(input_str) == expected
 
 

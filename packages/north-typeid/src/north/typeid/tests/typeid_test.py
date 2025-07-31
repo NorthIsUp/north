@@ -1,6 +1,6 @@
 from typing import Literal
 
-from .typeid import TypeId
+from north.typeid import TypeId
 
 
 def test_ids():
