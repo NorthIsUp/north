@@ -1,0 +1,13 @@
+[project]
+name            = "north-typeid"
+version         = "0.1.0"
+description     = "TypeId implementation for the north namespace"
+requires-python = ">=3.13"
+dependencies    = ["uuid6>=0.1.0"]
+
+[build-system]
+requires      = ["uv_build>=0.8,<0.9"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+namespace = true

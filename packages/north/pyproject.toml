@@ -1,0 +1,54 @@
+[project]
+name = "north"
+version = "0.1.0"
+description = "North utilities namespace package"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+string = [
+    "north-string",
+]
+typeid = [
+    "north-typeid",
+]
+matchbox = [
+    "north-matchbox",
+]
+funcy = [
+    "north-funcy",
+]
+registry = [
+    "north-registry",
+]
+all = [
+    "north-funcy",
+    "north-matchbox",
+    "north-registry",
+    "north-string",
+    "north-typeid",
+]
+
+[tool.uv.sources.north-string]
+workspace = true
+
+[tool.uv.sources.north-typeid]
+workspace = true
+
+[tool.uv.sources.north-matchbox]
+workspace = true
+
+[tool.uv.sources.north-funcy]
+workspace = true
+
+[tool.uv.sources.north-registry]
+workspace = true
+
+[tool.uv.build-backend]
+namespace = true
+
+[build-system]
+requires = [
+    "uv_build>=0.8,<0.9",
+]
+build-backend = "uv_build"

@@ -1,17 +1,21 @@
-[project]
-name            = "north"
-version         = "0.1.0"
-description     = "Add your description here"
-readme          = "README.md"
-requires-python = ">=3.13"
+[tool.uv.workspace]
+members = [
+    "packages/north",
+    "packages/north-funcy",
+    "packages/north-matchbox",
+    "packages/north-registry",
+    "packages/north-string",
+    "packages/north-typeid",
+]
 
-dependencies = ["pydantic>=2", "rich>=14", "structlog>=25", "tomlkit>=0.13"]
-
-[build-system]
-requires      = ["uv_build>=0.6,<0.7"]
-build-backend = "uv_build"
+[tool.uv.sources.north]
+workspace = true
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.5",
+    "north[matchbox,typeid]",
+    "pytest>=8.4.1",
+    "tomli-w",
+    "pre-commit",
+    "ruff",
 ]
