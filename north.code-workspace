@@ -1,10 +1,52 @@
 {
 	"folders": [
 		{
+			"name": "north",
 			"path": "."
 		},
+		{
+			"name": "north-package",
+			"path": "packages/north"
+		},
+		{
+			"path": "packages/north-funcy"
+		},
+		{
+			"path": "packages/north-matchbox"
+		},
+		{
+			"path": "packages/north-registry"
+		},
+		{
+			"path": "packages/north-string"
+		},
+		{
+			"path": "packages/north-typeid"
+		}
 	],
 	"settings": {
-		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+		"python.defaultInterpreterPath": "/Users/adam/.local/share/mise/installs/python/3.13.3/bin/python",
+		"python.testing.unittestEnabled": false,
+		"python.testing.pytestEnabled": true,
+		"python.testing.pytestArgs": [
+			"--verbose",
+			"--tb=short",
+			"--rootdir=${workspaceFolder}",
+			"packages/"
+		],
+		"python.testing.autoTestDiscoverOnSaveEnabled": true,
+		"python.testing.pytestPath": "pytest",
+		"python.analysis.extraPaths": [
+			"packages/north/src",
+			"packages/north-funcy/src",
+			"packages/north-matchbox/src",
+			"packages/north-registry/src",
+			"packages/north-string/src",
+			"packages/north-typeid/src"
+		],
+		"python.terminal.activateEnvironment": true,
+		"python.testing.pytestEnvVars": {
+			"PYTHONPATH": "packages/north/src:packages/north-funcy/src:packages/north-matchbox/src:packages/north-registry/src:packages/north-string/src:packages/north-typeid/src"
+		}
 	}
 }

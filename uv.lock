@@ -5,8 +5,11 @@ requires-python = ">=3.13"
 [manifest]
 members = [
     "north",
+    "north-cli",
     "north-funcy",
+    "north-fzf",
     "north-matchbox",
+    "north-pydantic",
     "north-registry",
     "north-string",
     "north-typeid",
@@ -19,6 +22,7 @@ dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff" },
     { name = "tomli-w" },
+    { name = "uuid6", specifier = ">=2025.0.1" },
 ]
 
 [[package]]
@@ -100,17 +104,29 @@ source = { editable = "packages/north" }
 
 [package.optional-dependencies]
 all = [
+    { name = "north-cli" },
     { name = "north-funcy" },
+    { name = "north-fzf" },
     { name = "north-matchbox" },
+    { name = "north-pydantic" },
     { name = "north-registry" },
     { name = "north-string" },
     { name = "north-typeid" },
 ]
+cli = [
+    { name = "north-cli" },
+]
 funcy = [
     { name = "north-funcy" },
 ]
+fzf = [
+    { name = "north-fzf" },
+]
 matchbox = [
     { name = "north-matchbox" },
+]
+pydantic = [
+    { name = "north-pydantic" },
 ]
 registry = [
     { name = "north-registry" },
@@ -124,10 +140,16 @@ typeid = [
 
 [package.metadata]
 requires-dist = [
+    { name = "north-cli", marker = "extra == 'all'", editable = "packages/north-cli" },
+    { name = "north-cli", marker = "extra == 'cli'", editable = "packages/north-cli" },
     { name = "north-funcy", marker = "extra == 'all'", editable = "packages/north-funcy" },
     { name = "north-funcy", marker = "extra == 'funcy'", editable = "packages/north-funcy" },
+    { name = "north-fzf", marker = "extra == 'all'", editable = "packages/north-fzf" },
+    { name = "north-fzf", marker = "extra == 'fzf'", editable = "packages/north-fzf" },
     { name = "north-matchbox", marker = "extra == 'all'", editable = "packages/north-matchbox" },
     { name = "north-matchbox", marker = "extra == 'matchbox'", editable = "packages/north-matchbox" },
+    { name = "north-pydantic", marker = "extra == 'all'", editable = "packages/north-pydantic" },
+    { name = "north-pydantic", marker = "extra == 'pydantic'", editable = "packages/north-pydantic" },
     { name = "north-registry", marker = "extra == 'all'", editable = "packages/north-registry" },
     { name = "north-registry", marker = "extra == 'registry'", editable = "packages/north-registry" },
     { name = "north-string", marker = "extra == 'all'", editable = "packages/north-string" },
@@ -135,7 +157,12 @@ requires-dist = [
     { name = "north-typeid", marker = "extra == 'all'", editable = "packages/north-typeid" },
     { name = "north-typeid", marker = "extra == 'typeid'", editable = "packages/north-typeid" },
 ]
-provides-extras = ["string", "typeid", "matchbox", "funcy", "registry", "all"]
+provides-extras = ["cli", "funcy", "fzf", "matchbox", "pydantic", "registry", "string", "typeid", "all"]
+
+[[package]]
+name = "north-cli"
+version = "0.1.0"
+source = { editable = "packages/north-cli" }
 
 [[package]]
 name = "north-funcy"
@@ -143,9 +170,19 @@ version = "0.1.0"
 source = { editable = "packages/north-funcy" }
 
 [[package]]
+name = "north-fzf"
+version = "0.1.0"
+source = { editable = "packages/north-fzf" }
+
+[[package]]
 name = "north-matchbox"
 version = "0.1.0"
 source = { editable = "packages/north-matchbox" }
+
+[[package]]
+name = "north-pydantic"
+version = "0.1.0"
+source = { editable = "packages/north-pydantic" }
 
 [[package]]
 name = "north-registry"

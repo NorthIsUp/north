@@ -635,18 +635,18 @@ def test_pascalcase(pascalcase_scenarios: tuple[str, str]):
     assert pascalcase(input_str) == expected
 
 
-def test_pathcase(pathcase_scenario: tuple[str, str]):
-    input_str, expected = pathcase_scenario
+def test_pathcase(pathcase_scenarios: tuple[str, str]):
+    input_str, expected = pathcase_scenarios
     assert pathcase(input_str) == expected
 
 
-def test_backslashcase(backslashcase_scenario: tuple[str, str]):
-    input_str, expected = backslashcase_scenario
+def test_backslashcase(backslashcase_scenarios: tuple[str, str]):
+    input_str, expected = backslashcase_scenarios
     assert backslashcase(input_str) == expected
 
 
-def test_sentencecase(sentencecase_scenario: tuple[str, str]):
-    input_str, expected = sentencecase_scenario
+def test_sentencecase(sentencecase_scenarios: tuple[str, str]):
+    input_str, expected = sentencecase_scenarios
     # Rerun with corrected expected value based on implementation check:
     # Input: "String with !@#$%^&*()_+ symbols" -> Expected: "String with symbols"
     # Handle special case with symbols
@@ -656,42 +656,42 @@ def test_sentencecase(sentencecase_scenario: tuple[str, str]):
     assert sentencecase(input_str) == expected
 
 
-def test_snakecase(snakecase_scenario: tuple[str, str]):
-    input_str, expected = snakecase_scenario
+def test_snakecase(snakecase_scenarios: tuple[str, str]):
+    input_str, expected = snakecase_scenarios
     assert snakecase(input_str) == expected
 
 
-def test_spinalcase(spinalcase_scenario: tuple[str, str]):
-    input_str, expected = spinalcase_scenario
+def test_spinalcase(spinalcase_scenarios: tuple[str, str]):
+    input_str, expected = spinalcase_scenarios
     assert spinalcase(input_str) == expected
 
 
-def test_dotcase(dotcase_scenario: tuple[str, str]):
-    input_str, expected = dotcase_scenario
+def test_dotcase(dotcase_scenarios: tuple[str, str]):
+    input_str, expected = dotcase_scenarios
     assert dotcase(input_str) == expected
 
 
-def test_titlecase(titlecase_scenario: tuple[str, str]):
-    input_str, expected = titlecase_scenario
+def test_titlecase(titlecase_scenarios: tuple[str, str]):
+    input_str, expected = titlecase_scenarios
     # Correcting expectation for titlecase based on implementation (snake -> split -> title word)
     # "String with !@#$%^&*()_+ symbols" -> snake -> "string_with___________symbols"
     # -> split -> ["string", "with", "", "", "", "", "", "", "", "", "", "symbols"]
     # -> title -> "String With           Symbols" (multiple spaces preserved)
-    if input_str == "String with !@#$%^&*()_+ symbols":
-        expected = "String With           Symbols"  # Corrected expectation
+    # if input_str == "String with !@#$%^&*()_+ symbols":
+    #     expected = "String With Symbols"  # Corrected expectation
     assert titlecase(input_str) == expected
 
 
-def test_trimcase(trimcase_scenario: tuple[str, str]):
-    input_str, expected = trimcase_scenario
+def test_trimcase(trimcase_scenarios: tuple[str, str]):
+    input_str, expected = trimcase_scenarios
     assert trimcase(input_str) == expected
 
 
-def test_uppercase(uppercase_scenario: tuple[str, str]):
-    input_str, expected = uppercase_scenario
+def test_uppercase(uppercase_scenarios: tuple[str, str]):
+    input_str, expected = uppercase_scenarios
     assert uppercase(input_str) == expected
 
 
-def test_alphanumcase(alphanumcase_scenario: tuple[str, str]):
-    input_str, expected = alphanumcase_scenario
+def test_alphanumcase(alphanumcase_scenarios: tuple[str, str]):
+    input_str, expected = alphanumcase_scenarios
     assert alphanumcase(input_str) == expected

@@ -14,3 +14,4 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 namespace = true
+module-name = "north"

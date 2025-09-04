@@ -7,10 +7,6 @@ uv         = "latest"
 UV_PREVIEW = "1"
 
 [tasks.test]
-description = "Run working tests in the workspace"
-run         = "uv run pytest packages/north-matchbox/src/ -v"
-
-[tasks.test-all]
 description = "Run ALL tests (including broken ones)"
 run         = "uv run pytest packages/*/src/ -v --tb=short"
 
@@ -18,18 +14,19 @@ run         = "uv run pytest packages/*/src/ -v --tb=short"
 description = "Run tests for a specific package (e.g., mise run test-package north-matchbox)"
 run         = "uv run pytest packages/{{arg()}}/src/ -v"
 
-[tasks.test-matchbox]
-description = "Run matchbox tests"
-run         = "uv run pytest packages/north-matchbox/src/ -v"
-
 [tasks.update-config]
 description = "Update north package configuration"
 run         = "uv run python scripts/update_north_config.py"
 
 [tasks.build]
 description = "Build all packages"
-run         = "uv build --package north && uv build --package north-string && uv build --package north-typeid && uv build --package north-matchbox && uv build --package north-funcy && uv build --package north-registry"
+run         = "uv build --all"
 
 [tasks.build-package]
 description = "Build a specific package (e.g., mise run build-package north-string)"
 run         = "uv build --package $1"
+
+[tasks.clean]
+run = """
+rm -rf dist .venv .pytest_cache .ruff_cache
+"""

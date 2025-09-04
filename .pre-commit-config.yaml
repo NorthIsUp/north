@@ -1,27 +1,32 @@
 repos:
-  - repo: local
-    hooks:
-      - id: update-north-config
-        name: Update north package configuration
-        entry: python scripts/update_north_config.py
-        language: python
-        files: ^packages/.*/pyproject\.toml$
-        pass_filenames: false
-        always_run: false
-        additional_dependencies: [tomli-w]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-toml
-      - id: check-added-large-files
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
+- repo: local
+  hooks:
+  - id: update-north-config
+    name: Update north package configuration
+    entry: uv run scripts/update_north_config.py
+    language: python
+    files: ^packages/.*/pyproject\.toml$
+    pass_filenames: false
+    always_run: false
+    additional_dependencies: [uv]
+  - id: build
+    name: Ensure 'uv build' works
+    language: python
+    files: ^packages/.*
+    pass_filenames: false
+    entry: uv build --all
+    always_run: true
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: check-toml
+  - id: check-added-large-files
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.8.4
+  hooks:
+  - id: ruff
+    args: [--fix]
+  - id: ruff-format

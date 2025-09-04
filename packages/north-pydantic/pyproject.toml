@@ -1,7 +1,7 @@
 [project]
-name        = "north-matchbox"
-version     = "0.1.0"
-description = "Pattern matching and guards for the north namespace"
+name            = "north-pydantic"
+version         = "0.1.0"
+description     = "Pydantic utilities for the north namespace"
 requires-python = ">=3.13"
 dependencies    = []
 

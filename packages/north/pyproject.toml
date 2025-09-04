@@ -6,28 +6,58 @@ requires-python = ">=3.13"
 dependencies = []
 
 [project.optional-dependencies]
+cli = [
+    "north-cli",
+]
+funcy = [
+    "north-funcy",
+]
+fzf = [
+    "north-fzf",
+]
+matchbox = [
+    "north-matchbox",
+]
+pydantic = [
+    "north-pydantic",
+]
+registry = [
+    "north-registry",
+]
 string = [
     "north-string",
 ]
 typeid = [
     "north-typeid",
 ]
-matchbox = [
-    "north-matchbox",
-]
-funcy = [
-    "north-funcy",
-]
-registry = [
-    "north-registry",
-]
 all = [
+    "north-cli",
     "north-funcy",
+    "north-fzf",
     "north-matchbox",
+    "north-pydantic",
     "north-registry",
     "north-string",
     "north-typeid",
 ]
+
+[tool.uv.sources.north-cli]
+workspace = true
+
+[tool.uv.sources.north-funcy]
+workspace = true
+
+[tool.uv.sources.north-fzf]
+workspace = true
+
+[tool.uv.sources.north-matchbox]
+workspace = true
+
+[tool.uv.sources.north-pydantic]
+workspace = true
+
+[tool.uv.sources.north-registry]
+workspace = true
 
 [tool.uv.sources.north-string]
 workspace = true
@@ -35,17 +65,9 @@ workspace = true
 [tool.uv.sources.north-typeid]
 workspace = true
 
-[tool.uv.sources.north-matchbox]
-workspace = true
-
-[tool.uv.sources.north-funcy]
-workspace = true
-
-[tool.uv.sources.north-registry]
-workspace = true
-
 [tool.uv.build-backend]
 namespace = true
+module-name = "north"
 
 [build-system]
 requires = [

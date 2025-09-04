@@ -1,8 +1,11 @@
 [tool.uv.workspace]
 members = [
     "packages/north",
+    "packages/north-cli",
     "packages/north-funcy",
+    "packages/north-fzf",
     "packages/north-matchbox",
+    "packages/north-pydantic",
     "packages/north-registry",
     "packages/north-string",
     "packages/north-typeid",
@@ -11,11 +14,62 @@ members = [
 [tool.uv.sources.north]
 workspace = true
 
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = [
+    "packages",
+]
+python_files = [
+    "test_*.py",
+    "*_test.py",
+]
+python_classes = [
+    "Test*",
+]
+python_functions = [
+    "test_*",
+]
+pythonpath = [
+    "packages/north/src",
+    "packages/north-funcy/src",
+    "packages/north-matchbox/src",
+    "packages/north-registry/src",
+    "packages/north-string/src",
+    "packages/north-typeid/src",
+    "packages/north-cli/src",
+    "packages/north-pydantic/src",
+    "packages/north-fzf/src",
+]
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--strict-config",
+    "--disable-warnings",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+extend-select = [
+    "I",
+]
+ignore = [
+    "E501",
+]
+
 [dependency-groups]
 dev = [
     "north[matchbox,typeid]",
-    "pytest>=8.4.1",
+    "pytest>=8.4",
     "tomli-w",
     "pre-commit",
     "ruff",
+    "uuid6>=2025.0.1",
+    "click",
 ]
