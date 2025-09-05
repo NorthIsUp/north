@@ -7,7 +7,6 @@ repos:
     language: python
     files: ^packages/.*/pyproject\.toml$
     pass_filenames: false
-    always_run: false
     additional_dependencies: [uv]
   - id: build
     name: Ensure 'uv build' works
@@ -15,9 +14,17 @@ repos:
     files: ^packages/.*
     pass_filenames: false
     entry: uv build --all
+    always_run: false
+    additional_dependencies: [uv]
+  - id: test
+    name: run tests
+    language: python
     always_run: true
+    pass_filenames: false
+    entry: uv run pytest
+    additional_dependencies: [uv, pytest]
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
   - id: trailing-whitespace
   - id: end-of-file-fixer
@@ -25,7 +32,7 @@ repos:
   - id: check-toml
   - id: check-added-large-files
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.8.4
+  rev: v0.12.12
   hooks:
   - id: ruff
     args: [--fix]

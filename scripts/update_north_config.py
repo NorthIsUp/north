@@ -39,7 +39,9 @@ def scan_packages() -> List[Dict[str, str]]:
 
     # Get all package directories
     package_dirs = [
-        d for d in packages_dir.iterdir() if d.is_dir() and d.name != "north"
+        d
+        for d in packages_dir.iterdir()
+        if d.is_dir() and d.name != "north" and d.suffix != ".bak"
     ]
 
     if not package_dirs:
@@ -108,7 +110,7 @@ def check_missing_packages(packages: List[Dict[str, str]]) -> None:
             config.get("tool", {}).get("uv", {}).get("workspace", {}).get("members", [])
         )
         for member in members:
-            if member.startswith("packages/"):
+            if member.startswith("packages/") and not member.endswith(".bak"):
                 pkg_dir = Path(member)
                 if not pkg_dir.exists():
                     pkg_name = pkg_dir.name
@@ -164,9 +166,7 @@ def update_north_config(packages: List[Dict[str, str]]) -> None:
         sources[pkg["name"]] = {"workspace": True}
 
     # Write updated config
-    with open(north_config_path, "wb") as f:
-        tomli_w.dump(config, f)
-
+    north_config_path.write_text(tomli_w.dumps(config, indent=2))
     console.print(f"[green]✅ Updated {north_config_path}[/green]")
 
     # Create a nice table for packages
@@ -218,8 +218,7 @@ def update_workspace_config(packages: List[Dict[str, str]]) -> None:
     members[:] = sorted(set(members))
 
     # Write updated config
-    with open(workspace_config_path, "wb") as f:
-        tomli_w.dump(config, f)
+    workspace_config_path.write_text(tomli_w.dumps(config, indent=2))
 
     console.print(
         f"[green]✅ Updated {workspace_config_path} workspace members[/green]"

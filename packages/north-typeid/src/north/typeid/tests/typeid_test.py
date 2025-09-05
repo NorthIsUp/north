@@ -2,12 +2,14 @@ from typing import Literal
 
 from north.typeid import TypeId
 
+TestId = TypeId[Literal["test"]]
+
 
 def test_ids():
-    assert TypeId("hi") == TypeId("hi")
-    assert TypeId("hi") != TypeId("hi2")
-    assert TypeId("hi") != TypeId("hi_1234")
-    assert TypeId("hi") != TypeId("hi_1234")
+    assert TestId("hi") == TestId("hi")
+    assert TestId("hi") != TestId("hi2")
+    assert TestId("hi") != TestId("test_1234")
+    assert TestId("hi") != TestId("test_1234")
 
 
 def test_type_safety() -> None:
@@ -57,8 +59,20 @@ def test_type_safety() -> None:
     # but we can't test that at runtime without a type checker
 
 
-def test_values():
+def test_values1():
     typeid = "enc_01jp36hnz4fvmvm4bge859pb5r"
     expected_uuid = "01958668-d7e4-7ee9-ba11-70720a9b2cb8"
-    assert TypeId._convert_b32_to_uuid(typeid) == expected_uuid
-    assert TypeId._convert_uuid_to_b32(expected_uuid) == typeid
+
+    EncId = TypeId[Literal["enc"]]
+    enc = EncId(typeid)
+    assert enc.uuid_str == expected_uuid
+
+
+def test_values():
+    typeid = "enc_01jp36hnz4fvmvm4bge859pb5r"
+    prefix, suffix = typeid.split("_")
+    expected_uuid = "01958668-d7e4-7ee9-ba11-70720a9b2cb8"
+
+    assert prefix == "enc"
+    assert str(TypeId._convert_b32_to_uuid(suffix)) == expected_uuid
+    assert TypeId._convert_uuid_to_b32(expected_uuid) == suffix

@@ -1,16 +1,18 @@
+[build-system]
+build-backend = "uv_build"
+
+requires = [ "uv-build>=0.8,<0.9" ]
+
 [project]
-name            = "north-registry"
-version         = "0.1.0"
-description     = "Registry and autodiscovery utilities for the north namespace"
+name = "north-registry"
+version = "0.1.0"
+description = "Registry and autodiscovery utilities for the north namespace"
 requires-python = ">=3.13"
-dependencies    = ["pydantic>=2", "north-string"]
+classifiers = [ "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python :: 3.13" ]
+dependencies = [ "north-string", "pydantic>=2" ]
 
 [tool.uv.sources]
 north-string = { workspace = true }
-
-[build-system]
-requires      = ["uv_build>=0.8,<0.9"]
-build-backend = "uv_build"
 
 [tool.uv.build-backend]
 namespace = true

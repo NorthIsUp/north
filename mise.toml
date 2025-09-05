@@ -8,7 +8,7 @@ UV_PREVIEW = "1"
 
 [tasks.test]
 description = "Run ALL tests (including broken ones)"
-run         = "uv run pytest packages/*/src/ -v --tb=short"
+run         = "uv run pytest"
 
 [tasks.test-package]
 description = "Run tests for a specific package (e.g., mise run test-package north-matchbox)"
@@ -27,6 +27,6 @@ description = "Build a specific package (e.g., mise run build-package north-stri
 run         = "uv build --package $1"
 
 [tasks.clean]
-run = """
-rm -rf dist .venv .pytest_cache .ruff_cache
+run = """#!/bin/zsh
+rm -rf dist .venv .pytest_cache .ruff_cache **/*.egg-info
 """
