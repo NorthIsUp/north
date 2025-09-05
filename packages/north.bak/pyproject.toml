@@ -1,0 +1,80 @@
+[project]
+name = "north"
+version = "0.1.0"
+description = "North namespace package"
+requires-python = ">=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.optional-dependencies]
+cli = [
+  "north-cli",
+]
+funcy = [
+  "north-funcy",
+]
+fzf = [
+  "north-fzf",
+]
+matchbox = [
+  "north-matchbox",
+]
+pydantic = [
+  "north-pydantic",
+]
+registry = [
+  "north-registry",
+]
+string = [
+  "north-string",
+]
+typeid = [
+  "north-typeid",
+]
+all = [
+  "north-cli",
+  "north-funcy",
+  "north-fzf",
+  "north-matchbox",
+  "north-pydantic",
+  "north-registry",
+  "north-string",
+  "north-typeid",
+]
+
+[build-system]
+build-backend = "uv_build"
+requires = [
+  "uv-build>=0.8,<0.9",
+]
+
+[tool.uv.build-backend]
+namespace = true
+module-name = "north"
+
+[tool.uv.sources.north-cli]
+workspace = true
+
+[tool.uv.sources.north-funcy]
+workspace = true
+
+[tool.uv.sources.north-fzf]
+workspace = true
+
+[tool.uv.sources.north-matchbox]
+workspace = true
+
+[tool.uv.sources.north-pydantic]
+workspace = true
+
+[tool.uv.sources.north-registry]
+workspace = true
+
+[tool.uv.sources.north-string]
+workspace = true
+
+[tool.uv.sources.north-typeid]
+workspace = true
