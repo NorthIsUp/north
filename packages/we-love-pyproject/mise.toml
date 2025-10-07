@@ -1,0 +1,30 @@
+[tasks.generate-tool-models]
+tools = { 'uv' = 'latest', 'bkt' = 'latest' }
+description = "Generate tool models"
+run = """#!/usr/bin/env zsh
+set -euo pipefail
+
+schemas=(
+    "pyproject" "https://json.schemastore.org/pyproject.json"
+    "poetry" "https://json.schemastore.org/poetry.json"
+    "pdm" "https://json.schemastore.org/pdm.json"
+    "hatch" "https://json.schemastore.org/hatch.json"
+    "partial-black" "https://json.schemastore.org/partial-black.json"
+    "partial-mypy" "https://json.schemastore.org/partial-mypy.json"
+    "partial-pytest" "https://json.schemastore.org/partial-pytest.json"
+    "partial-coverage" "https://json.schemastore.org/partial-coverage.json"
+    "partial-setuptools" "https://json.schemastore.org/partial-setuptools.json"
+    "ruff" "https://json.schemastore.org/ruff.json"
+)
+
+
+for name schema in $schemas; do
+    print -Pu2 "%F{blue}+> generating model for $name from $schema...%f"
+    uvx --from 'datamodel-code-generator[http]' \
+        datamodel-codegen \
+            --input-file-type jsonschema \
+            --url $schema \
+            --output ./src/we_love/pyproject/_${name}.py || print -Pu2 "%F{red}+> failed to generate model for $name from $schema%f"
+    ruff format ./src/we_love/pyproject/_*.py
+done
+"""

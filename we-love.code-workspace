@@ -1,0 +1,95 @@
+{
+	"folders": [
+		{
+			"name": "we_love",
+			"path": "."
+		},
+		{
+			"name": "  \u2014 alfred",
+			"path": "packages/we-love-alfred"
+		},
+		{
+			"name": "  \u2014 cli",
+			"path": "packages/we-love-cli"
+		},
+		{
+			"name": "  \u2014 funcy",
+			"path": "packages/we-love-funcy"
+		},
+		{
+			"name": "  \u2014 fzf",
+			"path": "packages/we-love-fzf"
+		},
+		{
+			"name": "  \u2014 matchbox",
+			"path": "packages/we-love-matchbox"
+		},
+		{
+			"name": "  \u2014 pydantic",
+			"path": "packages/we-love-pydantic"
+		},
+		{
+			"name": "  \u2014 pyproject",
+			"path": "packages/we-love-pyproject"
+		},
+		{
+			"name": "  \u2014 registry",
+			"path": "packages/we-love-registry"
+		},
+		{
+			"name": "  \u2014 string",
+			"path": "packages/we-love-string"
+		},
+		{
+			"name": "  \u2014 typeid",
+			"path": "packages/we-love-typeid"
+		}
+	],
+	"settings": {
+		"python.defaultInterpreterPath": "/Users/adam/.local/share/mise/installs/python/3.13.7/bin/python",
+		"python.testing.unittestEnabled": false,
+		"python.testing.pytestEnabled": true,
+		"python.testing.pytestArgs": [
+			"--verbose",
+			"--tb=short",
+			"--rootdir=${workspaceFolder}",
+			"packages/"
+		],
+		"python.testing.autoTestDiscoverOnSaveEnabled": true,
+		"python.testing.pytestPath": "pytest",
+		"python.analysis.extraPaths": [
+			"packages/we-love/src",
+			"packages/we-love-funcy/src",
+			"packages/we-love-matchbox/src",
+			"packages/we-love-registry/src",
+			"packages/we-love-string/src",
+			"packages/we-love-typeid/src"
+		],
+		"python.terminal.activateEnvironment": true,
+		"python.testing.pytestEnvVars": {
+			"PYTHONPATH": "packages/we-love/src:packages/we-love-funcy/src:packages/we-love-matchbox/src:packages/we-love-registry/src:packages/we-love-string/src:packages/we-love-typeid/src"
+		},
+		"files.exclude": {
+			"packages/*/": true,
+			"packages/*/.*": true,
+			"packages/*/__pycache__/": true,
+			"packages/*/.*.pyc": true,
+			"packages/*/.*.pyo": true,
+			"packages/*/.*.pyd": true,
+			"packages/*/.pytest_cache/": true,
+			"packages/*/dist/": true,
+			"packages/*/build/": true,
+			"packages/*/*.egg-info/": true
+		},
+		"ruff.path": [
+			"/Users/adam/.local/share/mise/installs/ruff/0.13.2/ruff-aarch64-apple-darwin/ruff"
+		],
+		"ruff.interpreter": [
+			"/Users/adam/.local/share/mise/installs/python/3.13.7/bin/python"
+		],
+		"bun.runtime": "/Users/adam/.local/share/mise/installs/bun/1.2.23/bin/bun",
+		"debug.javascript.defaultRuntimeExecutable": {
+			"pwa-node": "/Users/adam/.local/share/mise/installs/node/24.8.0/bin/node"
+		}
+	}
+}

@@ -1,32 +1,152 @@
 [tools]
+pkl        = "latest"
 pre-commit = "latest"
 python     = "3.13"
 uv         = "latest"
+hk         = "latest"
+ruff       = "latest"
+prettier   = "latest"
+node       = "latest"
+[settings]
+experimental = true
 
 [env]
 UV_PREVIEW = "1"
+
+[tasks.uv-sync]
+description = "Sync uv workspace"
+run = """#!/usr/bin/env zsh
+for file in packages/*/pyproject.toml ; do
+    pdir=${file:h}
+    [[ -d $pdir ]] || exit 1
+    print -Pu2 "%F{blue}+> syncing ${pdir:t}...%f"
+    uv sync --directory ${pdir} --color=always 2>&1 | awk '{print "  "$0}' || {
+        print -Pu2 "%F{red}+> uv sync failled, cleaning%f"
+        rm -rf ${pdir}/.venv
+    }
+done
+"""
 
 [tasks.test]
 description = "Run ALL tests (including broken ones)"
 run         = "uv run pytest"
 
 [tasks.test-package]
-description = "Run tests for a specific package (e.g., mise run test-package north-matchbox)"
+description = "Run tests for a specific package (e.g., mise run test-package we-love-matchbox)"
 run         = "uv run pytest packages/{{arg()}}/src/ -v"
 
 [tasks.update-config]
-description = "Update north package configuration"
-run         = "uv run python scripts/update_north_config.py"
+description = "Update we-love package configuration"
+run         = "./scripts/update_we_love_config.py"
 
-[tasks.build]
-description = "Build all packages"
-run         = "uv build --all"
+[tasks.bump-patch]
+description = "Bump the patch version of a specific package (e.g., mise run bump-patch string)"
+run = """#!/usr/bin/env zsh
+set -x
+package={{arg()}}
+uv version --bump patch --package $package --directory packages/${package//_/-}
+"""
 
 [tasks.build-package]
-description = "Build a specific package (e.g., mise run build-package north-string)"
-run         = "uv build --package $1"
+wait_for = ["bump-patch"]
+description = "Build a specific package into root dist directory (e.g., mise run build-package we-love-string)"
+run = """
+set -x
+package={{arg()}}
+uv build --package $package --out-dir dist --directory packages/${package//_/-} """
+
+[tasks.publish]
+description = "Build and publish a specific package (e.g., mise run publish string)"
+run = """#!/usr/bin/env zsh
+set -euo pipefail
+
+name_dash=${1}
+[[ ${name_dash} == we-love-* ]] || name_dash=we-love-${name_dash}
+name_under=${name_dash/-/_}
+scripts/diff-package $name_dash --quiet && {
+    echo "Package $name_dash has already been published"
+    exit 1
+} || {
+    echo "Package $name_dash has not been published, bumping patch and building"
+    mise run bump-patch $name_dash
+    mise run build-package $name_dash
+    echo "Publishing $name_dash..."
+    uv publish packages/${name_dash}/dist/${name_under}-*.whl packages/${name_dash}/dist/${name_under}-*.tar.gz
+}
+"""
+
+[tasks.publish-from-dist]
+description = "Publish a specific package from dist directory without building (e.g., mise run publish-from-dist string)"
+run = """#!/usr/bin/env zsh
+package_name="we_love_$1"
+uv publish dist/${package_name}-*.whl dist/${package_name}-*.tar.gz
+"""
+
+[tasks.publish-all]
+description = "Build and publish all packages to PyPI"
+depends = ["build"]
+run = """#!/usr/bin/env zsh
+echo "Publishing all packages..."
+uv publish dist/*
+"""
+
+[tasks.publish-all-from-dist]
+description = "Publish all packages from dist directory to PyPI (without building)"
+run         = "uv publish dist/*"
+
+[tasks.check-pypi]
+description = "Check if a package in dist already exists on PyPI using SHA256 checksums (e.g., mise run check-pypi string)"
+run = """#!/usr/bin/env zsh
+uv run scripts/check_package_pypi.py we-love-$1
+"""
+
+[tasks.check-pypi-strict]
+description = "Check if a package exists on PyPI and exit with error if it does (e.g., mise run check-pypi-strict string)"
+run = """#!/usr/bin/env zsh
+uv run scripts/check_package_pypi.py we-love-$1 --exit-code
+"""
 
 [tasks.clean]
-run = """#!/bin/zsh
+run = """#!/usr/bin/env zsh
 rm -rf dist .venv .pytest_cache .ruff_cache **/*.egg-info
+"""
+
+[tasks.new-package]
+description = "Create a new package"
+run = """#!/usr/bin/env zsh
+uv run scripts/update_we_love_config.py --create "$1" --description "$2"
+"""
+
+[[watch_files]]
+patterns = ["packages/*/pyproject.toml"]
+run      = "mise run uv-sync-changed"
+
+[tasks.uv-sync-changed]
+description = "Sync changes to uv workspace"
+dir = "{{ config_root }}"
+run = """#!/usr/bin/env zsh
+typeset -T MISE_WATCH_FILES_MODIFIED mise_watch_files_modified
+
+for file in packages/*/pyproject.toml ; do
+    pdir=${file:h}
+    [[ -d $pdir ]] || exit 1
+    [[ ! -d ${pdir}/.venv ]] && {
+        print -u2 "+> ⚠️ missing .venv in '${pdir:t}', syncing"
+        uv sync --directory ${pdir} || {
+            print -u2 "+> 🚨 uv sync failled, cleaning"
+            rm -rf ${pdir}/.venv
+        }
+    }
+done
+
+for file in $mise_watch_files_modified; do
+    [[ $file == */pyproject.toml ]] && {
+        pdir=${file:h}
+        print -u2 "+> ℹ️ pyproject.toml changed, syncing ${pdir:t}"
+        uv sync --directory ${pdir} || {
+            print -u2 "+> 🚨 uv sync failled, cleaning"
+            rm -rf ${pdir}/.venv
+        }
+    }
+done
 """

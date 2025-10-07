@@ -1,0 +1,31 @@
+[build-system]
+build-backend = "uv_build"
+requires      = ["uv-build>=0.8,<0.9"]
+
+[project]
+name = "we-love-cli"
+version = "0.1.0"
+description = "CLI utilities for the we-love namespace"
+requires-python = ">=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "we-love-pydantic",
+  "we-love-registry",
+  "pydantic>=2",
+  "argcomplete",
+]
+
+[tool.uv.build-backend]
+namespace   = true
+module-name = "we_love"
+
+[tool.uv.sources]
+we-love-pydantic = { path = "../we-love-pydantic" }
+we-love-registry = { path = "../we-love-registry" }
+
+[tool.pyright]
+venv     = ".venv"
+venvPath = "."

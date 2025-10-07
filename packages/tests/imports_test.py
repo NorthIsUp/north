@@ -1,15 +1,15 @@
 """
-Test suite to verify that all north packages can be installed and imported correctly using uv run.
+Test suite to verify that all we-love packages can be installed and imported correctly using uv run.
 This is the recommended way to test package installation and imports.
 """
 
 import subprocess
-import tomllib
 from dataclasses import dataclass
 from inspect import cleandoc
 from pathlib import Path
 
 import pytest
+import tomllib
 
 
 @dataclass
@@ -20,11 +20,11 @@ class Package:
 
     @property
     def is_main(self) -> bool:
-        return self.package_name == "north"
+        return self.package_name == "we_love"
 
 
 def discover_packages() -> list[Package]:
-    """Discover all north packages by reading pyproject.toml files."""
+    """Discover all we-love packages by reading pyproject.toml files."""
     packages_dir = Path(__file__).parent.parent
     packages = []
 
@@ -38,17 +38,17 @@ def discover_packages() -> list[Package]:
             project_name = config.get("project", {}).get("name", "")
             description = config.get("project", {}).get("description", "No description")
 
-            # Skip if not a north package
-            if not project_name.startswith("north"):
+            # Skip if not a we-love package
+            if not project_name.startswith("we_love"):
                 continue
 
             # Determine the module name
-            if project_name == "north":
-                # Main north package
-                module_name = "north"
-                package_name = "north"
+            if project_name == "we_love":
+                # Main we-love package
+                module_name = "we_love"
+                package_name = "we_love"
             else:
-                # Namespace packages (e.g., north-string -> north.string)
+                # Namespace packages (e.g., we-love-string -> north.string)
                 package_name = project_name
                 module_name = project_name.replace("-", ".")
 
@@ -64,13 +64,13 @@ def discover_packages() -> list[Package]:
             print(f"Warning: Could not parse {pyproject_file}: {e}")
             continue
 
-    # Sort packages: main north package first, then others alphabetically
+    # Sort packages: main we-love package first, then others alphabetically
     packages.sort(key=lambda p: (not p.is_main, p.package_name))
     return packages
 
 
 def get_namespace_packages() -> list[Package]:
-    """Get only the namespace packages (excluding main north package)."""
+    """Get only the namespace packages (excluding main we-love package)."""
     all_packages = discover_packages()
     return [pkg for pkg in all_packages if not pkg.is_main]
 
@@ -109,8 +109,8 @@ def run_uv_test(
         return False, e.stderr
 
 
-class TestNorthPackageImports:
-    """Test class for north package imports using uv run."""
+class TestWeLovePackageImports:
+    """Test class for we-love package imports using uv run."""
 
     @pytest.fixture(scope="class")
     def discovered_packages(self) -> list[Package]:
@@ -122,19 +122,19 @@ class TestNorthPackageImports:
         """Get namespace packages at test class initialization."""
         return get_namespace_packages()
 
-    def test_main_north_package_import(
+    def test_main_we_love_package_import(
         self, discovered_packages: list[Package]
     ) -> None:
-        """Test that the main north package can be imported."""
+        """Test that the main we-love package can be imported."""
         main_package = next((pkg for pkg in discovered_packages if pkg.is_main), None)
-        assert main_package is not None, "Main north package not found"
+        assert main_package is not None, "Main we-love package not found"
 
         success, output = run_uv_test(
             [main_package.package_name],
             f"import {main_package.module_name}; print('{main_package.module_name} imported successfully')",
-            "Main north package import",
+            "Main we-love package import",
         )
-        assert success, f"Failed to import main north package: {output}"
+        assert success, f"Failed to import main we-love package: {output}"
         assert f"{main_package.module_name} imported successfully" in output
 
     @pytest.mark.parametrize(
@@ -144,7 +144,7 @@ class TestNorthPackageImports:
     def test_namespace_package_imports(self, package_info: Package) -> None:
         """Test that individual namespace packages can be imported."""
         success, output = run_uv_test(
-            ["north", package_info.package_name],
+            ["we_love", package_info.package_name],
             f"import {package_info.module_name}; print('{package_info.module_name} imported successfully')",
             f"{package_info.description} ({package_info.module_name})",
         )
@@ -160,17 +160,17 @@ class TestNorthPackageImports:
         if not namespace_packages:
             pytest.skip("No namespace packages found")
 
-        package_names = ["north"] + [pkg.package_name for pkg in namespace_packages]
+        package_names = ["we_love"] + [pkg.package_name for pkg in namespace_packages]
 
         # Create import statements for the selected packages
         import_statements = []
         for pkg in namespace_packages:
             if pkg.module_name == "north.string":
-                import_statements.append("import north.string.case")
+                import_statements.append("import we_love.string.case")
             elif pkg.module_name == "north.typeid":
-                import_statements.append("import north.typeid.typeid")
+                import_statements.append("import we_love.typeid.typeid")
             elif pkg.module_name == "north.matchbox":
-                import_statements.append("import north.matchbox.guards")
+                import_statements.append("import we_love.matchbox.guards")
             else:
                 import_statements.append(f"import {pkg.module_name}")
 
@@ -189,18 +189,18 @@ class TestNorthPackageImports:
 
     def test_functionality_test(self, discovered_packages: list[Package]) -> None:
         """Test that package functionality works correctly."""
-        # Find north-string package for functionality testing
+        # Find we-love-string package for functionality testing
         string_package = next(
-            (pkg for pkg in discovered_packages if pkg.package_name == "north-string"),
+            (pkg for pkg in discovered_packages if pkg.package_name == "we-love-string"),
             None,
         )
         if not string_package:
-            pytest.skip("north-string package not found")
+            pytest.skip("we-love-string package not found")
 
         success, output = run_uv_test(
-            ["north", string_package.package_name],
+            ["we_love", string_package.package_name],
             cleandoc("""
-            import north.string.case
+            import we_love.string.case
             result = north.string.case.snakecase('HelloWorld')
             print(f'Function test: snakecase result: {result}')
             """),
@@ -235,7 +235,7 @@ class TestNorthPackageImports:
         """Test that package discovery works correctly."""
         packages = discover_packages()
 
-        # Should have at least the main north package
+        # Should have at least the main we-love package
         assert len(packages) > 0, "No packages discovered"
 
         # Should have exactly one main package
@@ -243,7 +243,7 @@ class TestNorthPackageImports:
         assert len(main_packages) == 1, (
             f"Expected 1 main package, found {len(main_packages)}"
         )
-        assert main_packages[0].package_name == "north", (
+        assert main_packages[0].package_name == "we_love", (
             "Main package should be 'north'"
         )
 
@@ -259,7 +259,7 @@ class TestNorthPackageImports:
             assert pkg.is_main is not None, f"Package missing is_main: {pkg}"
 
             # Package names should start with 'north'
-            assert pkg.package_name.startswith("north"), (
+            assert pkg.package_name.startswith("we_love"), (
                 f"Package name should start with 'north': {pkg['package_name']}"
             )
 

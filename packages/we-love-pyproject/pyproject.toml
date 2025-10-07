@@ -1,0 +1,18 @@
+[build-system]
+build-backend = "uv_build"
+requires      = ["uv-build>=0.8,<0.9"]
+
+[project]
+name            = "we-love-pyproject"
+version         = "0.1.0"
+description     = "models to manipulate pyproject files"
+requires-python = ">=3.13"
+dependencies    = ["tomlkit", "pydantic"]
+
+[tool.uv.build-backend]
+namespace   = true
+module-name = "we_love"
+
+[tool.pyright]
+venv     = ".venv"
+venvPath = "."

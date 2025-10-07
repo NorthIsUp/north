@@ -2,19 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 
-[manifest]
-members = [
-    "we-love-alfred",
-    "we-love-cli",
-    "we-love-funcy",
-    "we-love-fzf",
-    "we-love-matchbox",
-    "we-love-pydantic",
-    "we-love-registry",
-    "we-love-string",
-    "we-love-typeid",
-]
-
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -22,15 +9,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
-]
-
-[[package]]
-name = "argcomplete"
-version = "3.6.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/16/0f/861e168fc813c56a78b35f3c30d91c6757d1fd185af1110f1aec784b35d0/argcomplete-3.6.2.tar.gz", hash = "sha256:d0519b1bc867f5f4f4713c41ad0aba73a4a5f007449716b16f385f2166dc6adf", size = 73403, upload-time = "2025-04-03T04:57:03.52Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/da/e42d7a9d8dd33fa775f467e4028a47936da2f01e4b0e561f9ba0d74cb0ca/argcomplete-3.6.2-py3-none-any.whl", hash = "sha256:65b3133a29ad53fb42c48cf5114752c7ab66c1c38544fdf6460f450c09b42591", size = 43708, upload-time = "2025-04-03T04:57:01.591Z" },
 ]
 
 [[package]]
@@ -206,18 +184,9 @@ wheels = [
 ]
 
 [[package]]
-name = "uuid6"
-version = "2025.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ca/b7/4c0f736ca824b3a25b15e8213d1bcfc15f8ac2ae48d1b445b310892dc4da/uuid6-2025.0.1.tar.gz", hash = "sha256:cd0af94fa428675a44e32c5319ec5a3485225ba2179eefcf4c3f205ae30a81bd", size = 13932, upload-time = "2025-07-04T18:30:35.186Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/b2/93faaab7962e2aa8d6e174afb6f76be2ca0ce89fde14d3af835acebcaa59/uuid6-2025.0.1-py3-none-any.whl", hash = "sha256:80530ce4d02a93cdf82e7122ca0da3ebbbc269790ec1cb902481fa3e9cc9ff99", size = 6979, upload-time = "2025-07-04T18:30:34.001Z" },
-]
-
-[[package]]
 name = "we-love-alfred"
-version = "0.4.3"
-source = { editable = "packages/we-love-alfred" }
+version = "0.4.10"
+source = { editable = "." }
 dependencies = [
     { name = "favicon" },
     { name = "pydantic" },
@@ -230,73 +199,3 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2" },
     { name = "requests" },
 ]
-
-[[package]]
-name = "we-love-cli"
-version = "0.1.0"
-source = { editable = "packages/we-love-cli" }
-dependencies = [
-    { name = "argcomplete" },
-    { name = "pydantic" },
-    { name = "we-love-pydantic" },
-    { name = "we-love-registry" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "argcomplete" },
-    { name = "pydantic", specifier = ">=2" },
-    { name = "we-love-pydantic", editable = "packages/we-love-pydantic" },
-    { name = "we-love-registry", editable = "packages/we-love-registry" },
-]
-
-[[package]]
-name = "we-love-funcy"
-version = "0.1.0"
-source = { editable = "packages/we-love-funcy" }
-
-[[package]]
-name = "we-love-fzf"
-version = "0.1.0"
-source = { editable = "packages/we-love-fzf" }
-
-[[package]]
-name = "we-love-matchbox"
-version = "0.1.0"
-source = { editable = "packages/we-love-matchbox" }
-
-[[package]]
-name = "we-love-pydantic"
-version = "0.1.0"
-source = { editable = "packages/we-love-pydantic" }
-
-[[package]]
-name = "we-love-registry"
-version = "0.1.0"
-source = { editable = "packages/we-love-registry" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "we-love-string" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2" },
-    { name = "we-love-string", editable = "packages/we-love-string" },
-]
-
-[[package]]
-name = "we-love-string"
-version = "0.1.0"
-source = { editable = "packages/we-love-string" }
-
-[[package]]
-name = "we-love-typeid"
-version = "0.1.0"
-source = { editable = "packages/we-love-typeid" }
-dependencies = [
-    { name = "uuid6" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "uuid6", specifier = ">=0.1" }]

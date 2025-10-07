@@ -1,0 +1,18 @@
+[project]
+name            = "we-love-alfred"
+version         = "0.4.10"
+description     = "help make alfred commands nice for we-love namespace"
+requires-python = ">=3.13"
+dependencies    = ["favicon", "pydantic>=2", "requests"]
+
+[build-system]
+requires      = ["uv_build>=0.8,<0.9"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+namespace   = true
+module-name = "we_love"
+
+[tool.pyright]
+venv     = ".venv"
+venvPath = "."

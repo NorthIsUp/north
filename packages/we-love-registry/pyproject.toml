@@ -1,0 +1,26 @@
+[build-system]
+build-backend = "uv_build"
+
+requires = ["uv-build>=0.8,<0.9"]
+
+[project]
+name = "we-love-registry"
+version = "0.1.0"
+description = "Registry and autodiscovery utilities for the we-love namespace"
+requires-python = ">=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = ["we-love-string", "pydantic>=2"]
+
+[tool.uv.sources]
+we-love-string = { path = "../we-love-string" }
+
+[tool.uv.build-backend]
+namespace   = true
+module-name = "we_love"
+
+[tool.pyright]
+venv     = ".venv"
+venvPath = "."

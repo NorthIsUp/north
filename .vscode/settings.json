@@ -1,25 +1,13 @@
 {
-    "python.defaultInterpreterPath": "/Users/adam/.local/share/mise/installs/python/3.13.3/bin/python",
-    "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": [
-        "--verbose",
-        "--tb=short",
-        "--rootdir=.",
-        "packages/"
+    "bun.runtime": "/Users/adam/.local/share/mise/shims/bun",
+    "debug.javascript.defaultRuntimeExecutable": {
+        "pwa-node": "/Users/adam/.local/share/mise/shims/node"
+    },
+    "python.defaultInterpreterPath": "/Users/adam/.local/share/mise/installs/python/3.13.7/bin/python",
+    "ruff.path": [
+        "/Users/adam/.local/share/mise/installs/ruff/0.13.2/ruff-aarch64-apple-darwin/ruff"
     ],
-    "python.testing.autoTestDiscoverOnSaveEnabled": true,
-    "python.testing.pytestPath": "pytest",
-    "python.analysis.extraPaths": [
-        "packages/north/src",
-        "packages/north-funcy/src",
-        "packages/north-matchbox/src",
-        "packages/north-registry/src",
-        "packages/north-string/src",
-        "packages/north-typeid/src"
-    ],
-    "python.terminal.activateEnvironment": true,
-    "python.testing.pytestEnvVars": {
-        "PYTHONPATH": "packages/north/src:packages/north-funcy/src:packages/north-matchbox/src:packages/north-registry/src:packages/north-string/src:packages/north-typeid/src"
-    }
+    "ruff.interpreter": [
+        "/Users/adam/.local/share/mise/installs/python/3.13.7/bin/python"
+    ]
 }
