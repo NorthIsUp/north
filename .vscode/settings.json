@@ -1,7 +1,7 @@
 {
-    "bun.runtime": "/Users/adam/.local/share/mise/shims/bun",
+    "bun.runtime": "/Users/adam/.local/share/mise/installs/bun/1.2.23/bin/bun",
     "debug.javascript.defaultRuntimeExecutable": {
-        "pwa-node": "/Users/adam/.local/share/mise/shims/node"
+        "pwa-node": "/Users/adam/.local/share/mise/installs/node/24.8.0/bin/node"
     },
     "python.defaultInterpreterPath": "/Users/adam/.local/share/mise/installs/python/3.13.7/bin/python",
     "ruff.path": [

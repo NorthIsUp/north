@@ -1,22 +1,30 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
 import os
-import subprocess
+from asyncio import TaskGroup, subprocess
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Self
+from functools import cached_property
+from pathlib import Path as SyncPath
+from typing import TYPE_CHECKING, Any, Callable, Self, TypedDict, Unpack
 from urllib.parse import urlsplit, urlunsplit
 
 import favicon
-import requests
+import httpx
+from aiopath import AsyncPath
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Awaitable, Sequence
+    from types import TracebackType
+
+    from typing_extensions import Required
 
 logger = logging.getLogger(__name__)
+
+HOME = AsyncPath(SyncPath.home())
 
 
 def _just_netloc(url: str) -> str:
@@ -107,7 +115,7 @@ class MenuItem(BaseModel):
 
     icon: dict[str, str] | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if isinstance(self.alt, str):
             self.alt = {"subtitle": self.alt}
         if isinstance(self.cmd, str):
@@ -130,14 +138,39 @@ class AlfredMenu(BaseModel):
     items: list[MenuItem] = field(default_factory=list)
 
 
+class AddItemArgs(TypedDict, total=False):
+    item_type: str
+    title: str
+    subtitle: str
+    arg: str
+    url: str
+    command: str
+    path: str
+    # Icon options
+    icon: str
+    glyph: str
+    appicon: str
+    clearbiticon: str
+    urlicon: str
+    favicon: str
+    workflowicon: str
+    filetype: str
+    fileicon: str
+    utiicon: str
+    # Additional options
+    uid: str
+    match: str
+    autocomplete: str
+
+
 @dataclass
 class AlfredWorkflow(BaseModel):
     """Alfred workflow generator for MaxCare."""
 
     cache_ttl: int = field(default=3600)
-    home: Path = field(default_factory=Path.home)
-    xdg_cache_home: Path = field(default_factory=lambda: Path.home() / ".cache")
-    icon_cache: Path = field(default_factory=lambda: Path.home() / ".cache" / "alfred-icons")
+    home: AsyncPath = HOME
+    xdg_cache_home: AsyncPath = HOME / ".cache"
+    icon_cache: AsyncPath = HOME / ".cache" / "alfred-icons"
     menu_items: list[MenuItem] = field(default_factory=list)
 
     # SF Symbols glyphs mapping
@@ -159,67 +192,58 @@ class AlfredWorkflow(BaseModel):
         }
     )
 
-    def sfsymbol(self, symbol: str) -> str | None:
+    @cached_property
+    def _item_queue(self) -> asyncio.Queue[AddItemArgs | None]:
+        return asyncio.Queue()
+
+    async def sfsymbol(self, symbol: str, _has_convert: dict[str, bool] = {}) -> str | None:
         """Generate SF Pro icon files for given symbol."""
         icon_stem = self.xdg_cache_home / f"font-icons/sf-pro-{symbol}"
         dark_path = icon_stem.with_suffix(".png").with_name(f"{icon_stem.stem}-dark.png")
         light_path = icon_stem.with_suffix(".png").with_name(f"{icon_stem.stem}-light.png")
 
-        if not dark_path.exists():
-            dark_path.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                # Create dark icon
-                subprocess.run(
-                    [
-                        "convert",
-                        "-background",
-                        "none",
-                        "-fill",
-                        "white",
-                        "-font",
-                        str(self.home / "Library/Fonts/SF-Pro.ttf"),
-                        "-pointsize",
-                        "300",
-                        f"label:{symbol}",
-                        str(dark_path),
-                    ],
-                    check=True,
-                )
-                # Create light icon
-                subprocess.run(
-                    [
-                        "convert",
-                        "-background",
-                        "none",
-                        "-fill",
-                        "black",
-                        "-font",
-                        str(self.home / "Library/Fonts/SF-Pro.ttf"),
-                        "-pointsize",
-                        "300",
-                        f"label:{symbol}",
-                        str(light_path),
-                    ],
-                    check=True,
-                )
-            except (subprocess.CalledProcessError, FileNotFoundError):
+        if not await dark_path.exists():
+            if "convert" not in _has_convert:
+                _has_convert["convert"] = (await subprocess.create_subprocess_exec("which", "convert")).returncode == 0
+
+            if not _has_convert["convert"]:
                 return None
 
-        return str(dark_path) if dark_path.exists() else None
+            await dark_path.parent.mkdir(parents=True, exist_ok=True)
+
+            async with TaskGroup() as tg:
+                for mode, path in [("black", dark_path), ("white", light_path)]:
+                    tg.create_task(
+                        subprocess.create_subprocess_exec(
+                            "convert",
+                            "-background",
+                            "none",
+                            "-fill",
+                            mode,
+                            "-font",
+                            str(self.home / "Library/Fonts/SF-Pro.ttf"),
+                            "-pointsize",
+                            "300",
+                            f"label:{symbol}",
+                            str(path),
+                        )
+                    )
+
+        return str(dark_path) if (await dark_path.exists()) else None
 
     def generate_uid(self, title: str, subtitle: str, arg: str) -> str:
         """Generate unique ID for menu item."""
         content = f"{title} {subtitle} {arg}"
         return hashlib.sha256(content.encode()).hexdigest()
 
-    def process_icon(self, icon_type: str, value: str, existing_icon: dict[str, str] | None = None) -> dict[str, str] | None:
+    async def process_icon(self, icon_type: str, value: str, existing_icon: dict[str, str] | None = None) -> dict[str, str] | None:
         """Process different icon types and return icon dict."""
-        if existing_icon and icon_type in ["appicon", "urlicon", "clearbiticon"]:
+        if existing_icon and icon_type in {"appicon", "urlicon", "clearbiticon"}:
             return existing_icon
 
         match icon_type:
             case "icon" if "*" in value:
-                if icon_path := next(Path().glob(value, case_sensitive=False), None):
+                if icon_path := await anext(AsyncPath().glob(value, case_sensitive=False), None):
                     return {"path": str(icon_path.absolute())}
                 return None
 
@@ -228,9 +252,9 @@ class AlfredWorkflow(BaseModel):
 
             case "glyph":
                 if value in self.glyphs:
-                    icon_path = self.sfsymbol(self.glyphs[value])
+                    icon_path = await self.sfsymbol(self.glyphs[value])
                     return {"path": icon_path} if icon_path else None
-                elif Path(value).exists():
+                elif await AsyncPath(value).exists():
                     return {"path": value}
                 else:
                     print(
@@ -249,72 +273,68 @@ class AlfredWorkflow(BaseModel):
                 return {"path": f"./icons/{value}.png"}
 
             case "appicon":
-                app_path = Path(f"/Applications/{value}.app/Contents/Resources/{value}.icns")
+                app_path = AsyncPath(f"/Applications/{value}.app/Contents/Resources/{value}.icns")
                 icon_path = self.icon_cache / f"{value}.png"
-                if icon_path.exists():
+                if await icon_path.exists():
                     return {"path": str(icon_path)}
-                elif app_path.exists():
+                elif await app_path.exists():
                     icon_path.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        subprocess.run(
-                            [
-                                "sips",
-                                "-s",
-                                "format",
-                                "png",
-                                str(app_path),
-                                "--out",
-                                str(icon_path),
-                            ],
-                            check=True,
-                        )
+                    proc = await subprocess.create_subprocess_exec(
+                        "sips",
+                        "-s",
+                        "format",
+                        "png",
+                        str(app_path),
+                        "--out",
+                        str(icon_path),
+                    )
+                    if proc.returncode == 0:
                         return {"path": str(icon_path)}
-                    except subprocess.CalledProcessError:
-                        return None
+                    return None
 
             case "clearbiticon":
                 domain = value.split("://")[-1].split("/")[0].split(":")[0]
                 icon_url = f"https://logo.clearbit.com/{domain}"
                 icon_path = self.icon_cache / f"{domain}.png"
-                return self._download_icon(icon_url, icon_path)
+                return await self._download_icon(icon_url, icon_path)
 
             case "urlicon":
                 clean_url = value.replace("/", "_")
                 icon_path = self.icon_cache / f"{clean_url}.png"
-                return self._download_icon(value, icon_path)
+                return await self._download_icon(value, icon_path)
 
             case "favicon":
                 value_url = urlsplit(value)
 
-                def _get_favicon() -> tuple[str, str]:
+                async def _get_favicon() -> tuple[str, str]:
                     try:
-                        icon = favicon.get(value)[0]
+                        icon = (await asyncio.to_thread(favicon.get, value))[0]
                     except Exception:
-                        icon = favicon.get(urlunsplit(value_url._replace(path="")))[0]
+                        icon = (await asyncio.to_thread(favicon.get, urlunsplit(value_url._replace(path=""))))[0]
 
                     return (icon.url, f"favicon.{icon.format}")
 
-                return self._download_icon(
+                return await self._download_icon(
                     _get_favicon,
                     self.icon_cache / value_url.netloc / "favicon.*",
                 )
 
         return None
 
-    def _download_icon(
+    async def _download_icon(
         self,
-        url: str | Callable[[], str] | Callable[[], tuple[str, str]],
-        icon_path: Path,
+        url: str | Callable[[], Awaitable[str]] | Callable[[], Awaitable[tuple[str, str]]],
+        icon_path: AsyncPath,
     ) -> dict[str, str] | None:
         """Download icon from URL."""
-        if icon_path.suffix == ".*" and (new_icon_path := next(icon_path.parent.glob(icon_path.name), None)):
+        if icon_path.suffix == ".*" and (new_icon_path := await anext(icon_path.parent.glob(icon_path.name), None)):
             icon_path = new_icon_path
 
-        if icon_path.exists() and icon_path.stat().st_size > 20:
+        if (await icon_path.exists()) and (await icon_path.stat()).st_size > 20:
             return {"path": str(icon_path)}
 
         if callable(url):
-            match url():
+            match await url():
                 case str(url):
                     pass
                 case (str(url), str(filename)):
@@ -323,27 +343,29 @@ class AlfredWorkflow(BaseModel):
         try:
             icon_path.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(f"Downloading icon from {url} to {icon_path}")
-            response = requests.get(
-                url,
-                timeout=2,
-                stream=True,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-                },
-            )
-            logger.debug(f"Response: {response.status_code}")
-            response.raise_for_status()
-            with open(icon_path, "wb") as f:
-                f.writelines(response.iter_content(1024))
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    url,
+                    timeout=2,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+                    },
+                )
+                logger.debug(f"Response: {response.status_code}")
+                response.raise_for_status()
+                icon_path.write_bytes(response.content)
 
-            if icon_path.stat().st_size <= 20:
-                icon_path.unlink()
-                return None
             return {"path": str(icon_path)}
-        except Exception:
+        except httpx.HTTPError:
             return None
 
-    def add_item(
+    def queue_item(self, item_type: str, /, **kwargs: Unpack[AddItemArgs]) -> None:
+        self._item_queue.put_nowait({
+            "item_type": item_type,
+            **kwargs,
+        })
+
+    async def add_item(
         self,
         item_type: str,
         *,
@@ -368,7 +390,7 @@ class AlfredWorkflow(BaseModel):
         uid: str | None = None,
         match: str | None = None,
         autocomplete: str | None = None,
-        **kwargs,
+        **kwargs: str | None,
     ) -> None:
         """Add a menu item based on type using keyword arguments."""
         item_args = {"title": title}
@@ -404,7 +426,7 @@ class AlfredWorkflow(BaseModel):
 
         # Handle path argument
         if path:
-            path_obj = Path(path).expanduser()
+            path_obj = AsyncPath(path).expanduser()
             item_args.setdefault("uid", path)
             item_args.setdefault("arg", str(path_obj.relative_to(self.home, walk_up=True)))
             item_args.setdefault("title", path_obj.name)
@@ -423,7 +445,7 @@ class AlfredWorkflow(BaseModel):
             "utiicon": utiicon,
         }.items():
             if icon_value:
-                icon_dict = self.process_icon(icon_type, icon_value, icon_dict)
+                icon_dict = await self.process_icon(icon_type, icon_value, icon_dict)
                 break
 
         # Set additional overrides
@@ -435,7 +457,7 @@ class AlfredWorkflow(BaseModel):
             item_args["autocomplete"] = autocomplete
 
         # Add any additional kwargs
-        item_args.update(kwargs)
+        item_args.update({k: v for k, v in kwargs.items() if v is not None})
 
         # Generate UID and set defaults
         generated_uid = self.generate_uid(
@@ -451,9 +473,7 @@ class AlfredWorkflow(BaseModel):
         item_args.setdefault("autocomplete", item_args.get("arg", ""))
 
         # Create menu item
-        menu_item = MenuItem(**item_args)
-        if icon_dict:
-            menu_item.icon = icon_dict
+        menu_item = MenuItem(icon=icon_dict, **item_args)
 
         self.menu_items.append(menu_item)
 
@@ -461,139 +481,64 @@ class AlfredWorkflow(BaseModel):
         self,
         title: str,
         url: str,
-        *,
-        subtitle: str | None = None,
-        # Icon options
-        icon: str | None = None,
-        glyph: str | None = None,
-        appicon: str | None = None,
-        clearbiticon: str | None = None,
-        urlicon: str | None = None,
-        workflowicon: str | None = None,
-        filetype: str | None = None,
-        fileicon: str | None = None,
-        utiicon: str | None = None,
-        # Additional options
-        uid: str | None = None,
-        match: str | None = None,
-        autocomplete: str | None = None,
-        **kwargs,
+        /,
+        **kwargs: Unpack[AddItemArgs],
     ) -> None:
         """Add a URL menu item."""
         url = url.replace("http://", "https://")
 
-        self.add_item(
-            "url",
-            title=title,
-            url=url,
-            subtitle=subtitle,
-            icon=icon,
-            glyph=glyph,
-            appicon=appicon,
-            clearbiticon=clearbiticon,
-            urlicon=urlicon,
-            workflowicon=workflowicon,
-            filetype=filetype,
-            fileicon=fileicon,
-            utiicon=utiicon,
-            uid=uid,
-            match=match,
-            autocomplete=autocomplete,
-            **kwargs,
-        )
+        kwargs["title"] = title
+        kwargs["url"] = url
+
+        self.queue_item("url", **kwargs)
 
     def add_exec(
         self,
         title: str,
         command: str,
-        *,
-        subtitle: str | None = None,
-        # Icon options
-        icon: str | None = None,
-        glyph: str | None = None,
-        appicon: str | None = None,
-        clearbiticon: str | None = None,
-        urlicon: str | None = None,
-        workflowicon: str | None = None,
-        filetype: str | None = None,
-        fileicon: str | None = None,
-        utiicon: str | None = None,
-        # Additional options
-        uid: str | None = None,
-        match: str | None = None,
-        autocomplete: str | None = None,
-        **kwargs,
+        /,
+        **kwargs: Unpack[AddItemArgs],
     ) -> None:
         """Add an executable command menu item."""
-        self.add_item(
-            "exec",
-            title=title,
-            command=command,
-            subtitle=subtitle,
-            icon=icon,
-            glyph=glyph,
-            appicon=appicon,
-            clearbiticon=clearbiticon,
-            urlicon=urlicon,
-            workflowicon=workflowicon,
-            filetype=filetype,
-            fileicon=fileicon,
-            utiicon=utiicon,
-            uid=uid,
-            match=match,
-            autocomplete=autocomplete,
-            **kwargs,
-        )
+        kwargs["title"] = title
+        kwargs["command"] = command
+        self.queue_item("exec", **kwargs)
 
     def add_easy(
         self,
         title: str,
         subtitle: str,
         arg: str,
-        *,
-        # Icon options
-        icon: str | None = None,
-        glyph: str | None = None,
-        appicon: str | None = None,
-        clearbiticon: str | None = None,
-        urlicon: str | None = None,
-        workflowicon: str | None = None,
-        filetype: str | None = None,
-        fileicon: str | None = None,
-        utiicon: str | None = None,
-        # Additional options
-        uid: str | None = None,
-        match: str | None = None,
-        autocomplete: str | None = None,
-        path: str | None = None,
-        **kwargs,
+        /,
+        **kwargs: Unpack[AddItemArgs],
     ) -> None:
         """Add a simple menu item with title, subtitle, and arg."""
-        self.add_item(
-            "easy",
-            title=title,
-            subtitle=subtitle,
-            arg=arg,
-            icon=icon,
-            glyph=glyph,
-            appicon=appicon,
-            clearbiticon=clearbiticon,
-            urlicon=urlicon,
-            workflowicon=workflowicon,
-            filetype=filetype,
-            fileicon=fileicon,
-            utiicon=utiicon,
-            uid=uid,
-            match=match,
-            autocomplete=autocomplete,
-            path=path,
-            **kwargs,
-        )
+        kwargs["title"] = title
+        kwargs["subtitle"] = subtitle
+        kwargs["arg"] = arg
+        self.queue_item("easy", **kwargs)
 
     def add_config_items(self) -> None:
         """Add configuration menu items."""
         cache_path = self.icon_cache / "*"
-        self.add_exec("clear cache", f'[[ -d "{self.icon_cache}/" ]] && rm "{cache_path}"')
+        self.add_exec(
+            "clear cache",
+            f'[[ -d "{self.icon_cache}/" ]] && rm "{cache_path}"',
+        )
+
+    async def process_items(self) -> None:
+        """Process items in the queue."""
+        self._item_queue.put_nowait(None)
+
+        async def consumer() -> None:
+            while True:
+                item = await self._item_queue.get()
+                if item is None:
+                    break
+                tg.create_task(self.add_item(**item))
+
+        async with TaskGroup() as tg:
+            tg.create_task(consumer())
 
     def format_menu(self) -> str:
         """Generate the complete Alfred menu JSON."""
