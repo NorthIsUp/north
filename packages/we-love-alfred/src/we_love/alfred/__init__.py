@@ -126,7 +126,7 @@ class MenuItem(BaseModel):
 class MenuCache(BaseModel):
     """Pydantic model for Alfred menu cache settings."""
 
-    seconds: int
+    seconds: int = 3600  # 1 hour
     loosereload: bool = True
 
 
@@ -273,10 +273,16 @@ class AlfredWorkflow(BaseModel):
                 return {"path": f"./icons/{value}.png"}
 
             case "appicon":
-                app_path = AsyncPath(f"/Applications/{value}.app/Contents/Resources/{value}.icns")
-                icon_path = self.icon_cache / f"{value}.png"
+                if value.endswith(".icns"):
+                    app_path = AsyncPath(value)
+                    icon_path = self.icon_cache / f"{app_path.stem}.png"
+                else:
+                    app_path = AsyncPath(f"/Applications/{value}.app/Contents/Resources/{value}.icns")
+                    icon_path = self.icon_cache / f"{value}.png"
+
                 if await icon_path.exists():
                     return {"path": str(icon_path)}
+
                 elif await app_path.exists():
                     icon_path.parent.mkdir(parents=True, exist_ok=True)
                     proc = await subprocess.create_subprocess_exec(

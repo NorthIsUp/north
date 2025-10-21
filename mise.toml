@@ -42,7 +42,6 @@ run         = "./scripts/update_we_love_config.py"
 [tasks.bump-patch]
 description = "Bump the patch version of a specific package (e.g., mise run bump-patch string)"
 run = """#!/usr/bin/env zsh
-set -x
 package={{arg()}}
 uv version --bump patch --package $package --directory packages/${package//_/-}
 """
@@ -55,24 +54,93 @@ set -x
 package={{arg()}}
 uv build --package $package --out-dir dist --directory packages/${package//_/-} """
 
+[tasks.current-version]
+description = "Get the current version of a specific package (e.g., mise run current-version we-love-string)"
+run = """#!/usr/bin/env zsh
+package={{arg()}}
+case $package in
+    we-love-*) ;;
+    we_love_*) package=${package//_/-} ;;
+    *) package=we-love-${package} ;;
+esac
+uv version --short --package $package --directory packages/$package 2>/dev/null
+"""
+
+[tasks.published-version]
+description = "Get the published version of a specific package (e.g., mise run published-version we-love-string)"
+run = """#!/usr/bin/env zsh
+package={{arg()}}
+case $package in
+    we-love-*) ;;
+    we_love_*) package=${package//_/-} ;;
+    *) package=we-love-${package} ;;
+esac
+uvx get_pypi_latest_version $package 2>/dev/null
+"""
+
 [tasks.publish]
 description = "Build and publish a specific package (e.g., mise run publish string)"
+shell = "/bin/zsh"
 run = """#!/usr/bin/env zsh
 set -euo pipefail
 
-name_dash=${1}
-[[ ${name_dash} == we-love-* ]] || name_dash=we-love-${name_dash}
-name_under=${name_dash/-/_}
-scripts/diff-package $name_dash --quiet && {
-    echo "Package $name_dash has already been published"
-    exit 1
-} || {
-    echo "Package $name_dash has not been published, bumping patch and building"
-    mise run bump-patch $name_dash
-    mise run build-package $name_dash
-    echo "Publishing $name_dash..."
-    uv publish packages/${name_dash}/dist/${name_under}-*.whl packages/${name_dash}/dist/${name_under}-*.tar.gz
+case $1 in
+    we-love-*) ;;
+    we_love_*) name_dash=${1//_/-} ;;
+    *) name_dash=we-love-${1} ;;
+esac
+name_under=${name_dash//-/_}
+
+published_version=$(mise run published-version $name_dash)
+local_version=$(mise run current-version $name_dash)
+
+print -Pu2 "%F{blue}package: $1%f"
+print -Pu2 "%F{blue}    | name_dash         : $name_dash%f"
+print -Pu2 "%F{blue}    | name_under        : $name_under%f"
+print -Pu2 "%F{blue}    | published_version : $published_version%f"
+print -Pu2 "%F{blue}    | local_version     : $local_version%f"
+
+[[ $published_version == $local_version ]] && {
+    print -Pu2 "%F{green}✓ Package $name_dash is up to date, exiting%f"
+    exit 0
 }
+
+[[ $published_version > $local_version ]] && {
+    print -Pu2 "%F{red}✗ Package $name_dash is behind the latest published version, exiting%f"
+    exit 1
+}
+
+scripts/diff-package $name_dash --quiet && {
+    print -Pu2 "%F{red}✗ Package $name_dash has already been published but has different versions, exiting%f"
+    print -Pu2 "%F{red}    | published_version : $published_version%f"
+    print -Pu2 "%F{red}    | local_version     : $local_version%f"
+    exit 1
+}
+
+
+# existsing dists for the current version
+version_dists=(packages/${name_dash}/dist/${name_under}-${local_version}*(N))
+if [[ ${version_dists} ]]; then
+    print -Pu2 "%F{yellow}existing dists found, bumping patch and building%f"
+    mise run bump-patch $name_dash
+    # get the new version
+    local_version=$(mise run current-version $name_dash)
+fi
+
+print -Pu2 "%F{yellow}building $name_dash for version $local_version...%f"
+mise run build-package $name_dash
+
+print -Pu2 "%F{yellow}publishing $name_dash for version $local_version...%f"
+uv publish \
+    packages/${name_dash}/dist/${name_under}-${local_version}*.whl \
+    packages/${name_dash}/dist/${name_under}-${local_version}*.tar.gz
+
+print -Pu2 "%F{yellow}waiting for $name_dash $local_version to be published...%f"
+until (( $(mise run published-version $name_dash) == $local_version )); do
+    sleep 1
+    print -Pu2 "%F{yellow}.%f"
+done
+print -Pu2 "%F{green}✓ published $name_dash $local_version%f"
 """
 
 [tasks.publish-from-dist]
