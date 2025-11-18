@@ -8,23 +8,29 @@ import os
 from asyncio import TaskGroup, subprocess
 from dataclasses import dataclass, field
 from functools import cached_property
-from pathlib import Path as SyncPath
-from typing import TYPE_CHECKING, Any, Callable, Self, TypedDict, Unpack
+from typing import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import favicon
 import httpx
-from aiopath import AsyncPath
+from anyio import Path as AsyncPath
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Sequence
-    from types import TracebackType
+    from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 
-    from typing_extensions import Required
 
-logger = logging.getLogger(__name__)
+HOME = AsyncPath(os.path.expanduser("~"))
 
-HOME = AsyncPath(SyncPath.home())
+
+def _glob(path: AsyncPath, pattern: str, case_sensitive: bool = False, recurse_symlinks: bool = False) -> AsyncIterator[AsyncPath]:
+    from anyio._core._fileio import _PathIterator
+
+    iters = path._path.glob(
+        pattern,
+        case_sensitive=case_sensitive,
+        recurse_symlinks=recurse_symlinks,
+    )
+    return _PathIterator(iters)
 
 
 def _just_netloc(url: str) -> str:
@@ -193,20 +199,28 @@ class AlfredWorkflow(BaseModel):
     )
 
     @cached_property
-    def _item_queue(self) -> asyncio.Queue[AddItemArgs | None]:
+    def logger(self) -> logging.Logger:
+        return logging.getLogger(__name__)
+
+    @cached_property
+    def _item_queue(self) -> asyncio.Queue[AddItemArgs]:
         return asyncio.Queue()
 
-    async def sfsymbol(self, symbol: str, _has_convert: dict[str, bool] = {}) -> str | None:
+    @cached_property
+    async def _has_convert_bin(self) -> bool:
+        async def _() -> bool:
+            return (await subprocess.create_subprocess_exec("which", "convert")).returncode == 0
+
+        return await asyncio.create_task(_())
+
+    async def sfsymbol(self, symbol: str) -> str | None:
         """Generate SF Pro icon files for given symbol."""
         icon_stem = self.xdg_cache_home / f"font-icons/sf-pro-{symbol}"
         dark_path = icon_stem.with_suffix(".png").with_name(f"{icon_stem.stem}-dark.png")
         light_path = icon_stem.with_suffix(".png").with_name(f"{icon_stem.stem}-light.png")
 
         if not await dark_path.exists():
-            if "convert" not in _has_convert:
-                _has_convert["convert"] = (await subprocess.create_subprocess_exec("which", "convert")).returncode == 0
-
-            if not _has_convert["convert"]:
+            if not await self._has_convert_bin:
                 return None
 
             await dark_path.parent.mkdir(parents=True, exist_ok=True)
@@ -236,14 +250,19 @@ class AlfredWorkflow(BaseModel):
         content = f"{title} {subtitle} {arg}"
         return hashlib.sha256(content.encode()).hexdigest()
 
-    async def process_icon(self, icon_type: str, value: str, existing_icon: dict[str, str] | None = None) -> dict[str, str] | None:
+    async def process_icon(  # noqa: PLR0912
+        self,
+        icon_type: str,
+        value: str,
+        existing_icon: dict[str, str] | None = None,
+    ) -> dict[str, str] | None:
         """Process different icon types and return icon dict."""
         if existing_icon and icon_type in {"appicon", "urlicon", "clearbiticon"}:
             return existing_icon
 
         match icon_type:
             case "icon" if "*" in value:
-                if icon_path := await anext(AsyncPath().glob(value, case_sensitive=False), None):
+                async for icon_path in _glob(self.icon_cache, value, case_sensitive=False):
                     return {"path": str(icon_path.absolute())}
                 return None
 
@@ -284,7 +303,7 @@ class AlfredWorkflow(BaseModel):
                     return {"path": str(icon_path)}
 
                 elif await app_path.exists():
-                    icon_path.parent.mkdir(parents=True, exist_ok=True)
+                    await icon_path.parent.mkdir(parents=True, exist_ok=True)
                     proc = await subprocess.create_subprocess_exec(
                         "sips",
                         "-s",
@@ -315,7 +334,7 @@ class AlfredWorkflow(BaseModel):
                 async def _get_favicon() -> tuple[str, str]:
                     try:
                         icon = (await asyncio.to_thread(favicon.get, value))[0]
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         icon = (await asyncio.to_thread(favicon.get, urlunsplit(value_url._replace(path=""))))[0]
 
                     return (icon.url, f"favicon.{icon.format}")
@@ -324,6 +343,8 @@ class AlfredWorkflow(BaseModel):
                     _get_favicon,
                     self.icon_cache / value_url.netloc / "favicon.*",
                 )
+            case _:
+                raise ValueError(f"unknown icon type: '{icon_type}'")
 
         return None
 
@@ -333,8 +354,10 @@ class AlfredWorkflow(BaseModel):
         icon_path: AsyncPath,
     ) -> dict[str, str] | None:
         """Download icon from URL."""
-        if icon_path.suffix == ".*" and (new_icon_path := await anext(icon_path.parent.glob(icon_path.name), None)):
-            icon_path = new_icon_path
+        if icon_path.suffix == ".*":
+            async for new_icon_path in icon_path.parent.glob(icon_path.name):
+                icon_path = new_icon_path
+                break
 
         if (await icon_path.exists()) and (await icon_path.stat()).st_size > 20:
             return {"path": str(icon_path)}
@@ -347,8 +370,8 @@ class AlfredWorkflow(BaseModel):
                     icon_path = icon_path.with_name(filename)
 
         try:
-            icon_path.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"Downloading icon from {url} to {icon_path}")
+            await icon_path.parent.mkdir(parents=True, exist_ok=True)
+            self.logger.debug(f"Downloading icon from {url} to {icon_path}")
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     url,
@@ -357,9 +380,9 @@ class AlfredWorkflow(BaseModel):
                         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
                     },
                 )
-                logger.debug(f"Response: {response.status_code}")
+                self.logger.debug(f"Response: {response.status_code}")
                 response.raise_for_status()
-                icon_path.write_bytes(response.content)
+                await icon_path.write_bytes(response.content)
 
             return {"path": str(icon_path)}
         except httpx.HTTPError:
@@ -371,7 +394,7 @@ class AlfredWorkflow(BaseModel):
             **kwargs,
         })
 
-    async def add_item(
+    async def add_item(  # noqa: PLR0912
         self,
         item_type: str,
         *,
@@ -432,7 +455,7 @@ class AlfredWorkflow(BaseModel):
 
         # Handle path argument
         if path:
-            path_obj = AsyncPath(path).expanduser()
+            path_obj = await AsyncPath(path).expanduser()
             item_args.setdefault("uid", path)
             item_args.setdefault("arg", str(path_obj.relative_to(self.home, walk_up=True)))
             item_args.setdefault("title", path_obj.name)
@@ -534,17 +557,14 @@ class AlfredWorkflow(BaseModel):
 
     async def process_items(self) -> None:
         """Process items in the queue."""
-        self._item_queue.put_nowait(None)
-
-        async def consumer() -> None:
-            while True:
-                item = await self._item_queue.get()
-                if item is None:
-                    break
-                tg.create_task(self.add_item(**item))
+        self._item_queue.shutdown()
 
         async with TaskGroup() as tg:
-            tg.create_task(consumer())
+            try:
+                while item := await self._item_queue.get():
+                    tg.create_task(self.add_item(**cast(dict, item)))
+            except asyncio.QueueShutDown:
+                pass
 
     def format_menu(self) -> str:
         """Generate the complete Alfred menu JSON."""
