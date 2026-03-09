@@ -137,6 +137,7 @@ class BuildSystem(TomlSerializableModel):
 
     build_backend: str = Field(alias="build-backend")
     requires: list[str]
+    dependency_groups: DependencyGroup | None = None
 
 
 class DependencyGroup(TomlSerializableModel):

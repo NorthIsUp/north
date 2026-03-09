@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import datetime
 import logging
 import os
 import pathlib
+import re
 import sys
 import types
 import typing
-from argparse import ArgumentParser, _ArgumentGroup
+from argparse import ArgumentParser
 from asyncio import iscoroutinefunction
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
@@ -25,26 +27,41 @@ from typing import (
     get_origin,
 )
 
-import argcomplete
 from pydantic import (
     AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
+    PrivateAttr,
     ValidationError,
     field_validator,
     model_validator,
 )
 from rich import console
 from rich.panel import Panel
-from rich.pretty import pprint
-from stringcase import spinalcase
-from we_love.pydantic.models import Singleton
-from we_love.registry.autodiscovery import autodiscover_iter
+from rich.pretty import pprint, pretty_repr
+from we_love.pydantic.singleton import Singleton
+
+try:
+    import argcomplete
+except ImportError:
+    argcomplete = None
+
+if typing.TYPE_CHECKING:
+    from argparse import _ArgumentGroup
+
+    from pydantic import AliasPath
 
 logger = logging.getLogger(__name__)
 
+WE_LOVE_OPTIONAL_WARNINGS = True
 _DEFAULT_VERBOSITY = 2
+
+
+def kebab_case(s: str) -> str:
+    s = re.sub(r"[_\s]+", "-", s)  # underscores/spaces → hyphens
+    s = re.sub(r"(?<!^)(?=[A-Z])", "-", s)  # camel humps → hyphens
+    return s.lower().strip("-")
 
 
 # Supports the inherited settings pattern that we are using in the coding agent
@@ -56,9 +73,7 @@ class _GlobalSettingsStore(metaclass=Singleton):
 
     def get(self) -> GlobalSettings:
         if self._settings is None:
-            raise LookupError(
-                "Global settings not initialized. Call settings.set() first."
-            )
+            raise LookupError("Global settings not initialized. Call settings.set() first.")
         return self._settings
 
     def clear(self) -> None:
@@ -101,9 +116,7 @@ CLI_SUPPRESS = argparse.SUPPRESS
 CliSuppress = Annotated[T, CLI_SUPPRESS]
 
 # for unknown args
-CliUnknownArgs = Annotated[
-    list[str], Field(default=[]), _CliUnknownArgs := _t("_CliUnknownArgs")
-]
+CliUnknownArgs = Annotated[list[str], Field(default=[]), _CliUnknownArgs := _t("_CliUnknownArgs")]
 
 # for counting flags
 _Int = TypeVar("_Int", bound=int)
@@ -114,16 +127,12 @@ _StoreConst = TypeVar("_StoreConst", bound=Any)
 CliStoreConst = Annotated[_StoreConst, _CliStoreConst := _t("_CliStoreConst")]
 
 # for appending to a list
-CliAppend = Annotated[
-    list[str], Field(default_factory=list), _CliAppend := _t("_CliAppend")
-]
+CliAppend = Annotated[list[str], Field(default_factory=list), _CliAppend := _t("_CliAppend")]
 
 
 # for marking the verbosity arg, generally this doesn't need to be used by users
 _logging_group = Group("logging")
-_default_verbosity = (
-    object()
-)  # sentinel value for the default verbosity. 2 if unset, 0 if set
+_default_verbosity = object()  # sentinel value for the default verbosity. 2 if unset, 0 if set
 CliVerbosity = Annotated[
     int | None,
     Field(default=None, description="The verbosity of the logging"),
@@ -200,15 +209,9 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
     cli_dest_separator: str = "__"
     cli_command_dest: str = "commands"
 
-    cli_selected_command: str = Field(
-        default="", description="the name of the selected sub command"
-    )
-    cli_commands: dict[str, type[CliApp]] = Field(
-        default_factory=dict, description="The cli app classes that are discovered"
-    )
-    cli_parsers: dict[str, ArgumentParser] = Field(
-        default_factory=dict, description="the argparsers for the cli app classes"
-    )
+    cli_selected_command: str = Field(default="", description="the name of the selected sub command")
+    cli_commands: dict[str, type[CliApp]] = Field(default_factory=dict, description="The cli app classes that are discovered")
+    cli_parsers: dict[str, ArgumentParser] = Field(default_factory=dict, description="the argparsers for the cli app classes")
     cli_app_cls: type[CliApp] | None = None
     cli_app: CliApp | None = None
     cli_args: dict[str, Any] = Field(default_factory=dict)
@@ -224,9 +227,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         if isinstance(self.app_discovery_packages, str):
             self.app_discovery_packages = [self.app_discovery_packages]
 
-        self.cli_env_prefix = self.cli_env_prefix or self.cli_prog_name.replace(
-            "-", "_"
-        )
+        self.cli_env_prefix = self.cli_env_prefix or self.cli_prog_name.replace("-", "_")
 
     def run(self) -> None:
         """
@@ -249,6 +250,8 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         discover commands in the autodiscovery packages and populate the
         cli_commands dict
         """
+        from we_love.registry.autodiscovery import autodiscover_iter
+
         self.cli_commands = {
             command.cli_name(): command
             for command in sorted(
@@ -263,9 +266,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         build the argument parsers for the commands
         """
 
-        subparsers = self.parser.add_subparsers(
-            dest=self.cli_command_dest, help="Available subcommands"
-        )
+        subparsers = self.parser.add_subparsers(dest=self.cli_command_dest, help="Available subcommands")
 
         for name, command in self.cli_commands.items():
             dest = self._join_dest(self.cli_env_prefix, name)
@@ -283,7 +284,10 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
                 dest,
             )
 
-        argcomplete.autocomplete(self.parser)
+        if argcomplete:
+            argcomplete.autocomplete(self.parser)
+        elif WE_LOVE_OPTIONAL_WARNINGS:
+            logger.warning("the packages 'argcomplete' is not available, autocomplete will not be enabled")
 
     def parse_args_to_settings(self) -> None:
         """
@@ -338,7 +342,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
 
         self.cli_app._run_cli_cmd()
 
-    def build_parser_from_settings(
+    def build_parser_from_settings(  # noqa: PLR0912, PLR0914, PLR0915
         self,
         settings_cls: type[BaseSettings],
         parser: ArgumentParser,
@@ -393,23 +397,19 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
                     subparsers = subparsers or parser.add_subparsers(dest="command")
 
                     match field.annotation:
-                        case object(
-                            __origin__=typing.Union, __args__=(subcommand_cls, *_)
-                        ):
+                        case object(__origin__=typing.Union, __args__=(subcommand_cls, *_)):
                             # field is a subcommand
                             self.build_parser_from_settings(
                                 subcommand_cls,
                                 subparsers.add_parser(
-                                    spinalcase(name),
+                                    kebab_case(name),
                                     description=subcommand_cls.__doc__,
                                     epilog="and so it goes",
                                 ),
                                 dest=destination,
                             )
                         case _:
-                            raise NotImplementedError(
-                                f"field {name} has an unknown annotation: {field.annotation}"
-                            )
+                            raise NotImplementedError(f"field {name} has an unknown annotation: {field.annotation}")
 
                 # suppress fields, do not add them to the parser
                 if CLI_SUPPRESS in field.metadata:
@@ -451,21 +451,14 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
                 match annotation:
                     # unwrap optional types before we match on the annotation
                     case (
-                        object(
-                            __origin__=typing.Union,
-                            __args__=(annotation_cls, types.NoneType),
-                        )
+                        object(__origin__=typing.Union, __args__=(annotation_cls, types.NoneType))
                         | types.UnionType(__args__=(annotation_cls, types.NoneType))
                     ):
                         annotation = get_args(annotation)[0]
 
                         # unwrap Annotated types before we match on the annotation
                         if get_origin(annotation) == typing.Annotated:
-                            args = [
-                                _
-                                for _ in get_args(annotation)
-                                if not isinstance(_, Group)
-                            ]
+                            args = [_ for _ in get_args(annotation) if not isinstance(_, Group)]
                             if not args:
                                 raise ValueError(f"field {name} has no annotation")
                             annotation = args[0]
@@ -481,30 +474,22 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
                     # handle sequences for list[str|whatever] or tuple[str, ...]
                     case types.GenericAlias(
                         __origin__=type() as origin,
-                        __args__=(annotation_cls,)
-                        | (annotation_cls, types.EllipsisType()),
+                        __args__=(annotation_cls,) | (annotation_cls, types.EllipsisType()),
                     ) if issubclass(origin, Collection):
                         kwargs["type"] = annotation_cls
                         kwargs["action"] = "append"
 
                     # handle tuple types for tuple[str, whatever]
                     case types.GenericAlias(__origin__=b.tuple, __args__=args):
-                        raise NotImplementedError(
-                            f"mixed tuple types are not supported yet, got {args}"
-                        )
+                        raise NotImplementedError(f"mixed tuple types are not supported yet, got {args}")
 
                     # handle unhandled types, this will have a breakpoint to figure it out
                     case types.GenericAlias() as g:
-                        raise NotImplementedError(
-                            f"unknown generic alias for '{name}': {g}"
-                        )
+                        raise NotImplementedError(f"unknown generic alias for '{name}': {g}")
 
                     # handle Optional types
                     case (
-                        object(
-                            __origin__=typing.Union,
-                            __args__=(annotation_cls, types.NoneType),
-                        )
+                        object(__origin__=typing.Union, __args__=(annotation_cls, types.NoneType))
                         | types.UnionType(__args__=(annotation_cls, types.NoneType))
                     ):
                         kwargs["type"] = annotation_cls
@@ -519,11 +504,15 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
                         kwargs["type"] = type(lit[0])
                         kwargs["choices"] = lit
 
+                    case datetime.datetime:
+                        kwargs["type"] = datetime.datetime.fromisoformat
+                    case datetime.date:
+                        kwargs["type"] = datetime.date.fromisoformat
+                    case datetime.time:
+                        kwargs["type"] = datetime.time.fromisoformat
                     # handle unhandled types
                     case _:
-                        raise NotImplementedError(
-                            f"unknown annotation alias for '{name}': {field.annotation} (parsed to {annotation})"
-                        )
+                        raise NotImplementedError(f"unknown annotation alias for '{name}': {field.annotation} (parsed to {annotation})")
 
             # set the default from the environment if it exists
             if (envvar := self._dest_to_env_var(destination)) in os.environ:
@@ -537,15 +526,9 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
 
     def _dest_to_env_var(self, dest: str) -> str:
         """SOME_NAME.dest.name -> SOME_NAME__DEST__NAME"""
-        return (
-            dest.replace(self.cli_dest_separator, self.cli_env_separator)
-            .replace("-", "_")
-            .upper()
-        )
+        return dest.replace(self.cli_dest_separator, self.cli_env_separator).replace("-", "_").upper()
 
-    def _ns_to_command_dict(
-        self, ns: argparse.Namespace, command_only: bool = False
-    ) -> tuple[str, dict[str, Any]]:
+    def _ns_to_command_dict(self, ns: argparse.Namespace, command_only: bool = False) -> tuple[str, dict[str, Any]]:
         """
         convert an argparse.Namespace to a nested dict by . separated keys
 
@@ -575,14 +558,13 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         return command, result
 
     @staticmethod
-    def _get_alias_names(
+    def _get_alias_names(  # noqa: PLR0912
         field_name: str,
         field_info: Any,
         alias_path_args: dict[str, str] | None = None,
         case_sensitive: bool = True,
     ) -> tuple[tuple[str, ...], bool]:
         """Get alias names for a field, handling alias paths and case sensitivity."""
-        from pydantic import AliasPath
 
         alias_path_args = alias_path_args or {}
 
@@ -619,9 +601,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         return tuple(dict.fromkeys(alias_names)), is_alias_path_only
 
     @classmethod
-    def _get_arg_names(
-        cls, field_name: str, field_info: Any
-    ) -> tuple[Sequence[str], Sequence[str]]:
+    def _get_arg_names(cls, field_name: str, field_info: Any) -> tuple[Sequence[str], Sequence[str]]:
         """get the dashed and undashed version of the argument names"""
         names, _is_alias_path_only = cls._get_alias_names(field_name, field_info)
         names = [spinalcase(name) for name in names]
@@ -629,9 +609,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         return [f"--{name}" if len(name) > 1 else f"-{name}" for name in names], names
 
     @classmethod
-    def _get_command_cls(
-        cls, settings_cls: type[BaseSettings], command: str
-    ) -> type[BaseSettings]:
+    def _get_command_cls(cls, settings_cls: type[BaseSettings], command: str) -> type[BaseSettings]:
         """get a subcommand class from the settings class"""
         if command not in settings_cls.model_fields:
             raise ValueError(f"command '{command}' not found")
@@ -682,6 +660,10 @@ class DebugSettings(BaseSettings):
         default=False,
         description="Enable Python debugger post-mortem on exceptions",
     )
+    pydantic_detailed_output: Annotated[CliImplicitFlag[bool], _debug_group] = Field(
+        default=True,
+        description="Enable detailed output for pydantic validation errors",
+    )
 
     debugpy: Annotated[CliImplicitFlag[bool], _debug_group] = Field(
         default=False,
@@ -692,14 +674,52 @@ class DebugSettings(BaseSettings):
         description="The port to listen for remote debugger connections",
     )
 
-    @classmethod
-    def enable_postmortem(cls) -> None:
+    _excepthooks: list[Callable[[type[Exception], Exception, types.TracebackType], None]] = PrivateAttr(default_factory=list)
+
+    def model_post_init(self, context: Any) -> None:
+        super().model_post_init(context)
+        if self.pydantic_detailed_output:
+            self.enable_pydantic_detailed_output_excepthook()
+        if self.pdb:
+            self.enable_postmortem()
+        if self.debugpy:
+            self.enable_debugpy()
+
+    def add_excepthook(
+        self,
+        hook: Callable[[type[Exception], Exception, types.TracebackType], None],
+        exec_type: type[Exception] | tuple[type[Exception], ...] | None = None,
+    ) -> None:
+        """add an excepthook for pydantic validation errors"""
+
+        self._excepthooks.append(hook)
+        sys.excepthook = self._excepthook
+
+    def _excepthook(self, exc_type: type[Exception], exc: Exception, tb: types.TracebackType) -> None:
+        for hook in self._excepthooks:
+            hook(exc_type, exc, tb)
+
+    def enable_pydantic_detailed_output_excepthook(self) -> None:
+        """Enable pydantic detailed output on exceptions"""
+
+        def _pydantic_detailed_output_excepthook(exc_type: type[Exception], exc: Exception, tb: types.TracebackType) -> None:
+            if isinstance(exc, ValidationError):
+                payload = exc.errors(include_url=True)
+                sys.stderr.write(pretty_repr(payload))
+                sys.stderr.write("\n")
+                sys.stderr.flush()
+
+        self.add_excepthook(_pydantic_detailed_output_excepthook)
+
+    def enable_postmortem(self) -> None:
         """Enable post-mortem debugging on exceptions"""
 
         def _enter_post_mortem(type: Any, value: Any, traceback: Any) -> None:
             from pdb import post_mortem
 
             post_mortem(traceback)
+
+        self.add_excepthook(_enter_post_mortem)
 
         sys.excepthook = _enter_post_mortem
 
@@ -709,25 +729,11 @@ class DebugSettings(BaseSettings):
 
         debugpy.listen(("0.0.0.0", self.debugpy_port))
 
-        console.Console().print(
-            Panel(f"Waiting for vscode debugger to attach on port {self.debugpy_port}")
-        )
+        console.Console().print(Panel(f"Waiting for vscode debugger to attach on port {self.debugpy_port}"))
 
         logger.info("Waiting for vscode debugger to attach")
         debugpy.wait_for_client()
         logger.info("vscode debugger attached")
-
-    @model_validator(mode="after")
-    def validate_pdb(self) -> Self:
-        if self.pdb:
-            self.enable_postmortem()
-        return self
-
-    @model_validator(mode="after")
-    def validate_vscode_debugger(self) -> Self:
-        if self.debugpy:
-            self.enable_debugpy()
-        return self
 
 
 class LoggingSettings(BaseSettings):
@@ -848,12 +854,11 @@ class GlobalSettings(LoggingSettings, CacheSettings, DebugSettings):
         """
         if isinstance(self, cls):
             return self
-        raise ValueError(
-            f"cannot cast '{self.__class__.__name__} ({id(self.__class__)})' to '{cls.__name__} ({id(cls)})'"
-        )
+        raise ValueError(f"cannot cast '{self.__class__.__name__} ({id(self.__class__)})' to '{cls.__name__} ({id(cls)})'")
 
 
 _debug_group = Group("debug")
+CONTINUE = object()
 
 
 class CliApp(GlobalSettings):
@@ -876,25 +881,29 @@ class CliApp(GlobalSettings):
         super().__init_subclass__(**kwargs)
 
         if not hasattr(cls, "cli_cmd"):
-            e = NotImplementedError(
-                f"cli_cmd is required for all subclasses of CliApp: {cls.__name__}"
-            )
+            e = NotImplementedError(f"cli_cmd is required for all subclasses of CliApp: {cls.__name__}")
             if hasattr(cls, "cl_run"):
-                e.add_note(
-                    f"found '{cls.__name__}.cli_run()', you probably want to rename it 'cli_cmd' instead"
-                )
+                e.add_note(f"found '{cls.__name__}.cli_run()', you probably want to rename it 'cli_cmd' instead")
             raise e
 
     def _run_cli_cmd(self) -> None:
         """run the cli cmd entrypoint, if it is a coroutine, run it async"""
+        try:
+            cli_cmd = getattr(self, "cli_cmd", None)
+            assert cli_cmd is not None
 
-        cli_cmd = getattr(self, "cli_cmd", None)
-        assert cli_cmd is not None
+            if iscoroutinefunction(cli_cmd):
+                try:
+                    import uvloop
 
-        if iscoroutinefunction(cli_cmd):
-            asyncio.run(cli_cmd())
-        else:
-            cli_cmd()
+                    uvloop.run(cli_cmd())
+                except ImportError:
+                    asyncio.run(cli_cmd())
+            else:
+                cli_cmd()
+        except Exception as e:
+            logger.exception(f"Error running cli command: {e}", exc_info=e)
+            raise
 
     @classmethod
     def cli_name(cls, _cache: dict[str, Any] = {}) -> str:  # noqa: B006
@@ -903,9 +912,7 @@ class CliApp(GlobalSettings):
         """
         if cls.__name__ not in _cache:
             tr = spinalcase if cls.model_config.get("cli_kebab_case") else str
-            _cache[cls.__name__] = cls.model_config.get("cli_prog_name") or tr(
-                cls.__name__
-            ).removeprefix("run-")
+            _cache[cls.__name__] = cls.model_config.get("cli_prog_name") or tr(cls.__name__).removeprefix("run-")
         return _cache[cls.__name__]
 
     @classmethod

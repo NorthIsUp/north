@@ -85,7 +85,7 @@ run = """#!/usr/bin/env zsh
 set -euo pipefail
 
 case $1 in
-    we-love-*) ;;
+    we-love-*) name_dash=$1 ;;
     we_love_*) name_dash=${1//_/-} ;;
     *) name_dash=we-love-${1} ;;
 esac
@@ -136,11 +136,13 @@ uv publish \
     packages/${name_dash}/dist/${name_under}-${local_version}*.tar.gz
 
 print -Pu2 "%F{yellow}waiting for $name_dash $local_version to be published...%f"
-until (( $(mise run published-version $name_dash) == $local_version )); do
+until [[ $(mise run published-version $name_dash) == $local_version ]]; do
     sleep 1
     print -Pu2 "%F{yellow}.%f"
 done
 print -Pu2 "%F{green}✓ published $name_dash $local_version%f"
+
+uvx $name_dash@latest _noop >/dev/null 2>&1 || true
 """
 
 [tasks.publish-from-dist]
@@ -182,7 +184,8 @@ rm -rf dist .venv .pytest_cache .ruff_cache **/*.egg-info
 [tasks.new-package]
 description = "Create a new package"
 run = """#!/usr/bin/env zsh
-uv run scripts/update_we_love_config.py --create "$1" --description "$2"
+# Force use of local development packages
+uv run --with-editable ./packages/we-love-pyproject scripts/update_we_love_config.py --create "$1" --description "$2"
 """
 
 [[watch_files]]

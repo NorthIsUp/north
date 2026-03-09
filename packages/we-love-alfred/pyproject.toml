@@ -1,9 +1,9 @@
 [project]
 name            = "we-love-alfred"
-version         = "0.5.1"
+version         = "0.5.9"
 description     = "help make alfred commands nice for we-love namespace"
 requires-python = ">=3.13"
-dependencies    = ["favicon", "pydantic>=2", "httpx", "anyio"]
+dependencies    = ["favicon", "pydantic>=2", "httpx", "anyio", "asyncstdlib"]
 
 [build-system]
 requires      = ["uv_build>=0.8,<0.9"]
@@ -12,6 +12,9 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 namespace   = true
 module-name = "we_love"
+
+[tool.uv.sources]
+anyio = { git = "https://github.com/northisup/anyio.git", rev = "modern_path_glob_args" }
 
 [tool.pyright]
 venv     = ".venv"

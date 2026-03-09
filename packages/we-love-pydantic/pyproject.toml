@@ -12,7 +12,7 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = []
+dependencies = ["stringcase", "pydantic>=2", "rich"]
 
 [tool.uv.build-backend]
 namespace   = true

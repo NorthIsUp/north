@@ -1,0 +1,26 @@
+[build-system]
+build-backend = "uv_build"
+requires      = ["uv-build>=0.8,<0.9"]
+
+[project]
+name            = "we-love-avatars"
+version         = "0.1.0"
+description     = "Create animated avatar images with moving loops and gradient backgrounds"
+requires-python = ">=3.13"
+dependencies    = [
+    "pillow>=11.0.0",
+    "numpy>=2.0.0",
+    "pydantic>=2.10.0",
+    "tqdm>=4.66.0",
+]
+
+
+[tool.pyright]
+venvPath = "."
+venv     = ".venv"
+
+[tool.uv.build-backend]
+namespace = true
+
+[dependency-groups]
+dev = ["pytest>=9.0.2"]

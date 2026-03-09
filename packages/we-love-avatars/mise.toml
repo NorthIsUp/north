@@ -1,0 +1,72 @@
+[tasks.test]
+description = "Run tests for we-love-avatars"
+run         = "uv run pytest src/we_love/avatars/tests/ -v"
+
+[tasks.demo]
+description = "Run demo example (creates output/demo.gif)"
+run         = "uv run python examples/demo.py"
+
+[tasks.examples]
+description = "Run all basic examples (creates 5 example GIFs)"
+run         = "uv run python examples/basic.py"
+
+[tasks.enhanced]
+description = "Run enhanced examples (zoomed, off-center, wave gradients)"
+run         = "uv run python examples/enhanced.py"
+
+[tasks.seed-based]
+description = "Run seed-based avatar generation examples"
+run         = "uv run python examples/seed_based.py"
+
+[tasks.aurora]
+description = "Run aurora-inspired gradient examples"
+run         = "uv run python examples/aurora.py"
+
+[tasks.progress]
+description = "Demo progress bar during generation"
+run         = "uv run python examples/with_progress.py"
+
+[tasks.random]
+description = "Generate random squiggles (different loop each time)"
+run         = "uv run python examples/random_squiggles.py"
+
+[tasks.benchmark]
+description = "Benchmark sequential vs parallel rendering"
+run         = "uv run python examples/benchmark.py"
+
+[tasks.variety]
+description = "Generate 100 random avatars to showcase variety"
+run         = "uv run python examples/variety_showcase.py"
+
+[tasks.variety-sample]
+description = "Generate 20 sample avatars for quick preview"
+run         = "uv run python examples/variety_showcase.py sample"
+
+[tasks.variety-quick]
+description = "Generate 10 sample avatars for very quick preview"
+run         = "uv run python examples/variety_showcase.py quick"
+
+[tasks.clouds]
+description = "Generate cloud gradients with domain warping"
+run         = "uv run python examples/clouds.py"
+
+[tasks.clean]
+description = "Clean generated outputs and cache files"
+run = """#!/usr/bin/env zsh
+rm -rf examples/output/
+rm -rf .pytest_cache .ruff_cache
+"""
+
+[tasks.clean-all]
+description = "Clean outputs, cache, and virtual environment"
+run = """#!/usr/bin/env zsh
+rm -rf examples/output/
+rm -rf .pytest_cache .ruff_cache .venv
+"""
+
+[tasks.open-output]
+description = "Open the examples output directory"
+run = """#!/usr/bin/env zsh
+mkdir -p examples/output
+open examples/output
+"""

@@ -1,0 +1,345 @@
+#!/usr/bin/env uv run --script
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#   "requests>=2.32.5",
+#   "rich>=14.1.0",
+# ]
+# ///
+"""
+Download the latest release of a package from PyPI and diff against local source tree.
+
+This script:
+1. Downloads the latest release for a package on PyPI to a cache dir (if missing)
+2. Extracts the contents of the releases to another cache dir (if missing)
+3. Runs a diff command against the files and the current code in the source tree
+4. Exits 0 if there are no changes
+
+Cache dir follows XDG_CACHE_HOME standard: $XDG_CACHE_HOME/we_love/pypi_diff/
+"""
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import zipfile
+from pathlib import Path
+
+import requests
+
+
+def get_cache_dir() -> Path:
+    """Get the XDG_CACHE_HOME directory for we_love."""
+    xdg_cache_home = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache_home:
+        cache_base = Path(xdg_cache_home)
+    else:
+        cache_base = Path.home() / ".cache"
+    
+    cache_dir = cache_base / "we_love" / "pypi_diff"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def normalize_package_name(name: str) -> str:
+    """
+    Normalize package name according to PEP 503.
+    PyPI normalizes names by lowercasing and converting runs of separators to single hyphens.
+    """
+    import re
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def get_latest_release_url(package_name: str) -> tuple[str, str, str] | None:
+    """
+    Get the download URL for the latest release of a package from PyPI.
+    Returns (version, filename, url) tuple or None if not found.
+    Prefers .whl files over .tar.gz files.
+    """
+    normalized_name = normalize_package_name(package_name)
+    url = f"https://pypi.org/pypi/{normalized_name}/json"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"Failed to fetch data for '{package_name}' from PyPI: {e}")
+        return None
+    
+    try:
+        data = response.json()
+        latest_version = data["info"]["version"]
+        
+        # Get files for the latest version
+        files = data["releases"][latest_version]
+        
+        if not files:
+            print(f"No files found for version '{latest_version}' of '{package_name}'")
+            return None
+        
+        # Prefer .whl files over .tar.gz
+        whl_files = [f for f in files if f["filename"].endswith(".whl")]
+        tar_files = [f for f in files if f["filename"].endswith(".tar.gz")]
+        
+        if whl_files:
+            file_info = whl_files[0]
+        elif tar_files:
+            file_info = tar_files[0]
+        else:
+            file_info = files[0]
+        
+        return latest_version, file_info["filename"], file_info["url"]
+    
+    except (KeyError, IndexError) as e:
+        print(f"Unexpected data format for '{package_name}': {e}")
+        return None
+
+
+def download_file(url: str, dest_path: Path, quiet: bool = False) -> None:
+    """Download a file from URL to destination path."""
+    if not quiet:
+        print(f"Downloading {url}...")
+    response = requests.get(url, stream=True, timeout=30)
+    response.raise_for_status()
+    
+    with open(dest_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+    
+    if not quiet:
+        print(f"Downloaded to {dest_path}")
+
+
+def extract_wheel(whl_path: Path, extract_dir: Path, quiet: bool = False) -> None:
+    """Extract a wheel file to a directory."""
+    if not quiet:
+        print(f"Extracting {whl_path.name}...")
+    with zipfile.ZipFile(whl_path, "r") as zip_ref:
+        zip_ref.extractall(extract_dir)
+    if not quiet:
+        print(f"Extracted to {extract_dir}")
+
+
+def extract_tarball(tar_path: Path, extract_dir: Path, quiet: bool = False) -> None:
+    """Extract a tar.gz file to a directory."""
+    if not quiet:
+        print(f"Extracting {tar_path.name}...")
+    with tarfile.open(tar_path, "r:gz") as tar_ref:
+        tar_ref.extractall(extract_dir)
+    if not quiet:
+        print(f"Extracted to {extract_dir}")
+
+
+def find_source_dir_in_wheel(extract_dir: Path, package_name: str) -> Path | None:
+    """
+    Find the source directory in an extracted wheel.
+    For namespace packages like we_love/*, look for we_love/{subpackage}
+    """
+    # For we-love-* packages, the source is in we_love/{subpackage}
+    if package_name.startswith("we-love-"):
+        subpackage = package_name[8:].replace("-", "_")
+        source_path = extract_dir / "we_love" / subpackage
+        if source_path.exists():
+            return source_path
+    
+    # Fallback: look for any Python package
+    for path in extract_dir.rglob("*.py"):
+        if path.name == "__init__.py":
+            return path.parent
+    
+    return None
+
+
+def find_source_dir_in_tarball(extract_dir: Path, package_name: str) -> Path | None:
+    """
+    Find the source directory in an extracted tarball.
+    Tarballs typically have a top-level directory {package}-{version}/src/...
+    """
+    # Look for src directory structure
+    src_dirs = list(extract_dir.glob("*/src"))
+    if src_dirs:
+        src_dir = src_dirs[0]
+        
+        # For we-love-* packages
+        if package_name.startswith("we-love-"):
+            subpackage = package_name[8:].replace("-", "_")
+            source_path = src_dir / "we_love" / subpackage
+            if source_path.exists():
+                return source_path
+        
+        # Fallback: first Python package we find
+        for path in src_dir.rglob("*.py"):
+            if path.name == "__init__.py":
+                return path.parent
+    
+    return None
+
+
+def run_diff(pypi_dir: Path, local_dir: Path, quiet: bool = False) -> bool:
+    """
+    Run diff command between PyPI extracted dir and local source dir.
+    Returns True if there are differences, False if identical.
+    """
+    if not quiet:
+        print(f"\nRunning diff between:")
+        print(f"  PyPI:  {pypi_dir}")
+        print(f"  Local: {local_dir}")
+        print()
+    
+    # Use diff -r with some common exclusions
+    result = subprocess.run(
+        [
+            "diff",
+            "-r",
+            "-u",  # Unified format
+            "--exclude=__pycache__",
+            "--exclude=*.pyc",
+            "--exclude=.DS_Store",
+            str(pypi_dir),
+            str(local_dir),
+        ],
+        capture_output=quiet,
+    )
+    
+    # diff returns 0 if no differences, 1 if differences, >1 if error
+    if result.returncode == 0:
+        if not quiet:
+            print("\n✅ No differences found!")
+        return False
+    elif result.returncode == 1:
+        if not quiet:
+            print("\n⚠️  Differences found!")
+        return True
+    else:
+        print(f"\n❌ diff command failed with exit code {result.returncode}")
+        sys.exit(2)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Download latest PyPI release and diff against local source tree"
+    )
+    parser.add_argument(
+        "package_name",
+        help="Name of the package to check (e.g., 'we-love-string')",
+    )
+    parser.add_argument(
+        "--source-dir",
+        type=Path,
+        help="Path to local source directory (default: auto-detect from package name)",
+    )
+    parser.add_argument(
+        "--force-download",
+        action="store_true",
+        help="Force re-download even if cached",
+    )
+    parser.add_argument(
+        "--force-extract",
+        action="store_true",
+        help="Force re-extract even if cached",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress informational output",
+    )
+    
+    args = parser.parse_args()
+    
+    # Get cache directories
+    cache_dir = get_cache_dir()
+    downloads_dir = cache_dir / "downloads"
+    extracts_dir = cache_dir / "extracts"
+    downloads_dir.mkdir(parents=True, exist_ok=True)
+    extracts_dir.mkdir(parents=True, exist_ok=True)
+    
+    if not args.quiet:
+        print(f"Cache directory: {cache_dir}")
+    
+    # Get latest release info
+    release_info = get_latest_release_url(args.package_name)
+    if not release_info:
+        print(f"Could not find latest release for '{args.package_name}'")
+        sys.exit(1)
+    
+    version, filename, download_url = release_info
+    if not args.quiet:
+        print(f"Latest version: {version}")
+        print(f"File: {filename}")
+    
+    # Download file if not cached
+    download_path = downloads_dir / filename
+    if args.force_download or not download_path.exists():
+        download_file(download_url, download_path, quiet=args.quiet)
+    else:
+        if not args.quiet:
+            print(f"Using cached download: {download_path}")
+    
+    # Extract file if not cached
+    extract_path = extracts_dir / f"{args.package_name}-{version}"
+    if args.force_extract or not extract_path.exists():
+        extract_path.mkdir(parents=True, exist_ok=True)
+        if filename.endswith(".whl"):
+            extract_wheel(download_path, extract_path, quiet=args.quiet)
+        elif filename.endswith(".tar.gz"):
+            extract_tarball(download_path, extract_path, quiet=args.quiet)
+        else:
+            print(f"Unknown file type: {filename}")
+            sys.exit(1)
+    else:
+        if not args.quiet:
+            print(f"Using cached extraction: {extract_path}")
+    
+    # Find source directory in extracted files
+    if filename.endswith(".whl"):
+        pypi_source_dir = find_source_dir_in_wheel(extract_path, args.package_name)
+    else:
+        pypi_source_dir = find_source_dir_in_tarball(extract_path, args.package_name)
+    
+    if not pypi_source_dir:
+        print(f"Could not find source directory in extracted files at {extract_path}")
+        print("Directory contents:")
+        for path in extract_path.rglob("*"):
+            if path.is_file():
+                print(f"  {path.relative_to(extract_path)}")
+        sys.exit(1)
+    
+    # Determine local source directory
+    if args.source_dir:
+        local_source_dir = args.source_dir
+    else:
+        # Auto-detect: packages/{package_name}/src/we_love/{subpackage}
+        if args.package_name.startswith("we-love-"):
+            subpackage = args.package_name[8:]
+            local_source_dir = (
+                Path.cwd()
+                / "packages"
+                / args.package_name
+                / "src"
+                / "we_love"
+                / subpackage.replace("-", "_")
+            )
+        else:
+            print("Cannot auto-detect source directory for non-we-love-* packages")
+            print("Please specify --source-dir")
+            sys.exit(1)
+    
+    if not local_source_dir.exists():
+        print(f"Local source directory does not exist: {local_source_dir}")
+        sys.exit(1)
+    
+    # Run diff
+    has_differences = run_diff(pypi_source_dir, local_source_dir, quiet=args.quiet)
+    
+    # Exit with appropriate code
+    if has_differences:
+        sys.exit(1)
+    else:
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
