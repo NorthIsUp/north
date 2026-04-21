@@ -13,9 +13,6 @@ build-backend = "uv_build"
 namespace   = true
 module-name = "we_love"
 
-[tool.uv.sources]
-anyio = { git = "https://github.com/northisup/anyio.git", rev = "modern_path_glob_args" }
-
 [tool.pyright]
 venv     = ".venv"
 venvPath = "."

@@ -1,0 +1,110 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package short name (e.g. string) or full (we-love-string). Use 'all' to publish every out-of-date package.
+        required: true
+        default: all
+  push:
+    tags:
+      # Publish a single package: `git tag we-love-string-v0.1.1 && git push --tags`
+      - "we-love-*-v*"
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.pick.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pick
+        run: |
+          set -euo pipefail
+          case "${{ github.event_name }}" in
+            push)
+              tag="${GITHUB_REF#refs/tags/}"
+              name="${tag%-v*}"
+              echo "packages=[\"$name\"]" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_dispatch)
+              input="${{ inputs.package }}"
+              if [ "$input" = "all" ]; then
+                pkgs=$(ls -d packages/we-love-* | xargs -n1 basename | jq -R . | jq -sc .)
+              else
+                case "$input" in
+                  we-love-*) name="$input" ;;
+                  we_love_*) name="${input//_/-}" ;;
+                  *) name="we-love-$input" ;;
+                esac
+                pkgs="[\"$name\"]"
+              fi
+              echo "packages=$pkgs" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+  publish:
+    needs: resolve
+    runs-on: ubuntu-latest
+    # PyPI trusted publishing (recommended). Configure per package at:
+    #   https://pypi.org/manage/account/publishing/
+    # If using API tokens instead, drop this and set UV_PUBLISH_TOKEN from secrets below.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        package: ${{ fromJson(needs.resolve.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+
+      - name: version info
+        id: ver
+        run: |
+          set -euo pipefail
+          name_dash="${{ matrix.package }}"
+          local_version=$(uv version --short --package "$name_dash" --directory "packages/$name_dash")
+          published_version=$(uvx get_pypi_latest_version "$name_dash" 2>/dev/null || echo "none")
+          echo "local=$local_version" >> "$GITHUB_OUTPUT"
+          echo "published=$published_version" >> "$GITHUB_OUTPUT"
+          echo "$name_dash: local=$local_version published=$published_version"
+
+      - name: skip if already published
+        if: steps.ver.outputs.local == steps.ver.outputs.published
+        run: |
+          echo "::notice::${{ matrix.package }} ${{ steps.ver.outputs.local }} already on PyPI — skipping"
+
+      - name: build
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: uv build --package "${{ matrix.package }}" --out-dir dist --directory "packages/${{ matrix.package }}"
+
+      - name: publish (trusted publishing via OIDC)
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: uv publish "packages/${{ matrix.package }}/dist/"*
+
+      - name: verify
+        if: steps.ver.outputs.local != steps.ver.outputs.published
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            got=$(uvx get_pypi_latest_version "${{ matrix.package }}" 2>/dev/null || echo "")
+            if [ "$got" = "${{ steps.ver.outputs.local }}" ]; then
+              echo "::notice::published ${{ matrix.package }} ${{ steps.ver.outputs.local }}"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::warning::did not see ${{ matrix.package }} ${{ steps.ver.outputs.local }} on PyPI after 120s"

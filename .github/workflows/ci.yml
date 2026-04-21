@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.ls.outputs.packages }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: ls
+        run: |
+          pkgs=$(ls -d packages/we-love-* | xargs -n1 basename | jq -R . | jq -sc .)
+          echo "discovered: $pkgs"
+          echo "packages=$pkgs" >> "$GITHUB_OUTPUT"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.discover.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+      - name: sync
+        run: uv sync --directory packages/${{ matrix.package }}
+      - name: pytest
+        working-directory: packages/${{ matrix.package }}
+        # exit code 5 = "no tests collected" — acceptable for packages without tests
+        run: |
+          set +e
+          uv run pytest src -v --rootdir=.
+          code=$?
+          [ $code -eq 5 ] && exit 0
+          exit $code
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.discover.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          experimental: true
+      - name: build
+        run: uv build --package ${{ matrix.package }} --out-dir dist --directory packages/${{ matrix.package }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.package }}
+          path: packages/${{ matrix.package }}/dist/
+          if-no-files-found: error
+          retention-days: 7
