@@ -4,7 +4,7 @@ requires      = ["uv-build>=0.8,<0.9"]
 
 [project]
 name            = "we-love-avatars"
-version         = "0.1.0"
+version         = "0.1.3"
 description     = "Create animated avatar images with moving loops and gradient backgrounds"
 requires-python = ">=3.13"
 dependencies    = [
@@ -20,7 +20,8 @@ venvPath = "."
 venv     = ".venv"
 
 [tool.uv.build-backend]
-namespace = true
+namespace   = true
+module-name = "we_love"
 
 [dependency-groups]
 dev = ["pytest>=9.0.2"]

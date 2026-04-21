@@ -75,7 +75,7 @@ case $package in
     we_love_*) package=${package//_/-} ;;
     *) package=we-love-${package} ;;
 esac
-uvx get_pypi_latest_version $package 2>/dev/null
+uvx get_pypi_latest_version $package 2>/dev/null || true
 """
 
 [tasks.publish]
