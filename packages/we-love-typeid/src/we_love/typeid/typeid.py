@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import UserString
 from functools import cached_property
-from typing import ClassVar, Literal, Self, _LiteralGenericAlias, get_args
+from typing import ClassVar, Literal, _LiteralGenericAlias, get_args
 
 import uuid6
 
