@@ -19,8 +19,8 @@ class RegexMatch:
         self.compiled_pattern = re.compile(self.pattern, self.flags)
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, str):  # only implemented for str comparison
-            raise NotImplementedError()
+        if not isinstance(other, str):
+            return NotImplemented
 
         self._match = self.match_func(self.compiled_pattern, other, 0, len(other))
         return self._match is not None
