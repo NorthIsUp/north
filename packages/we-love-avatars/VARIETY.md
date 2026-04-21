@@ -94,8 +94,8 @@ Generate 100, find 5-10 you love, then:
 from we_love.avatars import avatar, Avatar
 
 # Recreate your favorite
-favorite_seed = 'the-seed-from-filename'
-Avatar(avatar(favorite_seed)).save_gif('favorite.gif')
+favorite_seed = "the-seed-from-filename"
+Avatar(avatar(favorite_seed)).save_gif("favorite.gif")
 ```
 
 ### 3. Statistical Testing
@@ -145,9 +145,9 @@ gen_config = AvatarGeneratorConfig(
 for i in range(50):
     seed = str(uuid.uuid4())
     config = avatar(seed, gen_config)
-    
+
     Avatar(config).save_gif(
-        f'gallery/piece_{i:03d}.gif',
+        f"gallery/piece_{i:03d}.gif",
         parallel=True,
         optimize=False,
         progress=True,

@@ -18,11 +18,11 @@ With 30-second animations at 30fps, you're rendering **900 frames**. That takes 
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 av = Avatar(config)
 
 # Simply add progress=True
-av.save_gif('avatar.gif', progress=True)
+av.save_gif("avatar.gif", progress=True)
 ```
 
 **Output:**
@@ -38,7 +38,7 @@ For quicker generation, disable optimization:
 
 ```python
 # 20-30% faster encoding, ~15% larger file
-av.save_gif('avatar.gif', progress=True, optimize=False)
+av.save_gif("avatar.gif", progress=True, optimize=False)
 
 # Output:
 # Rendering frames: 100%|████████| 900/900 [00:05<00:00, 156fps]
@@ -54,10 +54,10 @@ av.save_gif('avatar.gif', progress=True, optimize=False)
 
 ```python
 # Default behavior: silent rendering
-av.save_gif('avatar.gif')
+av.save_gif("avatar.gif")
 
 # Or explicitly disable
-av.save_gif('avatar.gif', progress=False)
+av.save_gif("avatar.gif", progress=False)
 ```
 
 ## Use Cases
@@ -66,19 +66,19 @@ av.save_gif('avatar.gif', progress=False)
 ```python
 # User is waiting - show progress
 print("Generating your avatar...")
-av.save_gif('avatar.gif', progress=True)
+av.save_gif("avatar.gif", progress=True)
 print("✓ Complete!")
 ```
 
 ### Batch Processing
 ```python
-users = ['alice', 'bob', 'charlie', 'diana', 'eve']
+users = ["alice", "bob", "charlie", "diana", "eve"]
 
 for user in users:
     print(f"Generating for {user}:")
     config = avatar(user)
     av = Avatar(config)
-    av.save_gif(f'{user}.gif', progress=True)
+    av.save_gif(f"{user}.gif", progress=True)
     print()
 ```
 
@@ -97,7 +97,7 @@ Rendering frames: 100%|████████| 900/900 [00:05<00:00, 165frame/
 # Background jobs, CI/CD, etc. - disable progress
 for user in users:
     av = Avatar(avatar(user))
-    av.save_gif(f'{user}.gif')  # Silent
+    av.save_gif(f"{user}.gif")  # Silent
 ```
 
 ## Advanced: Just Frames
@@ -105,7 +105,7 @@ for user in users:
 You can also show progress when rendering frames without saving:
 
 ```python
-config = avatar('test')
+config = avatar("test")
 av = Avatar(config)
 
 # Render all frames with progress
@@ -113,7 +113,7 @@ frames = av.render_all_frames(progress=True)
 
 # Now do something with frames
 for i, frame in enumerate(frames):
-    frame.save(f'frame_{i:04d}.png')
+    frame.save(f"frame_{i:04d}.png")
 ```
 
 ## Technical Details
@@ -138,7 +138,7 @@ Worth it for the feedback!
 
 If `tqdm` isn't available (shouldn't happen with our deps):
 ```python
-av.save_gif('avatar.gif', progress=True)
+av.save_gif("avatar.gif", progress=True)
 # Falls back to silent rendering gracefully
 ```
 
@@ -180,10 +180,10 @@ This demonstrates:
 
 ```python
 # Interactive, manual generation
-av.save_gif('avatar.gif', progress=True)  # ✅ Show progress
+av.save_gif("avatar.gif", progress=True)  # ✅ Show progress
 
 # Automation, background jobs
-av.save_gif('avatar.gif')  # ✅ Silent (default)
+av.save_gif("avatar.gif")  # ✅ Silent (default)
 ```
 
 Simple, optional, and helpful! 🎯

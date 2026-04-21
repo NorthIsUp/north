@@ -73,12 +73,14 @@ We're doing:
 ```python
 # What we do (numpy - correct):
 import numpy as np
+
 xx, yy = np.meshgrid(x, y)
 gradient = np.sin(xx * np.pi * 3)
 
 # If we used pandas (wrong tool):
 import pandas as pd
-df = pd.DataFrame({'x': x, 'y': y})
+
+df = pd.DataFrame({"x": x, "y": y})
 # ... now what? Pandas doesn't have meshgrid or fast pixel ops
 ```
 
@@ -145,6 +147,7 @@ Use CUDA/OpenCL to run gradient calculations on GPU:
 Compile numpy code to machine code:
 ```python
 from numba import jit
+
 
 @jit(nopython=True)
 def gradient_calc(xx, yy, t):

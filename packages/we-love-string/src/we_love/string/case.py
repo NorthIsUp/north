@@ -151,9 +151,7 @@ def sentencecase(string: str) -> str:
     if not s:
         return ""
     # Apply capitalcase logic directly after handling uppercase letters
-    transformed = _SENTENCE_CASE_CAPITAL_RE.sub(
-        lambda m: joiner + m.group(0).lower(), s
-    ).strip()
+    transformed = _SENTENCE_CASE_CAPITAL_RE.sub(lambda m: joiner + m.group(0).lower(), s).strip()
     return transformed[0].upper() + transformed[1:] if transformed else ""
 
 

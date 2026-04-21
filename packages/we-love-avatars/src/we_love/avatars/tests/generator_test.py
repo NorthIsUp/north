@@ -6,7 +6,7 @@ from we_love.avatars.generator import AvatarGenerator, AvatarGeneratorConfig, av
 
 def test_avatar_function() -> None:
     """Test the main avatar() function."""
-    config = avatar('test@example.com')
+    config = avatar("test@example.com")
 
     assert isinstance(config, AvatarConfig)
     assert config.width == 512
@@ -16,7 +16,7 @@ def test_avatar_function() -> None:
 
 def test_deterministic_generation() -> None:
     """Test that same seed produces same config."""
-    seed = 'alice@example.com'
+    seed = "alice@example.com"
 
     config1 = avatar(seed)
     config2 = avatar(seed)
@@ -30,8 +30,8 @@ def test_deterministic_generation() -> None:
 
 def test_different_seeds_different_configs() -> None:
     """Test that different seeds produce different configs."""
-    config1 = avatar('alice@example.com')
-    config2 = avatar('bob@example.com')
+    config1 = avatar("alice@example.com")
+    config2 = avatar("bob@example.com")
 
     # Should produce different configs (extremely unlikely to be identical)
     # Check at least one property differs
@@ -46,7 +46,7 @@ def test_different_seeds_different_configs() -> None:
 def test_generator_class() -> None:
     """Test AvatarGenerator class."""
     generator = AvatarGenerator()
-    config = generator.generate_config('test')
+    config = generator.generate_config("test")
 
     assert isinstance(config, AvatarConfig)
     assert len(config.loop_configs) > 0
@@ -63,7 +63,7 @@ def test_generator_with_config() -> None:
         max_loops=1,
     )
 
-    config = avatar('test', gen_config)
+    config = avatar("test", gen_config)
 
     assert config.width == 256
     assert config.height == 256
@@ -75,7 +75,7 @@ def test_generator_with_config() -> None:
 def test_generator_generate_avatar() -> None:
     """Test generating full Avatar instance."""
     generator = AvatarGenerator()
-    av = generator.generate('test@example.com')
+    av = generator.generate("test@example.com")
 
     assert isinstance(av, Avatar)
     assert av.config.width == 512
@@ -84,7 +84,7 @@ def test_generator_generate_avatar() -> None:
 def test_zoom_disabled() -> None:
     """Test generation with zoom disabled."""
     gen_config = AvatarGeneratorConfig(enable_zoom=False)
-    config = avatar('test', gen_config)
+    config = avatar("test", gen_config)
 
     # When zoom disabled, offsets should be 0
     for loop in config.loop_configs:
@@ -97,7 +97,7 @@ def test_zoom_disabled() -> None:
 def test_wave_gradients_disabled() -> None:
     """Test generation with wave gradients disabled."""
     gen_config = AvatarGeneratorConfig(enable_wave_gradients=False)
-    config = avatar('test', gen_config)
+    config = avatar("test", gen_config)
 
     # Should not use WAVE gradient type
     from we_love.avatars.gradient import GradientType
@@ -107,7 +107,7 @@ def test_wave_gradients_disabled() -> None:
 
 def test_color_palette_generation() -> None:
     """Test that color palettes are generated."""
-    config = avatar('test')
+    config = avatar("test")
 
     assert len(config.gradient_config.colors) >= 2
     # Colors should be valid RGB tuples
@@ -118,12 +118,12 @@ def test_color_palette_generation() -> None:
 
 def test_loop_parameters() -> None:
     """Test that loop parameters are within valid ranges."""
-    config = avatar('test')
+    config = avatar("test")
 
     for loop in config.loop_configs:
         # Line width should be 5-10% of image width
         width_pct = (loop.width / config.width) * 100
-        assert 5.0 <= width_pct <= 10.0, f'Width {loop.width}px is {width_pct:.1f}% of {config.width}px'
+        assert 5.0 <= width_pct <= 10.0, f"Width {loop.width}px is {width_pct:.1f}% of {config.width}px"
         assert 0.0 < loop.size <= 2.0
         assert 0.0 < loop.speed <= 2.0
         assert len(loop.color) == 3

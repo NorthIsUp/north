@@ -2,7 +2,6 @@
 
 import pytest
 from PIL import Image
-
 from we_love.avatars.gradient import Gradient, GradientConfig, GradientType
 
 
@@ -24,7 +23,7 @@ def test_gradient_render_linear() -> None:
 
     assert isinstance(img, Image.Image)
     assert img.size == (100, 100)
-    assert img.mode == 'RGB'
+    assert img.mode == "RGB"
 
 
 def test_gradient_render_radial() -> None:
@@ -81,7 +80,7 @@ def test_gradient_insufficient_colors() -> None:
     config = GradientConfig(colors=[(255, 0, 0)])
     gradient = Gradient(config)
 
-    with pytest.raises(ValueError, match='At least 2 colors required'):
+    with pytest.raises(ValueError, match="At least 2 colors required"):
         gradient.render(100, 100)
 
 

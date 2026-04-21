@@ -12,7 +12,7 @@ The Northern Lights palette had a jarring jump:
 colors = [
     (180, 60, 140),  # Pink
     (120, 40, 180),  # Deep purple ❌ HARSH JUMP!
-    ...
+    ...,
 ]
 ```
 
@@ -27,7 +27,7 @@ colors = [
     (120, 60, 180),  # Medium purple ✅ SMOOTH!
     (110, 60, 190),  # Purple
     (100, 70, 200),  # Purple-blue
-    (90, 80, 200),   # Blue-purple
+    (90, 80, 200),  # Blue-purple
     (110, 70, 185),  # Back to purple
 ]
 ```
@@ -124,7 +124,7 @@ colors = [
 ```python
 colors = [
     (100, 50, 150),  # Purple
-    (200, 10, 50),   # Pink ❌ JUMP!
+    (200, 10, 50),  # Pink ❌ JUMP!
 ]
 # Distance: ~130 units - harsh transition
 ```
@@ -135,13 +135,13 @@ Test color smoothness:
 ```python
 from we_love.avatars import avatar
 
-config = avatar('test')
+config = avatar("test")
 colors = config.gradient_config.colors
 
 for i in range(len(colors) - 1):
-    c1, c2 = colors[i], colors[i+1]
-    dist = sum((a - b)**2 for a, b in zip(c1, c2))**0.5
-    print(f'Color {i} → {i+1}: {dist:.1f} units')
+    c1, c2 = colors[i], colors[i + 1]
+    dist = sum((a - b) ** 2 for a, b in zip(c1, c2)) ** 0.5
+    print(f"Color {i} → {i + 1}: {dist:.1f} units")
 ```
 
 All our palettes have smooth transitions (< 55 units) for the perfect aurora effect! 🌌

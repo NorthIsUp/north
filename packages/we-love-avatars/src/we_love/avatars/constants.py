@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
+
 # Loop type weights for selection
-PREFERRED_LOOP_TYPES = ['epitrochoid', 'lissajous', 'rose']
+PREFERRED_LOOP_TYPES = ["epitrochoid", "lissajous", "rose"]
 
 # Loop color palette (light colors that contrast with dark gradients)
 LOOP_COLORS = [
@@ -43,7 +45,7 @@ EPITROCHOID_R_MINOR_MAX = 0.18
 LISSAJOUS_FREQ_MIN = 2.0
 LISSAJOUS_FREQ_MAX = 6.0
 LISSAJOUS_PHASE_MIN = 0.0
-LISSAJOUS_PHASE_MAX = 3.14
+LISSAJOUS_PHASE_MAX = math.pi
 
 # Rose parameter ranges
 ROSE_PETALS_MIN = 3

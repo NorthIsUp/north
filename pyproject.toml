@@ -1,6 +1,8 @@
 [tool.ruff]
 line-length = 140
 preview = true
+target-version = "py313"
+extend-exclude = ["**/examples/**", "**/tests/**", "packages/tests"]
 # specific rules to enable
 lint.extend-select = [
     "A",     # shadowing
@@ -38,7 +40,24 @@ lint.ignore = [
     "RET504",  # Unnecessary assignment to {name} before return statement
     "TC006",   # Type checking: Add quotes to type expression in typing.cast()
     "TC007",   # Type checking: Add quotes to type alias
+    "BLE001",  # Blind Exception — fine for script-level error reporting
+    "N806",    # Variable in function should be lowercase — mathematical names OK
+    "N999",    # Invalid module name — we have dashes in package names
+    "PLR0912", # too many branches
+    "PLR0914", # too many local variables
+    "PLR0915", # too many statements
+    "PLR0916", # too many Boolean expressions
+    "RUF001",  # Ambiguous unicode characters in strings
+    "RUF067",  # __init__ module should only contain docstrings and re-exports
+    "RUF069",  # Unreliable floating-point equality — fine in tests and config
+    "TRY401",  # Redundant exception object in logging.exception
+    "T100",    # debugpy uses
+    "PYI036",  # __exit__ annotation style
+    "PYI063",  # PEP 570 syntax
+    "ANN001",  # Missing type annotation — strict; too many existing
+    "E741",    # Ambiguous variable name
 ]
+
 # specific fixes to be more aggressive with
 lint.extend-safe-fixes = [
     "FA",
@@ -54,6 +73,10 @@ lint.flake8-type-checking.runtime-evaluated-base-classes = [
 ]
 
 lint.future-annotations = true
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/**" = ["T100", "ANN001", "ANN201", "EXE001", "EXE002"]
+"**/_dap.py" = ["T100"]
 
 [tool.pyproject-fmt]
 column_width = 1          # always wrap lists

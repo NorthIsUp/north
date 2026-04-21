@@ -37,7 +37,7 @@ def paths_key(module: ModuleType) -> Iterable[Path]:
     yield Path(module.__file__)
 
 
-def autodiscover(
+def autodiscover[R](
     package: ModuleType | str | Iterable[ModuleType | str],
     recursive: bool = True,
     key: Callable[[ModuleType], Iterable[R]] = module_key,
@@ -45,7 +45,7 @@ def autodiscover(
     return list(autodiscover_iter(package, recursive, key))
 
 
-def autodiscover_iter(
+def autodiscover_iter[R](
     package: ModuleType | str | Iterable[ModuleType | str],
     recursive: bool = True,
     key: Callable[[ModuleType], Iterable[R]] = module_key,

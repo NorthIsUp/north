@@ -80,7 +80,7 @@ colors_linear = [(30, 95, 95), ..., (70, 105, 160)]
 loop_dist = distance(colors_linear[0], colors_linear[-1])
 # Result: 95.5 units ❌ Harsh
 
-# Circular palette  
+# Circular palette
 colors_circular = [(30, 95, 95), ..., (30, 95, 95)]
 loop_dist = distance(colors_circular[0], colors_circular[-1])
 # Result: 0.0 units ✅ Perfect
@@ -114,17 +114,17 @@ loop_dist = distance(colors_circular[0], colors_circular[-1])
 
 ```python
 # Step 1: Pick colors
-base = (100, 50, 150)    # Purple
-mid = (130, 80, 200)     # Light purple  
-peak = (150, 110, 220)   # Lavender (brightest)
+base = (100, 50, 150)  # Purple
+mid = (130, 80, 200)  # Light purple
+peak = (150, 110, 220)  # Lavender (brightest)
 
 # Step 2: Build mirrored structure
 colors = [
-    base,   # Start
-    mid,    # Progress
-    peak,   # Peak (middle)
-    mid,    # Mirror
-    base,   # End (same as start!)
+    base,  # Start
+    mid,  # Progress
+    peak,  # Peak (middle)
+    mid,  # Mirror
+    base,  # End (same as start!)
 ]
 
 # Step 3: Verify
@@ -136,13 +136,13 @@ assert colors[0] == colors[-1]  # ✅ Circular!
 ```python
 # A → B → C → D → C → B → A
 colors = [
-    A,     # Start
-    B,     # 
-    C,     # 
-    D,     # Peak (middle)
-    C,     # Mirror
-    B,     # Mirror
-    A,     # End (same as start!)
+    A,  # Start
+    B,  #
+    C,  #
+    D,  # Peak (middle)
+    C,  # Mirror
+    B,  # Mirror
+    A,  # End (same as start!)
 ]
 ```
 
@@ -154,11 +154,11 @@ Test any palette:
 from we_love.avatars import avatar
 import math
 
-config = avatar('test')
+config = avatar("test")
 colors = config.gradient_config.colors
 
 # Check loop-around
-loop_dist = math.sqrt(sum((a - b)**2 for a, b in zip(colors[0], colors[-1])))
+loop_dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(colors[0], colors[-1])))
 print(f"Loop distance: {loop_dist:.1f} units")
 print(f"First: {colors[0]}")
 print(f"Last:  {colors[-1]}")

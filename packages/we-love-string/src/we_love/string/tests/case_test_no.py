@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
-from pytest import FixtureRequest
 from we_love.string.case import (
     alphanumcase,
     backslashcase,
@@ -17,6 +20,9 @@ from we_love.string.case import (
     trimcase,
     uppercase,
 )
+
+if TYPE_CHECKING:
+    from pytest import FixtureRequest
 
 # --- Test Data ---
 # Input string variations
@@ -80,6 +86,7 @@ TEST_STRINGS = [
                 "tEST1STRING2",
                 "stringWith!@#$%^&*()_+Symbols",
             ],
+            strict=False,
         )
     )
 )
@@ -117,6 +124,7 @@ def camelcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1_STRING2",
                 "String with !@#$%^&*()_+ symbols",
             ],
+            strict=False,
         )
     )
 )
@@ -154,6 +162,7 @@ def capitalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1_STRING2",
                 "STRING_WITH___________SYMBOLS",  # Non-alphanum become underscores
             ],
+            strict=False,
         )
     )
 )
@@ -191,6 +200,7 @@ def constcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1_string2",
                 "string with !@#$%^&*()_+ symbols",
             ],
+            strict=False,
         )
     )
 )
@@ -228,6 +238,7 @@ def lowercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1STRING2",
                 "StringWith!@#$%^&*()_+Symbols",
             ],
+            strict=False,
         )
     )
 )
@@ -265,6 +276,7 @@ def pascalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1/string2",
                 "string/with///////////symbols",  # Non-alphanum become underscores -> slashes
             ],
+            strict=False,
         )
     )
 )
@@ -302,6 +314,7 @@ def pathcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1\\string2",
                 "string\\with\\\\\\\\\\\\\\\\\\symbols",  # Non-alphanum become underscores -> backslashes
             ],
+            strict=False,
         )
     )
 )
@@ -341,6 +354,7 @@ def backslashcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 # ^ Let's re-verify sentencecase output based on impl:
                 # "String with !@#$%^&*()_+ symbols" -> "String with           symbols" -> "String with symbols"
             ],
+            strict=False,
         )
     )
 )
@@ -378,6 +392,7 @@ def sentencecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1_string2",
                 "string_with___________symbols",  # Non-alphanum become underscores
             ],
+            strict=False,
         )
     )
 )
@@ -415,6 +430,7 @@ def snakecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1-string2",
                 "string-with-----------symbols",  # Non-alphanum become underscores -> hyphens
             ],
+            strict=False,
         )
     )
 )
@@ -452,6 +468,7 @@ def spinalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "test1.string2",
                 "string.with...........symbols",  # Non-alphanum become underscores -> dots
             ],
+            strict=False,
         )
     )
 )
@@ -489,6 +506,7 @@ def dotcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "Test1 String2",
                 "String With           Symbols",  # Title case of snake_case version
             ],
+            strict=False,
         )
     )
 )
@@ -526,6 +544,7 @@ def titlecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1_STRING2",
                 "String with !@#$%^&*()_+ symbols",
             ],
+            strict=False,
         )
     )
 )
@@ -563,6 +582,7 @@ def trimcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1_STRING2",
                 "STRING WITH !@#$%^&*()_+ SYMBOLS",
             ],
+            strict=False,
         )
     )
 )
@@ -600,6 +620,7 @@ def uppercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
                 "TEST1STRING2",
                 "Stringwithsymbols",  # Only alphanumeric chars remain
             ],
+            strict=False,
         )
     )
 )
@@ -610,42 +631,42 @@ def alphanumcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
 # --- Test Functions ---
 
 
-def test_camelcase(camelcase_scenarios: tuple[str, str]):
+def test_camelcase(camelcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = camelcase_scenarios
     assert camelcase(input_str) == expected
 
 
-def test_capitalcase(capitalcase_scenarios: tuple[str, str]):
+def test_capitalcase(capitalcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = capitalcase_scenarios
     assert capitalcase(input_str) == expected
 
 
-def test_constcase(constcase_scenarios: tuple[str, str]):
+def test_constcase(constcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = constcase_scenarios
     assert constcase(input_str) == expected
 
 
-def test_lowercase(lowercase_scenarios: tuple[str, str]):
+def test_lowercase(lowercase_scenarios: tuple[str, str]) -> None:
     input_str, expected = lowercase_scenarios
     assert lowercase(input_str) == expected
 
 
-def test_pascalcase(pascalcase_scenarios: tuple[str, str]):
+def test_pascalcase(pascalcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = pascalcase_scenarios
     assert pascalcase(input_str) == expected
 
 
-def test_pathcase(pathcase_scenarios: tuple[str, str]):
+def test_pathcase(pathcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = pathcase_scenarios
     assert pathcase(input_str) == expected
 
 
-def test_backslashcase(backslashcase_scenarios: tuple[str, str]):
+def test_backslashcase(backslashcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = backslashcase_scenarios
     assert backslashcase(input_str) == expected
 
 
-def test_sentencecase(sentencecase_scenarios: tuple[str, str]):
+def test_sentencecase(sentencecase_scenarios: tuple[str, str]) -> None:
     input_str, expected = sentencecase_scenarios
     # Rerun with corrected expected value based on implementation check:
     # Input: "String with !@#$%^&*()_+ symbols" -> Expected: "String with symbols"
@@ -656,22 +677,22 @@ def test_sentencecase(sentencecase_scenarios: tuple[str, str]):
     assert sentencecase(input_str) == expected
 
 
-def test_snakecase(snakecase_scenarios: tuple[str, str]):
+def test_snakecase(snakecase_scenarios: tuple[str, str]) -> None:
     input_str, expected = snakecase_scenarios
     assert snakecase(input_str) == expected
 
 
-def test_spinalcase(spinalcase_scenarios: tuple[str, str]):
+def test_spinalcase(spinalcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = spinalcase_scenarios
     assert spinalcase(input_str) == expected
 
 
-def test_dotcase(dotcase_scenarios: tuple[str, str]):
+def test_dotcase(dotcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = dotcase_scenarios
     assert dotcase(input_str) == expected
 
 
-def test_titlecase(titlecase_scenarios: tuple[str, str]):
+def test_titlecase(titlecase_scenarios: tuple[str, str]) -> None:
     input_str, expected = titlecase_scenarios
     # Correcting expectation for titlecase based on implementation (snake -> split -> title word)
     # "String with !@#$%^&*()_+ symbols" -> snake -> "string_with___________symbols"
@@ -682,16 +703,16 @@ def test_titlecase(titlecase_scenarios: tuple[str, str]):
     assert titlecase(input_str) == expected
 
 
-def test_trimcase(trimcase_scenarios: tuple[str, str]):
+def test_trimcase(trimcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = trimcase_scenarios
     assert trimcase(input_str) == expected
 
 
-def test_uppercase(uppercase_scenarios: tuple[str, str]):
+def test_uppercase(uppercase_scenarios: tuple[str, str]) -> None:
     input_str, expected = uppercase_scenarios
     assert uppercase(input_str) == expected
 
 
-def test_alphanumcase(alphanumcase_scenarios: tuple[str, str]):
+def test_alphanumcase(alphanumcase_scenarios: tuple[str, str]) -> None:
     input_str, expected = alphanumcase_scenarios
     assert alphanumcase(input_str) == expected

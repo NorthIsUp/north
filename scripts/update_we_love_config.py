@@ -84,7 +84,7 @@ class WeLoveWorkspaceManager:
 
             try:
                 packages.append(Package.from_dir(pkg_dir))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 console.print(f"[red]❌ Error reading {pyproject_path}: {e}[/red]")
 
         self.packages = sorted(packages, key=lambda x: x.extra_name)
@@ -107,9 +107,8 @@ class WeLoveWorkspaceManager:
 
             # Sources declared but not present in scanned packages
             for pkg_name, source in py.get_workspace_sources().items():
-                if getattr(source, "workspace", False):
-                    if not any(pkg.name == pkg_name for pkg in self.packages):
-                        missing_packages.append((pkg_name, "uv.sources"))
+                if getattr(source, "workspace", False) and not any(pkg.name == pkg_name for pkg in self.packages):
+                    missing_packages.append((pkg_name, "uv.sources"))
 
         if missing_packages:
             console.print("\n[yellow]⚠️  Found packages in configuration that no longer exist:[/yellow]")

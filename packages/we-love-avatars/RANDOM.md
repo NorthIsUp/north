@@ -18,8 +18,8 @@ gen_config = AvatarGeneratorConfig(random_loop=True)
 
 # Same seed, different loops each time!
 for i in range(5):
-    config = avatar('my-seed', gen_config)
-    Avatar(config).save_gif(f'avatar_{i}.gif')
+    config = avatar("my-seed", gen_config)
+    Avatar(config).save_gif(f"avatar_{i}.gif")
     # Each one has a different squiggle! ✨
 ```
 
@@ -28,8 +28,8 @@ for i in range(5):
 ### Deterministic (Default)
 
 ```python
-config1 = avatar('alice')
-config2 = avatar('alice')
+config1 = avatar("alice")
+config2 = avatar("alice")
 
 # Everything is identical:
 # ✅ Same gradient
@@ -45,8 +45,8 @@ config2 = avatar('alice')
 ```python
 gen_config = AvatarGeneratorConfig(random_loop=True)
 
-config1 = avatar('alice', gen_config)
-config2 = avatar('alice', gen_config)
+config1 = avatar("alice", gen_config)
+config2 = avatar("alice", gen_config)
 
 # Gradient is same (from seed):
 # ✅ Same colors
@@ -107,7 +107,7 @@ Randomly chosen each generation!
 from we_love.avatars import Avatar, AvatarGeneratorConfig, avatar
 
 # Pick your favorite gradient
-seed = 'my-favorite-colors'
+seed = "my-favorite-colors"
 
 # Generate 10 variations
 gen_config = AvatarGeneratorConfig(
@@ -118,8 +118,8 @@ gen_config = AvatarGeneratorConfig(
 
 for i in range(10):
     config = avatar(seed, gen_config)
-    Avatar(config).save_gif(f'variation_{i}.gif', optimize=False)
-    
+    Avatar(config).save_gif(f"variation_{i}.gif", optimize=False)
+
 # Pick the best one!
 ```
 
@@ -127,14 +127,14 @@ for i in range(10):
 
 ```python
 # Create a series with consistent colors but varied squiggles
-theme_seed = 'midnight-aurora'
+theme_seed = "midnight-aurora"
 
 gen_config = AvatarGeneratorConfig(random_loop=True)
 
 for i in range(20):
     config = avatar(theme_seed, gen_config)
-    Avatar(config).save_gif(f'series_{i:02d}.gif')
-    
+    Avatar(config).save_gif(f"series_{i:02d}.gif")
+
 # All have same color theme, different squiggles!
 ```
 
@@ -142,15 +142,15 @@ for i in range(20):
 
 ```python
 # Generate collection with user addresses + randomness
-users = ['user1', 'user2', 'user3']
+users = ["user1", "user2", "user3"]
 
 gen_config = AvatarGeneratorConfig(random_loop=True)
 
 for user in users:
     # Generate 5 variations per user
     for variant in range(5):
-        config = avatar(f'{user}-{variant}', gen_config)
-        Avatar(config).save_gif(f'{user}_v{variant}.gif')
+        config = avatar(f"{user}-{variant}", gen_config)
+        Avatar(config).save_gif(f"{user}_v{variant}.gif")
 ```
 
 ## Example: Generate 5 Random Variations
@@ -164,15 +164,15 @@ gen_config = AvatarGeneratorConfig(
     duration=10.0,
 )
 
-seed = 'explore'
+seed = "explore"
 
 for i in range(5):
     config = avatar(seed, gen_config)
     loop = config.loop_configs[0]
-    
-    print(f'{i+1}. {loop.loop_type.value} at ({loop.offset_x:.2f}, {loop.offset_y:.2f})')
-    
-    Avatar(config).save_gif(f'random_{i}.gif', progress=True, optimize=False)
+
+    print(f"{i + 1}. {loop.loop_type.value} at ({loop.offset_x:.2f}, {loop.offset_y:.2f})")
+
+    Avatar(config).save_gif(f"random_{i}.gif", progress=True, optimize=False)
 ```
 
 **Output**:
@@ -235,7 +235,7 @@ random.seed(42)  # Set seed for repeatability
 
 for i in range(5):
     random.seed(42 + i)  # Different seed per variation
-    config = avatar('base', gen_config)
+    config = avatar("base", gen_config)
     # Now repeatable!
 ```
 
@@ -251,15 +251,15 @@ gen_config = AvatarGeneratorConfig(
 )
 
 for i in range(20):
-    Avatar(avatar('explore', gen_config)).save_gif(f'v{i}.gif', optimize=False)
+    Avatar(avatar("explore", gen_config)).save_gif(f"v{i}.gif", optimize=False)
 ```
 
 ### Production (Deterministic)
 ```python
 # Once you found a good one, use its config directly
 # Or just use deterministic generation from start
-config = avatar('alice@example.com')
-Avatar(config).save_gif('alice.gif')
+config = avatar("alice@example.com")
+Avatar(config).save_gif("alice.gif")
 ```
 
 ## Summary

@@ -7,7 +7,7 @@ The simplest way to create unique, deterministic avatars!
 ```python
 from we_love.avatars import avatar, Avatar
 
-Avatar(avatar('alice@example.com')).save_gif('alice.gif')
+Avatar(avatar("alice@example.com")).save_gif("alice.gif")
 ```
 
 ## How It Works
@@ -27,13 +27,15 @@ The `avatar(seed)` function:
 ```python
 from we_love.avatars import avatar, Avatar
 
+
 def generate_user_avatar(email: str) -> None:
     """Generate avatar for user email."""
-    Avatar(avatar(email)).save_gif(f'avatars/{email}.gif')
+    Avatar(avatar(email)).save_gif(f"avatars/{email}.gif")
+
 
 # Each user gets a unique, consistent avatar
-generate_user_avatar('alice@example.com')
-generate_user_avatar('bob@example.com')
+generate_user_avatar("alice@example.com")
+generate_user_avatar("bob@example.com")
 ```
 
 ### API Endpoints
@@ -44,12 +46,13 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+
 @app.get("/avatar/{username}")
 async def get_avatar(username: str):
     config = avatar(username)
     av = Avatar(config)
-    av.save_gif(f'/tmp/{username}.gif')
-    return FileResponse(f'/tmp/{username}.gif')
+    av.save_gif(f"/tmp/{username}.gif")
+    return FileResponse(f"/tmp/{username}.gif")
 ```
 
 ### Batch Generation
@@ -57,11 +60,11 @@ async def get_avatar(username: str):
 ```python
 from we_love.avatars import avatar, Avatar
 
-users = ['alice', 'bob', 'charlie', 'diana', 'eve']
+users = ["alice", "bob", "charlie", "diana", "eve"]
 
 for user in users:
-    Avatar(avatar(user)).save_gif(f'output/{user}.gif')
-    print(f'✓ Generated avatar for {user}')
+    Avatar(avatar(user)).save_gif(f"output/{user}.gif")
+    print(f"✓ Generated avatar for {user}")
 ```
 
 ## Customization
@@ -69,7 +72,7 @@ for user in users:
 ### Default Behavior
 
 ```python
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 # - 512x512 resolution
 # - 30 fps, 30 second duration (slow, mesmerizing)
 # - Aurora/plasma/wave/radial gradient (varies by seed)
@@ -91,13 +94,13 @@ custom_config = AvatarGeneratorConfig(
     height=256,
     fps=20,
     duration=2.0,
-    enable_zoom=False,      # No offset/zoom
+    enable_zoom=False,  # No offset/zoom
     enable_wave_gradients=False,  # Only linear/radial/angular
-    max_loops=1,            # Exactly one loop (this is the default)
+    max_loops=1,  # Exactly one loop (this is the default)
 )
 
-config = avatar('user@example.com', custom_config)
-Avatar(config).save_gif('small_avatar.gif')
+config = avatar("user@example.com", custom_config)
+Avatar(config).save_gif("small_avatar.gif")
 ```
 
 ## What Gets Generated?
@@ -134,17 +137,17 @@ from we_love.avatars import AvatarGenerator
 generator = AvatarGenerator()
 
 # Generate config
-config = generator.generate_config('user@example.com')
+config = generator.generate_config("user@example.com")
 
 # Or generate full Avatar
-avatar = generator.generate('user@example.com')
-avatar.save_gif('output.gif')
+avatar = generator.generate("user@example.com")
+avatar.save_gif("output.gif")
 ```
 
 ### Inspect Config Before Rendering
 
 ```python
-config = avatar('test@example.com')
+config = avatar("test@example.com")
 
 print(f"Gradient type: {config.gradient_config.gradient_type}")
 print(f"Number of loops: {len(config.loop_configs)}")  # Always 1 by default
@@ -155,7 +158,7 @@ config.duration = 5.0
 config.loop_configs[0].color = (255, 0, 0)
 
 # Then render
-Avatar(config).save_gif('modified.gif')
+Avatar(config).save_gif("modified.gif")
 ```
 
 ## Examples

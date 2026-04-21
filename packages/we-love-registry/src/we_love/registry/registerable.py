@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-RegisterableTypes = TypeVar(
-    "RegisterableTypes", "RegisterableModel", type["RegisterableType"]
-)
+RegisterableTypes = TypeVar("RegisterableTypes", "RegisterableModel", type["RegisterableType"])
 RegisterableTypesList = list[RegisterableTypes]
 RegisterableTypesDict = dict[str, RegisterableTypes]
 
@@ -119,9 +117,7 @@ class RegisterableBase(BaseModel):
     def registry(cls) -> Registry:
         if not hasattr(cls, "_registry"):
             extra_discovery_modules = getattr(cls, "_autodiscovery_module", ())
-            logger.debug(
-                f"  -->creating registry for '{cls.__name__}' with extra_discovery_modules: '{extra_discovery_modules}'"
-            )
+            logger.debug(f"  -->creating registry for '{cls.__name__}' with extra_discovery_modules: '{extra_discovery_modules}'")
             cls._registry = Registry(autodiscovery_module=extra_discovery_modules)
 
         return cls._registry
@@ -156,6 +152,4 @@ class RegisterableModel(RegisterableBase):
             # this is a mystery, `CodingSteps`s are creating a phantom
             # `BaseModelConfig` instance when no default is provided even tho
             # the default is `None`
-            logger.debug(
-                f"Skipping registration of {self.__class__.__name__} since it has no name."
-            )
+            logger.debug(f"Skipping registration of {self.__class__.__name__} since it has no name.")

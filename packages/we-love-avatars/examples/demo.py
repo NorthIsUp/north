@@ -68,16 +68,16 @@ def main() -> None:
     avatar = Avatar(config)
 
     # Save as GIF
-    print('Generating animated avatar...')
-    avatar.save_gif('output/demo.gif')
-    print('✓ Created: output/demo.gif')
+    print("Generating animated avatar...")
+    avatar.save_gif("output/demo.gif")
+    print("✓ Created: output/demo.gif")
 
     # Save a single frame as PNG
-    avatar.save_png('output/demo.png', frame=15)
-    print('✓ Created: output/demo.png')
+    avatar.save_png("output/demo.png", frame=15)
+    print("✓ Created: output/demo.png")
 
-    print('\nDone! Check the output/ directory.')
+    print("\nDone! Check the output/ directory.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

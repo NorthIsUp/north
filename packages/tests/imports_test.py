@@ -92,9 +92,7 @@ def get_all_module_imports() -> list[str]:
     return imports
 
 
-def run_uv_test(
-    packages: list[str], import_statement: str, description: str
-) -> tuple[bool, str]:
+def run_uv_test(packages: list[str], import_statement: str, description: str) -> tuple[bool, str]:
     """Test importing packages using uv run."""
     # Build the uv run command
     cmd = ["uv", "run", "--no-project"]
@@ -122,9 +120,7 @@ class TestWeLovePackageImports:
         """Get namespace packages at test class initialization."""
         return get_namespace_packages()
 
-    def test_main_we_love_package_import(
-        self, discovered_packages: list[Package]
-    ) -> None:
+    def test_main_we_love_package_import(self, discovered_packages: list[Package]) -> None:
         """Test that the main we-love package can be imported."""
         main_package = next((pkg for pkg in discovered_packages if pkg.is_main), None)
         assert main_package is not None, "Main we-love package not found"
@@ -151,9 +147,7 @@ class TestWeLovePackageImports:
         assert success, f"Failed to import {package_info.module_name}: {output}"
         assert f"{package_info.module_name} imported successfully" in output
 
-    def test_multiple_packages_together(
-        self, discovered_packages: list[Package]
-    ) -> None:
+    def test_multiple_packages_together(self, discovered_packages: list[Package]) -> None:
         """Test that multiple namespace packages can be imported together."""
         # Get first few namespace packages for testing
         namespace_packages = [pkg for pkg in discovered_packages if not pkg.is_main][:3]
@@ -174,10 +168,7 @@ class TestWeLovePackageImports:
             else:
                 import_statements.append(f"import {pkg.module_name}")
 
-        import_code = (
-            "\n".join(import_statements)
-            + "\nprint('Multiple namespace packages imported successfully')"
-        )
+        import_code = "\n".join(import_statements) + "\nprint('Multiple namespace packages imported successfully')"
 
         success, output = run_uv_test(
             package_names,
@@ -218,10 +209,7 @@ class TestWeLovePackageImports:
         for pkg in discovered_packages:
             import_statements.append(f"import {pkg.module_name}")
 
-        import_code = (
-            "\n".join(import_statements)
-            + "\nprint('All packages imported successfully')"
-        )
+        import_code = "\n".join(import_statements) + "\nprint('All packages imported successfully')"
 
         success, output = run_uv_test(
             all_package_names,
@@ -240,12 +228,8 @@ class TestWeLovePackageImports:
 
         # Should have exactly one main package
         main_packages = [pkg for pkg in packages if pkg.is_main]
-        assert len(main_packages) == 1, (
-            f"Expected 1 main package, found {len(main_packages)}"
-        )
-        assert main_packages[0].package_name == "we_love", (
-            "Main package should be 'north'"
-        )
+        assert len(main_packages) == 1, f"Expected 1 main package, found {len(main_packages)}"
+        assert main_packages[0].package_name == "we_love", "Main package should be 'north'"
 
         # Should have namespace packages
         namespace_packages = [pkg for pkg in packages if not pkg.is_main]
@@ -259,15 +243,9 @@ class TestWeLovePackageImports:
             assert pkg.is_main is not None, f"Package missing is_main: {pkg}"
 
             # Package names should start with 'north'
-            assert pkg.package_name.startswith("we_love"), (
-                f"Package name should start with 'north': {pkg['package_name']}"
-            )
+            assert pkg.package_name.startswith("we_love"), f"Package name should start with 'north': {pkg['package_name']}"
 
             # Module names should be valid Python identifiers
-            assert pkg.module_name.replace(".", "_").replace("-", "_").isidentifier(), (
-                f"Invalid module name: {pkg['module_name']}"
-            )
+            assert pkg.module_name.replace(".", "_").replace("-", "_").isidentifier(), f"Invalid module name: {pkg['module_name']}"
 
-        print(
-            f"✅ Discovered {len(packages)} packages: {[pkg.package_name for pkg in packages]}"
-        )
+        print(f"✅ Discovered {len(packages)} packages: {[pkg.package_name for pkg in packages]}")

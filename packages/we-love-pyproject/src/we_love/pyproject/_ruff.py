@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Extra, Field, conint, constr
 
@@ -22,7 +22,7 @@ class ApiBan(BaseModel):
 
 
 class BannedAliases(BaseModel):
-    __root__: List[str]
+    __root__: list[str]
 
 
 class ConstantType(Enum):
@@ -46,7 +46,7 @@ class Convention3(Enum):
 
 
 class Convention(BaseModel):
-    __root__: Union[Convention1, Convention2, Convention3]
+    __root__: Convention1 | Convention2 | Convention3
 
 
 class Direction1(Enum):
@@ -58,34 +58,34 @@ class Direction2(Enum):
 
 
 class Direction(BaseModel):
-    __root__: Union[Direction1, Direction2]
+    __root__: Direction1 | Direction2
 
 
 class Flake8AnnotationsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allow_star_arg_any: Optional[bool] = Field(
+    allow_star_arg_any: bool | None = Field(
         None,
         alias="allow-star-arg-any",
         description="Whether to suppress `ANN401` for dynamically typed `*args` and `**kwargs` arguments.",
     )
-    ignore_fully_untyped: Optional[bool] = Field(
+    ignore_fully_untyped: bool | None = Field(
         None,
         alias="ignore-fully-untyped",
         description="Whether to suppress `ANN*` rules for any declaration that hasn't been typed at all. This makes it easier to gradually add types to a codebase.",
     )
-    mypy_init_return: Optional[bool] = Field(
+    mypy_init_return: bool | None = Field(
         None,
         alias="mypy-init-return",
         description="Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
     )
-    suppress_dummy_args: Optional[bool] = Field(
+    suppress_dummy_args: bool | None = Field(
         None,
         alias="suppress-dummy-args",
         description='Whether to suppress `ANN000`-level violations for arguments matching the "dummy" variable regex (like `_`).',
     )
-    suppress_none_returning: Optional[bool] = Field(
+    suppress_none_returning: bool | None = Field(
         None,
         alias="suppress-none-returning",
         description="Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
@@ -96,27 +96,27 @@ class Flake8BanditOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_markup_calls: Optional[List[str]] = Field(
+    allowed_markup_calls: list[str] | None = Field(
         None,
         alias="allowed-markup-calls",
         description="A list of callable names, whose result may be safely passed into [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).\n\nThis setting helps you avoid false positives in code like:\n\n```python from bleach import clean from markupsafe import Markup\n\ncleaned_markup = Markup(clean(some_user_input)) ```\n\nWhere the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html) usually ensures that there's no XSS vulnerability.\n\nAlthough it is not recommended, you may also use this setting to whitelist other kinds of calls, e.g. calls to i18n translation functions, where how safe that is will depend on the implementation and how well the translations are audited.\n\nAnother common use-case is to wrap the output of functions that generate markup like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring) or template rendering engines where sanitization of potential user input is either already baked in or has to happen before rendering.",
     )
-    check_typed_exception: Optional[bool] = Field(
+    check_typed_exception: bool | None = Field(
         None,
         alias="check-typed-exception",
         description="Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default, `try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.",
     )
-    extend_markup_names: Optional[List[str]] = Field(
+    extend_markup_names: list[str] | None = Field(
         None,
         alias="extend-markup-names",
         description="A list of additional callable names that behave like [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).",
     )
-    hardcoded_tmp_directory: Optional[List[str]] = Field(
+    hardcoded_tmp_directory: list[str] | None = Field(
         None,
         alias="hardcoded-tmp-directory",
         description="A list of directories to consider temporary (see `S108`).",
     )
-    hardcoded_tmp_directory_extend: Optional[List[str]] = Field(
+    hardcoded_tmp_directory_extend: list[str] | None = Field(
         None,
         alias="hardcoded-tmp-directory-extend",
         description="A list of directories to consider temporary, in addition to those specified by [`hardcoded-tmp-directory`](#lint_flake8-bandit_hardcoded-tmp-directory) (see `S108`).",
@@ -127,7 +127,7 @@ class Flake8BooleanTrapOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    extend_allowed_calls: Optional[List[str]] = Field(
+    extend_allowed_calls: list[str] | None = Field(
         None,
         alias="extend-allowed-calls",
         description="Additional callable functions with which to allow boolean traps.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.Field`, rather than `Field`).",
@@ -138,7 +138,7 @@ class Flake8BugbearOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    extend_immutable_calls: Optional[List[str]] = Field(
+    extend_immutable_calls: list[str] | None = Field(
         None,
         alias="extend-immutable-calls",
         description='Additional callable functions to consider "immutable" when evaluating, e.g., the `function-call-in-default-argument` rule (`B008`) or `function-call-in-dataclass-defaults` rule (`RUF009`).\n\nExpects to receive a list of fully-qualified names (e.g., `fastapi.Query`, rather than `Query`).',
@@ -149,28 +149,28 @@ class Flake8BuiltinsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_modules: Optional[List[str]] = Field(
+    allowed_modules: list[str] | None = Field(
         None,
         alias="allowed-modules",
         description="List of builtin module names to allow.",
     )
-    builtins_allowed_modules: Optional[List[str]] = Field(
+    builtins_allowed_modules: list[str] | None = Field(
         None,
         alias="builtins-allowed-modules",
         description="DEPRECATED: This option has been renamed to `allowed-modules`. Use `allowed-modules` instead.\n\nList of builtin module names to allow.\n\nThis option is ignored if both `allowed-modules` and `builtins-allowed-modules` are set.",
     )
-    builtins_ignorelist: Optional[List[str]] = Field(
+    builtins_ignorelist: list[str] | None = Field(
         None,
         alias="builtins-ignorelist",
         description="DEPRECATED: This option has been renamed to `ignorelist`. Use `ignorelist` instead.\n\nIgnore list of builtins.\n\nThis option is ignored if both `ignorelist` and `builtins-ignorelist` are set.",
     )
-    builtins_strict_checking: Optional[bool] = Field(
+    builtins_strict_checking: bool | None = Field(
         None,
         alias="builtins-strict-checking",
         description="DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.\n\nCompare module names instead of full module paths.\n\nThis option is ignored if both `strict-checking` and `builtins-strict-checking` are set.",
     )
-    ignorelist: Optional[List[str]] = Field(None, description="Ignore list of builtins.")
-    strict_checking: Optional[bool] = Field(
+    ignorelist: list[str] | None = Field(None, description="Ignore list of builtins.")
+    strict_checking: bool | None = Field(
         None,
         alias="strict-checking",
         description="Compare module names instead of full module paths.\n\nUsed by [`A005` - `stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/).",
@@ -181,7 +181,7 @@ class Flake8ComprehensionsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allow_dict_calls_with_keyword_arguments: Optional[bool] = Field(
+    allow_dict_calls_with_keyword_arguments: bool | None = Field(
         None,
         alias="allow-dict-calls-with-keyword-arguments",
         description="Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
@@ -192,16 +192,16 @@ class Flake8CopyrightOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    author: Optional[str] = Field(
+    author: str | None = Field(
         None,
         description="Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
     )
-    min_file_size: Optional[conint(ge=0)] = Field(
+    min_file_size: conint(ge=0) | None = Field(
         None,
         alias="min-file-size",
         description="A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
     )
-    notice_rgx: Optional[str] = Field(
+    notice_rgx: str | None = Field(
         None,
         alias="notice-rgx",
         description="The regular expression used to match the copyright notice, compiled with the [`regex`](https://docs.rs/regex/latest/regex/) crate. Defaults to `(?i)Copyright\\s+((?:\\(C\\)|©)\\s+)?\\d{4}((-|,\\s)\\d{4})*`, which matches the following:\n\n- `Copyright 2023` - `Copyright (C) 2023` - `Copyright 2021-2023` - `Copyright (C) 2021-2023` - `Copyright (C) 2021, 2023`",
@@ -212,7 +212,7 @@ class Flake8ErrMsgOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    max_string_length: Optional[conint(ge=0)] = Field(
+    max_string_length: conint(ge=0) | None = Field(
         None,
         alias="max-string-length",
         description="Maximum string length for string literals in exception messages.",
@@ -223,12 +223,12 @@ class Flake8GetTextOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    extend_function_names: Optional[List[str]] = Field(
+    extend_function_names: list[str] | None = Field(
         None,
         alias="extend-function-names",
         description="Additional function names to consider as internationalization calls, in addition to those included in [`function-names`](#lint_flake8-gettext_function-names).",
     )
-    function_names: Optional[List[str]] = Field(
+    function_names: list[str] | None = Field(
         None,
         alias="function-names",
         description="The function names to consider as internationalization calls.",
@@ -239,7 +239,7 @@ class Flake8ImplicitStrConcatOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allow_multiline: Optional[bool] = Field(
+    allow_multiline: bool | None = Field(
         None,
         alias="allow-multiline",
         description="Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).\n\nSetting `allow-multiline = false` will automatically disable the `explicit-string-concatenation` (`ISC003`) rule. Otherwise, both implicit and explicit multiline string concatenations would be seen as violations, making it impossible to write a linter-compliant multiline string.",
@@ -250,22 +250,22 @@ class Flake8ImportConventionsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    aliases: Optional[Dict[str, Any]] = Field(
+    aliases: dict[str, Any] | None = Field(
         None,
         description="The conventional aliases for imports. These aliases can be extended by the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.",
     )
-    banned_aliases: Optional[Dict[str, Any]] = Field(
+    banned_aliases: dict[str, Any] | None = Field(
         None,
         alias="banned-aliases",
         description="A mapping from module to its banned import aliases.",
     )
-    banned_from: Optional[List[str]] = Field(
+    banned_from: list[str] | None = Field(
         None,
         alias="banned-from",
         description='A list of modules that should not be imported from using the `from ... import ...` syntax.\n\nFor example, given `banned-from = ["pandas"]`, `from pandas import DataFrame` would be disallowed, while `import pandas` would be allowed.',
         unique_items=True,
     )
-    extend_aliases: Optional[Dict[str, Any]] = Field(
+    extend_aliases: dict[str, Any] | None = Field(
         None,
         alias="extend-aliases",
         description="A mapping from module to conventional import alias. These aliases will be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.",
@@ -276,12 +276,12 @@ class Flake8SelfOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    extend_ignore_names: Optional[List[str]] = Field(
+    extend_ignore_names: list[str] | None = Field(
         None,
         alias="extend-ignore-names",
         description="Additional names to ignore when considering `flake8-self` violations, in addition to those included in [`ignore-names`](#lint_flake8-self_ignore-names).",
     )
-    ignore_names: Optional[List[str]] = Field(
+    ignore_names: list[str] | None = Field(
         None,
         alias="ignore-names",
         description="A list of names to ignore when considering `flake8-self` violations.",
@@ -292,27 +292,27 @@ class Flake8TypeCheckingOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    exempt_modules: Optional[List[str]] = Field(
+    exempt_modules: list[str] | None = Field(
         None,
         alias="exempt-modules",
         description="Exempt certain modules from needing to be moved into type-checking blocks.",
     )
-    quote_annotations: Optional[bool] = Field(
+    quote_annotations: bool | None = Field(
         None,
         alias="quote-annotations",
         description='Whether to add quotes around type annotations, if doing so would allow the corresponding import to be moved into a type-checking block.\n\nFor example, in the following, Python requires that `Sequence` be available at runtime, despite the fact that it\'s only used in a type annotation:\n\n```python from collections.abc import Sequence\n\ndef func(value: Sequence[int]) -> None: ... ```\n\nIn other words, moving `from collections.abc import Sequence` into an `if TYPE_CHECKING:` block above would cause a runtime error, as the type would no longer be available at runtime.\n\nBy default, Ruff will respect such runtime semantics and avoid moving the import to prevent such runtime errors.\n\nSetting `quote-annotations` to `true` will instruct Ruff to add quotes around the annotation (e.g., `"Sequence[int]"`), which in turn enables Ruff to move the import into an `if TYPE_CHECKING:` block, like so:\n\n```python from typing import TYPE_CHECKING\n\nif TYPE_CHECKING: from collections.abc import Sequence\n\ndef func(value: "Sequence[int]") -> None: ... ```\n\nNote that this setting has no effect when `from __future__ import annotations` is present, as `__future__` annotations are always treated equivalently to quoted annotations.',
     )
-    runtime_evaluated_base_classes: Optional[List[str]] = Field(
+    runtime_evaluated_base_classes: list[str] | None = Field(
         None,
         alias="runtime-evaluated-base-classes",
         description="Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined classes that inherit from those base classes. For example, if you define a common `DeclarativeBase` subclass that's used throughout your project (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to this list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt models from being moved into type-checking blocks.",
     )
-    runtime_evaluated_decorators: Optional[List[str]] = Field(
+    runtime_evaluated_decorators: list[str] | None = Field(
         None,
         alias="runtime-evaluated-decorators",
         description='Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic\'s `@pydantic.validate_call` decorator (for functions) and attrs\' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI\'s `fastapi.FastAPI.get` which will work across assignments in the same module.\n\nFor example: ```python import fastapi\n\napp = FastAPI("app")\n\n@app.get("/home") def home() -> str: ... ```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.',
     )
-    strict: Optional[bool] = Field(
+    strict: bool | None = Field(
         None,
         description="Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports are present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
     )
@@ -322,7 +322,7 @@ class Flake8UnusedArgumentsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ignore_variadic_names: Optional[bool] = Field(
+    ignore_variadic_names: bool | None = Field(
         None,
         alias="ignore-variadic-names",
         description="Whether to allow unused variadic arguments, like `*args` and `**kwargs`.",
@@ -346,7 +346,7 @@ class IndentStyle2(Enum):
 
 
 class IndentStyle(BaseModel):
-    __root__: Union[IndentStyle1, IndentStyle2]
+    __root__: IndentStyle1 | IndentStyle2
 
 
 class IndentWidth(BaseModel):
@@ -370,7 +370,7 @@ class LineEnding4(Enum):
 
 
 class LineEnding(BaseModel):
-    __root__: Union[LineEnding1, LineEnding2, LineEnding3, LineEnding4]
+    __root__: LineEnding1 | LineEnding2 | LineEnding3 | LineEnding4
 
 
 class LineLength(BaseModel):
@@ -391,7 +391,7 @@ class McCabeOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    max_complexity: Optional[conint(ge=0)] = Field(
+    max_complexity: conint(ge=0) | None = Field(
         None,
         alias="max-complexity",
         description="The maximum McCabe complexity to allow before triggering `C901` errors.",
@@ -437,22 +437,22 @@ class Pep8NamingOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    classmethod_decorators: Optional[List[str]] = Field(
+    classmethod_decorators: list[str] | None = Field(
         None,
         alias="classmethod-decorators",
         description="A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.validator`, rather than `validator`) or alternatively a plain name which is then matched against the last segment in case the decorator itself consists of a dotted name.",
     )
-    extend_ignore_names: Optional[List[str]] = Field(
+    extend_ignore_names: list[str] | None = Field(
         None,
         alias="extend-ignore-names",
         description='Additional names (or patterns) to ignore when considering `pep8-naming` violations, in addition to those included in [`ignore-names`](#lint_pep8-naming_ignore-names).\n\nSupports glob patterns. For example, to ignore all names starting with `test_` or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).',
     )
-    ignore_names: Optional[List[str]] = Field(
+    ignore_names: list[str] | None = Field(
         None,
         alias="ignore-names",
         description='A list of names (or patterns) to ignore when considering `pep8-naming` violations.\n\nSupports glob patterns. For example, to ignore all names starting with `test_` or ending with `_test`, you could use `ignore-names = ["test_*", "*_test"]`. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).',
     )
-    staticmethod_decorators: Optional[List[str]] = Field(
+    staticmethod_decorators: list[str] | None = Field(
         None,
         alias="staticmethod-decorators",
         description="A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.\n\nExpects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`, rather than `teardown`) or alternatively a plain name which is then matched against the last segment in case the decorator itself consists of a dotted name.",
@@ -463,7 +463,7 @@ class PyUpgradeOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    keep_runtime_typing: Optional[bool] = Field(
+    keep_runtime_typing: bool | None = Field(
         None,
         alias="keep-runtime-typing",
         description="Whether to avoid [PEP 585](https://peps.python.org/pep-0585/) (`List[int]` -> `list[int]`) and [PEP 604](https://peps.python.org/pep-0604/) (`Union[str, int]` -> `str | int`) rewrites even if a file imports `from __future__ import annotations`.\n\nThis setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and is most commonly used when working with libraries like Pydantic and FastAPI, which rely on the ability to parse type annotations at runtime. The use of `from __future__ import annotations` causes Python to treat the type annotations as strings, which typically allows for the use of language features that appear in later Python versions but are not yet supported by the current version (e.g., `str | int`). However, libraries that rely on runtime type annotations will break if the annotations are incompatible with the current Python version.\n\nFor example, while the following is valid Python 3.8 code due to the presence of `from __future__ import annotations`, the use of `str | int` prior to Python 3.10 will cause Pydantic to raise a `TypeError` at runtime:\n\n```python from __future__ import annotations\n\nimport pydantic\n\nclass Foo(pydantic.BaseModel): bar: str | int ```",
@@ -474,17 +474,17 @@ class PycodestyleOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ignore_overlong_task_comments: Optional[bool] = Field(
+    ignore_overlong_task_comments: bool | None = Field(
         None,
         alias="ignore-overlong-task-comments",
         description='Whether line-length violations (`E501`) should be triggered for comments starting with [`task-tags`](#lint_task-tags) (by default: "TODO", "FIXME", and "XXX").',
     )
-    max_doc_length: Optional[LineLength] = Field(
+    max_doc_length: LineLength | None = Field(
         None,
         alias="max-doc-length",
         description="The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within documentation (`W505`), including standalone comments. By default, this is set to `null` which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containing Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
     )
-    max_line_length: Optional[LineLength] = Field(
+    max_line_length: LineLength | None = Field(
         None,
         alias="max-line-length",
         description="The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default, this is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml # The formatter wraps lines at a length of 88. line-length = 88\n\n[pycodestyle] # E501 reports lines that exceed the length of 100. max-line-length = 100 ```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
@@ -495,7 +495,7 @@ class PydoclintOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ignore_one_line_docstrings: Optional[bool] = Field(
+    ignore_one_line_docstrings: bool | None = Field(
         None,
         alias="ignore-one-line-docstrings",
         description="Skip docstrings which fit on a single line.\n\nNote: The corresponding setting in `pydoclint` is named `skip-checking-short-docstrings`.",
@@ -506,21 +506,21 @@ class PydocstyleOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    convention: Optional[Convention] = Field(
+    convention: Convention | None = Field(
         None,
         description='Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in the specified convention. As such, the intended workflow is to enable a convention and then selectively enable or disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = "google"`, below. select = ["D"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = ["D417"]\n\n[tool.ruff.lint.pydocstyle] convention = "google" ```\n\nTo enable an additional rule that\'s excluded from the convention, select the desired rule via its fully qualified rule code (e.g., `D400` instead of `D4` or `D40`):\n\n```toml [tool.ruff.lint] # Enable D400 on top of the Google convention. extend-select = ["D400"]\n\n[tool.ruff.lint.pydocstyle] convention = "google" ```',
     )
-    ignore_decorators: Optional[List[str]] = Field(
+    ignore_decorators: list[str] | None = Field(
         None,
         alias="ignore-decorators",
         description="Ignore docstrings for functions or methods decorated with the specified fully-qualified decorators.",
     )
-    ignore_var_parameters: Optional[bool] = Field(
+    ignore_var_parameters: bool | None = Field(
         None,
         alias="ignore-var-parameters",
         description="If set to `true`, ignore missing documentation for `*args` and `**kwargs` parameters.",
     )
-    property_decorators: Optional[List[str]] = Field(
+    property_decorators: list[str] | None = Field(
         None,
         alias="property-decorators",
         description="A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
@@ -531,12 +531,12 @@ class PyflakesOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_unused_imports: Optional[List[str]] = Field(
+    allowed_unused_imports: list[str] | None = Field(
         None,
         alias="allowed-unused-imports",
         description="A list of modules to ignore when considering unused imports.\n\nUsed to prevent violations for specific modules that are known to have side effects on import (e.g., `hvplot.pandas`).\n\nModules in this list are expected to be fully-qualified names (e.g., `hvplot.pandas`). Any submodule of a given module will also be ignored (e.g., given `hvplot`, `hvplot.pandas` will also be ignored).",
     )
-    extend_generics: Optional[List[str]] = Field(
+    extend_generics: list[str] | None = Field(
         None,
         alias="extend-generics",
         description='Additional functions or classes to consider generic, such that any subscripts should be treated as type annotation (e.g., `ForeignKey` in `django.db.models.ForeignKey["User"]`.\n\nExpects to receive a list of fully-qualified names (e.g., `django.db.models.ForeignKey`, rather than `ForeignKey`).',
@@ -547,58 +547,58 @@ class PylintOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allow_dunder_method_names: Optional[List[str]] = Field(
+    allow_dunder_method_names: list[str] | None = Field(
         None,
         alias="allow-dunder-method-names",
         description="Dunder methods name to allow, in addition to the default set from the Python standard library (see `PLW3201`).",
         unique_items=True,
     )
-    allow_magic_value_types: Optional[List[ConstantType]] = Field(
+    allow_magic_value_types: list[ConstantType] | None = Field(
         None,
         alias="allow-magic-value-types",
         description='Constant types to ignore when used as "magic values" (see `PLR2004`).',
     )
-    max_args: Optional[conint(ge=0)] = Field(
+    max_args: conint(ge=0) | None = Field(
         None,
         alias="max-args",
         description="Maximum number of arguments allowed for a function or method definition (see `PLR0913`).",
     )
-    max_bool_expr: Optional[conint(ge=0)] = Field(
+    max_bool_expr: conint(ge=0) | None = Field(
         None,
         alias="max-bool-expr",
         description="Maximum number of Boolean expressions allowed within a single `if` statement (see `PLR0916`).",
     )
-    max_branches: Optional[conint(ge=0)] = Field(
+    max_branches: conint(ge=0) | None = Field(
         None,
         alias="max-branches",
         description="Maximum number of branches allowed for a function or method body (see `PLR0912`).",
     )
-    max_locals: Optional[conint(ge=0)] = Field(
+    max_locals: conint(ge=0) | None = Field(
         None,
         alias="max-locals",
         description="Maximum number of local variables allowed for a function or method body (see `PLR0914`).",
     )
-    max_nested_blocks: Optional[conint(ge=0)] = Field(
+    max_nested_blocks: conint(ge=0) | None = Field(
         None,
         alias="max-nested-blocks",
         description="Maximum number of nested blocks allowed within a function or method body (see `PLR1702`).",
     )
-    max_positional_args: Optional[conint(ge=0)] = Field(
+    max_positional_args: conint(ge=0) | None = Field(
         None,
         alias="max-positional-args",
         description="Maximum number of positional arguments allowed for a function or method definition (see `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
     )
-    max_public_methods: Optional[conint(ge=0)] = Field(
+    max_public_methods: conint(ge=0) | None = Field(
         None,
         alias="max-public-methods",
         description="Maximum number of public methods allowed for a class (see `PLR0904`).",
     )
-    max_returns: Optional[conint(ge=0)] = Field(
+    max_returns: conint(ge=0) | None = Field(
         None,
         alias="max-returns",
         description="Maximum number of return statements allowed for a function or method body (see `PLR0911`)",
     )
-    max_statements: Optional[conint(ge=0)] = Field(
+    max_statements: conint(ge=0) | None = Field(
         None,
         alias="max-statements",
         description="Maximum number of statements allowed for a function or method body (see `PLR0915`).",
@@ -625,7 +625,7 @@ class Quote2(Enum):
 
 
 class Quote(BaseModel):
-    __root__: Union[Quote1, Quote2]
+    __root__: Quote1 | Quote2
 
 
 class QuoteStyle(Enum):
@@ -643,7 +643,7 @@ class RelativeImportsOrder2(Enum):
 
 
 class RelativeImportsOrder(BaseModel):
-    __root__: Union[RelativeImportsOrder1, RelativeImportsOrder2]
+    __root__: RelativeImportsOrder1 | RelativeImportsOrder2
 
 
 class RequiredVersion(BaseModel):
@@ -654,17 +654,17 @@ class RuffOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_markup_calls: Optional[List[str]] = Field(
+    allowed_markup_calls: list[str] | None = Field(
         None,
         alias="allowed-markup-calls",
         description="A list of callable names, whose result may be safely passed into [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `bleach.clean`, rather than `clean`).\n\nThis setting helps you avoid false positives in code like:\n\n```python from bleach import clean from markupsafe import Markup\n\ncleaned_markup = Markup(clean(some_user_input)) ```\n\nWhere the use of [`bleach.clean`](https://bleach.readthedocs.io/en/latest/clean.html) usually ensures that there's no XSS vulnerability.\n\nAlthough it is not recommended, you may also use this setting to whitelist other kinds of calls, e.g. calls to i18n translation functions, where how safe that is will depend on the implementation and how well the translations are audited.\n\nAnother common use-case is to wrap the output of functions that generate markup like [`xml.etree.ElementTree.tostring`](https://docs.python.org/3/library/xml.etree.elementtree.html#xml.etree.ElementTree.tostring) or template rendering engines where sanitization of potential user input is either already baked in or has to happen before rendering.",
     )
-    extend_markup_names: Optional[List[str]] = Field(
+    extend_markup_names: list[str] | None = Field(
         None,
         alias="extend-markup-names",
         description="A list of additional callable names that behave like [`markupsafe.Markup`](https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup).\n\nExpects to receive a list of fully-qualified names (e.g., `webhelpers.html.literal`, rather than `literal`).",
     )
-    parenthesize_tuple_in_subscript: Optional[bool] = Field(
+    parenthesize_tuple_in_subscript: bool | None = Field(
         None,
         alias="parenthesize-tuple-in-subscript",
         description="Whether to prefer accessing items keyed by tuples with parentheses around the tuple (see `RUF031`).",
@@ -2087,36 +2087,36 @@ class Strictness2(Enum):
 
 
 class Strictness(BaseModel):
-    __root__: Union[Strictness1, Strictness2]
+    __root__: Strictness1 | Strictness2
 
 
 class AnalyzeOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    detect_string_imports: Optional[bool] = Field(
+    detect_string_imports: bool | None = Field(
         None,
         alias="detect-string-imports",
         description='Whether to detect imports from string literals. When enabled, Ruff will search for string literals that "look like" import paths, and include them in the import map, if they resolve to valid Python modules.',
     )
-    direction: Optional[Direction] = Field(
+    direction: Direction | None = Field(
         None,
         description="Whether to generate a map from file to files that it depends on (dependencies) or files that depend on it (dependents).",
     )
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         None,
         description="A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    include_dependencies: Optional[Dict[str, Any]] = Field(
+    include_dependencies: dict[str, Any] | None = Field(
         None,
         alias="include-dependencies",
         description="A map from file path to the list of Python or non-Python file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
     )
-    preview: Optional[bool] = Field(
+    preview: bool | None = Field(
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable commands.",
     )
-    string_imports_min_dots: Optional[conint(ge=0)] = Field(
+    string_imports_min_dots: conint(ge=0) | None = Field(
         None,
         alias="string-imports-min-dots",
         description='The minimum number of dots in a string to consider it a valid import.\n\nThis setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled. For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`) would be considered valid imports.',
@@ -2124,54 +2124,54 @@ class AnalyzeOptions(BaseModel):
 
 
 class DocstringCodeLineWidth(BaseModel):
-    __root__: Union[LineWidth, str]
+    __root__: LineWidth | str
 
 
 class Flake8PytestStyleOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    fixture_parentheses: Optional[bool] = Field(
+    fixture_parentheses: bool | None = Field(
         None,
         alias="fixture-parentheses",
         description="Boolean flag specifying whether `@pytest.fixture()` without parameters should have parentheses. If the option is set to `false` (the default), `@pytest.fixture` is valid and `@pytest.fixture()` is invalid. If set to `true`, `@pytest.fixture()` is valid and `@pytest.fixture` is invalid.",
     )
-    mark_parentheses: Optional[bool] = Field(
+    mark_parentheses: bool | None = Field(
         None,
         alias="mark-parentheses",
         description="Boolean flag specifying whether `@pytest.mark.foo()` without parameters should have parentheses. If the option is set to `false` (the default), `@pytest.mark.foo` is valid and `@pytest.mark.foo()` is invalid. If set to `true`, `@pytest.mark.foo()` is valid and `@pytest.mark.foo` is invalid.",
     )
-    parametrize_names_type: Optional[ParametrizeNameType] = Field(
+    parametrize_names_type: ParametrizeNameType | None = Field(
         None,
         alias="parametrize-names-type",
         description='Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n- `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize("name1,name2", ...)` - `tuple` (default) — e.g. `@pytest.mark.parametrize(("name1", "name2"), ...)` - `list` — e.g. `@pytest.mark.parametrize(["name1", "name2"], ...)`',
     )
-    parametrize_values_row_type: Optional[ParametrizeValuesRowType] = Field(
+    parametrize_values_row_type: ParametrizeValuesRowType | None = Field(
         None,
         alias="parametrize-values-row-type",
         description='Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n- `tuple` (default) — e.g. `@pytest.mark.parametrize(("name1", "name2"), [(1, 2), (3, 4)])` - `list` — e.g. `@pytest.mark.parametrize(("name1", "name2"), [[1, 2], [3, 4]])`',
     )
-    parametrize_values_type: Optional[ParametrizeValuesType] = Field(
+    parametrize_values_type: ParametrizeValuesType | None = Field(
         None,
         alias="parametrize-values-type",
         description='Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n- `tuple` — e.g. `@pytest.mark.parametrize("name", (1, 2, 3))` - `list` (default) — e.g. `@pytest.mark.parametrize("name", [1, 2, 3])`',
     )
-    raises_extend_require_match_for: Optional[List[str]] = Field(
+    raises_extend_require_match_for: list[str] | None = Field(
         None,
         alias="raises-extend-require-match-for",
         description="List of additional exception names that require a match= parameter in a `pytest.raises()` call. This extends the default list of exceptions that require a match= parameter. This option is useful if you want to extend the default list of exceptions that require a match= parameter without having to specify the entire list. Note that this option does not remove any exceptions from the default list.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    raises_require_match_for: Optional[List[str]] = Field(
+    raises_require_match_for: list[str] | None = Field(
         None,
         alias="raises-require-match-for",
         description="List of exception names that require a match= parameter in a `pytest.raises()` call.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    warns_extend_require_match_for: Optional[List[str]] = Field(
+    warns_extend_require_match_for: list[str] | None = Field(
         None,
         alias="warns-extend-require-match-for",
         description="List of additional warning names that require a match= parameter in a `pytest.warns()` call. This extends the default list of warnings that require a match= parameter.\n\nThis option is useful if you want to extend the default list of warnings that require a match= parameter without having to specify the entire list.\n\nNote that this option does not remove any warnings from the default list.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    warns_require_match_for: Optional[List[str]] = Field(
+    warns_require_match_for: list[str] | None = Field(
         None,
         alias="warns-require-match-for",
         description="List of warning names that require a match= parameter in a `pytest.warns()` call.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
@@ -2182,22 +2182,22 @@ class Flake8QuotesOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    avoid_escape: Optional[bool] = Field(
+    avoid_escape: bool | None = Field(
         None,
         alias="avoid-escape",
         description="Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
     )
-    docstring_quotes: Optional[Quote] = Field(
+    docstring_quotes: Quote | None = Field(
         None,
         alias="docstring-quotes",
         description='Quote style to prefer for docstrings (either "single" or "double").\n\nWhen using the formatter, only "double" is compatible, as the formatter enforces double quotes for docstrings strings.',
     )
-    inline_quotes: Optional[Quote] = Field(
+    inline_quotes: Quote | None = Field(
         None,
         alias="inline-quotes",
         description='Quote style to prefer for inline strings (either "single" or "double").\n\nWhen using the formatter, ensure that [`format.quote-style`](#format_quote-style) is set to the same preferred quote style.',
     )
-    multiline_quotes: Optional[Quote] = Field(
+    multiline_quotes: Quote | None = Field(
         None,
         alias="multiline-quotes",
         description='Quote style to prefer for multiline strings (either "single" or "double").\n\nWhen using the formatter, only "double" is compatible, as the formatter enforces double quotes for multiline strings.',
@@ -2208,17 +2208,17 @@ class Flake8TidyImportsOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ban_relative_imports: Optional[Strictness] = Field(
+    ban_relative_imports: Strictness | None = Field(
         None,
         alias="ban-relative-imports",
         description='Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent module or beyond (`"parents"`).',
     )
-    banned_api: Optional[Dict[str, Any]] = Field(
+    banned_api: dict[str, Any] | None = Field(
         None,
         alias="banned-api",
         description="Specific modules or module members that may not be imported or accessed. Note that this rule is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
     )
-    banned_module_level_imports: Optional[List[str]] = Field(
+    banned_module_level_imports: list[str] | None = Field(
         None,
         alias="banned-module-level-imports",
         description="List of specific modules that may not be imported at module level, and should instead be imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:` block, or some other nested context). This also affects the rule `import-outside-top-level` if `banned-module-level-imports` is enabled.",
@@ -2229,37 +2229,37 @@ class FormatOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    docstring_code_format: Optional[bool] = Field(
+    docstring_code_format: bool | None = Field(
         None,
         alias="docstring-code-format",
         description='Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): """ Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) """ pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): """ Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) """ pass ```\n\nIf a code snippet in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren\'t valid Python, then the block is left untouched automatically.',
     )
-    docstring_code_line_length: Optional[DocstringCodeLineWidth] = Field(
+    docstring_code_line_length: DocstringCodeLineWidth | None = Field(
         None,
         alias="docstring-code-line-length",
         description='Set the line length used when formatting code snippets in docstrings.\n\nThis only has an effect when the `docstring-code-format` setting is enabled.\n\nThe default value for this setting is `"dynamic"`, which has the effect of ensuring that any reformatted code examples in docstrings adhere to the global line length configuration that is used for the surrounding Python code. The point of this setting is that it takes the indentation of the docstring into account when reformatting code examples.\n\nAlternatively, this can be set to a fixed integer, which will result in the same line length limit being applied to all reformatted code examples in docstrings. When set to a fixed integer, the indent of the docstring is not taken into account. That is, this may result in lines in the reformatted code example that exceed the globally configured line length limit.\n\nFor example, when this is set to `20` and [`docstring-code-format`](#docstring-code-format) is enabled, then this code:\n\n```python def f(x): \'\'\' Something about `f`. And an example:\n\n.. code-block:: python\n\nfoo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear) \'\'\' pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): """ Something about `f`. And an example:\n\n.. code-block:: python\n\n( foo, bar, quux, ) = this_is_a_long_line( lion, hippo, lemur, bear, ) """ pass ```',
     )
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         None,
         description="A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    indent_style: Optional[IndentStyle] = Field(
+    indent_style: IndentStyle | None = Field(
         None,
         alias="indent-style",
         description='Whether to use spaces or tabs for indentation.\n\n`indent-style = "space"` (default):\n\n```python def f(): print("Hello") #  Spaces indent the `print` statement. ```\n\n`indent-style = "tab"`:\n\n```python def f(): print("Hello") #  A tab `\\t` indents the `print` statement. ```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation). We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.',
     )
-    line_ending: Optional[LineEnding] = Field(
+    line_ending: LineEnding | None = Field(
         None,
         alias="line-ending",
         description="The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
     )
-    preview: Optional[bool] = Field(None, description="Whether to enable the unstable preview style formatting.")
-    quote_style: Optional[QuoteStyle] = Field(
+    preview: bool | None = Field(None, description="Whether to enable the unstable preview style formatting.")
+    quote_style: QuoteStyle | None = Field(
         None,
         alias="quote-style",
         description='Configures the preferred quote character for strings. The recommended options are\n\n* `double` (default): Use double quotes `"` * `single`: Use single quotes `\'`\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for triple quoted strings and docstrings even when using `quote-style = "single"`.\n\nRuff deviates from using the configured quotes if doing so prevents the need for escaping quote characters inside the string:\n\n```python a = "a string without any quotes" b = "It\'s monday morning" ```\n\nRuff will change the quotes of the string assigned to `a` to single quotes when using `quote-style = "single"`. However, Ruff uses double quotes for the string assigned to `b` because using single quotes would require escaping the `\'`, which leads to the less readable code: `\'It\\\'s monday morning\'`.\n\nIn addition, Ruff supports the quote style `preserve` for projects that already use a mixture of single and double quotes and can\'t migrate to the `double` or `single` style. The quote style `preserve` leaves the quotes of all strings unchanged.',
     )
-    skip_magic_trailing_comma: Optional[bool] = Field(
+    skip_magic_trailing_comma: bool | None = Field(
         None,
         alias="skip-magic-trailing-comma",
         description="Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments are collapsed to a single line because the trailing comma is ignored def test(a, b): pass ```",
@@ -2267,156 +2267,156 @@ class FormatOptions(BaseModel):
 
 
 class ImportSection(BaseModel):
-    __root__: Union[ImportType, str]
+    __root__: ImportType | str
 
 
 class IsortOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    case_sensitive: Optional[bool] = Field(
+    case_sensitive: bool | None = Field(
         None,
         alias="case-sensitive",
         description="Sort imports taking into account case sensitivity.",
     )
-    classes: Optional[List[str]] = Field(
+    classes: list[str] | None = Field(
         None,
         description="An override list of tokens to always recognize as a Class for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.",
     )
-    combine_as_imports: Optional[bool] = Field(
+    combine_as_imports: bool | None = Field(
         None,
         alias="combine-as-imports",
         description="Combines as imports on the same line. See isort's [`combine-as-imports`](https://pycqa.github.io/isort/docs/configuration/options.html#combine-as-imports) option.",
     )
-    constants: Optional[List[str]] = Field(
+    constants: list[str] | None = Field(
         None,
         description="An override list of tokens to always recognize as a CONSTANT for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.",
     )
-    default_section: Optional[ImportSection] = Field(
+    default_section: ImportSection | None = Field(
         None,
         alias="default-section",
         description="Define a default section for any imports that don't fit into the specified [`section-order`](#lint_isort_section-order).",
     )
-    detect_same_package: Optional[bool] = Field(
+    detect_same_package: bool | None = Field(
         None,
         alias="detect-same-package",
         description="Whether to automatically mark imports from within the same package as first-party. For example, when `detect-same-package = true`, then when analyzing files within the `foo` package, any imports from within the `foo` package will be considered first-party.\n\nThis heuristic is often unnecessary when `src` is configured to detect all first-party sources; however, if `src` is _not_ configured, this heuristic can be useful to detect first-party imports from _within_ (but not _across_) first-party packages.",
     )
-    extra_standard_library: Optional[List[str]] = Field(
+    extra_standard_library: list[str] | None = Field(
         None,
         alias="extra-standard-library",
         description="A list of modules to consider standard-library, in addition to those known to Ruff in advance.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    force_single_line: Optional[bool] = Field(
+    force_single_line: bool | None = Field(
         None,
         alias="force-single-line",
         description="Forces all from imports to appear on their own line.",
     )
-    force_sort_within_sections: Optional[bool] = Field(
+    force_sort_within_sections: bool | None = Field(
         None,
         alias="force-sort-within-sections",
         description="Don't sort straight-style imports (like `import sys`) before from-style imports (like `from itertools import groupby`). Instead, sort the imports by module, independent of import style.",
     )
-    force_to_top: Optional[List[str]] = Field(
+    force_to_top: list[str] | None = Field(
         None,
         alias="force-to-top",
         description="Force specific imports to the top of their appropriate section.",
     )
-    force_wrap_aliases: Optional[bool] = Field(
+    force_wrap_aliases: bool | None = Field(
         None,
         alias="force-wrap-aliases",
         description="Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When [`combine-as-imports`](#lint_isort_combine-as-imports) isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.\n\nWhen using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default) when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.",
     )
-    forced_separate: Optional[List[str]] = Field(
+    forced_separate: list[str] | None = Field(
         None,
         alias="forced-separate",
         description="A list of modules to separate into auxiliary block(s) of imports, in the order specified.",
     )
-    from_first: Optional[bool] = Field(
+    from_first: bool | None = Field(
         None,
         alias="from-first",
         description="Whether to place `import from` imports before straight imports when sorting.\n\nFor example, by default, imports will be sorted such that straight imports appear before `import from` imports, as in: ```python import os import sys from typing import List ```\n\nSetting `from-first = true` will instead sort such that `import from` imports appear before straight imports, as in: ```python from typing import List import os import sys ```",
     )
-    known_first_party: Optional[List[str]] = Field(
+    known_first_party: list[str] | None = Field(
         None,
         alias="known-first-party",
         description="A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    known_local_folder: Optional[List[str]] = Field(
+    known_local_folder: list[str] | None = Field(
         None,
         alias="known-local-folder",
         description="A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    known_third_party: Optional[List[str]] = Field(
+    known_third_party: list[str] | None = Field(
         None,
         alias="known-third-party",
         description="A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    length_sort: Optional[bool] = Field(
+    length_sort: bool | None = Field(
         None,
         alias="length-sort",
         description="Sort imports by their string length, such that shorter imports appear before longer imports. For example, by default, imports will be sorted alphabetically, as in: ```python import collections import os ```\n\nSetting `length-sort = true` will instead sort such that shorter imports appear before longer imports, as in: ```python import os import collections ```",
     )
-    length_sort_straight: Optional[bool] = Field(
+    length_sort_straight: bool | None = Field(
         None,
         alias="length-sort-straight",
         description="Sort straight imports by their string length. Similar to [`length-sort`](#lint_isort_length-sort), but applies only to straight imports and doesn't affect `from` imports.",
     )
-    lines_after_imports: Optional[int] = Field(
+    lines_after_imports: int | None = Field(
         None,
         alias="lines-after-imports",
         description="The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
     )
-    lines_between_types: Optional[conint(ge=0)] = Field(
+    lines_between_types: conint(ge=0) | None = Field(
         None,
         alias="lines-between-types",
         description='The number of lines to place between "direct" and `import from` imports.\n\nWhen using the formatter, only the values `0` and `1` are compatible because it preserves up to one empty line after imports in nested blocks.',
     )
-    no_lines_before: Optional[List[ImportSection]] = Field(
+    no_lines_before: list[ImportSection] | None = Field(
         None,
         alias="no-lines-before",
         description="A list of sections that should _not_ be delineated from the previous section via empty lines.",
     )
-    no_sections: Optional[bool] = Field(
+    no_sections: bool | None = Field(
         None,
         alias="no-sections",
         description="Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import numpy import os import pandas import sys ```",
     )
-    order_by_type: Optional[bool] = Field(
+    order_by_type: bool | None = Field(
         None,
         alias="order-by-type",
         description="Order imports by type, which is determined by case, in addition to alphabetically.",
     )
-    relative_imports_order: Optional[RelativeImportsOrder] = Field(
+    relative_imports_order: RelativeImportsOrder | None = Field(
         None,
         alias="relative-imports-order",
         description='Whether to place "closer" imports (fewer `.` characters, most local) before "further" imports (more `.` characters, least local), or vice versa.\n\nThe default ("furthest-to-closest") is equivalent to isort\'s [`reverse-relative`](https://pycqa.github.io/isort/docs/configuration/options.html#reverse-relative) default (`reverse-relative = false`); setting this to "closest-to-furthest" is equivalent to isort\'s `reverse-relative = true`.',
     )
-    required_imports: Optional[List[NameImports]] = Field(
+    required_imports: list[NameImports] | None = Field(
         None,
         alias="required-imports",
         description="Add the specified import line to all files.",
     )
-    section_order: Optional[List[ImportSection]] = Field(
+    section_order: list[ImportSection] | None = Field(
         None,
         alias="section-order",
         description="Override in which order the sections should be output. Can be used to move custom sections.",
     )
-    sections: Optional[Dict[str, Any]] = Field(
+    sections: dict[str, Any] | None = Field(
         None,
         description='A list of mappings from section names to modules.\n\nBy default, imports are categorized according to their type (e.g., `future`, `third-party`, and so on). This setting allows you to group modules into custom sections, to augment or override the built-in sections.\n\nFor example, to group all testing utilities, you could create a `testing` section: ```toml testing = ["pytest", "hypothesis"] ```\n\nThe values in the list are treated as glob patterns. For example, to match all packages in the LangChain ecosystem (`langchain-core`, `langchain-openai`, etc.): ```toml langchain = ["langchain-*"] ```\n\nCustom sections should typically be inserted into the [`section-order`](#lint_isort_section-order) list to ensure that they\'re displayed as a standalone group and in the intended order, as in: ```toml section-order = [ "future", "standard-library", "third-party", "first-party", "local-folder", "testing" ] ```\n\nIf a custom section is omitted from [`section-order`](#lint_isort_section-order), imports in that section will be assigned to the [`default-section`](#lint_isort_default-section) (which defaults to `third-party`).',
     )
-    single_line_exclusions: Optional[List[str]] = Field(
+    single_line_exclusions: list[str] | None = Field(
         None,
         alias="single-line-exclusions",
         description="One or more modules to exclude from the single line rule.",
     )
-    split_on_trailing_comma: Optional[bool] = Field(
+    split_on_trailing_comma: bool | None = Field(
         None,
         alias="split-on-trailing-comma",
         description="If a comma is placed after the last member in a multi-line import, then the imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.\n\nWhen using the formatter, ensure that [`format.skip-magic-trailing-comma`](#format_skip-magic-trailing-comma) is set to `false` (default) when enabling `split-on-trailing-comma` to avoid that the formatter removes the trailing commas.",
     )
-    variables: Optional[List[str]] = Field(
+    variables: list[str] | None = Field(
         None,
         description="An override list of tokens to always recognize as a var for [`order-by-type`](#lint_isort_order-by-type) regardless of casing.",
     )
@@ -2426,496 +2426,496 @@ class LintOptions(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_confusables: Optional[List[constr(min_length=1, max_length=1)]] = Field(
+    allowed_confusables: list[constr(min_length=1, max_length=1)] | None = Field(
         None,
         alias="allowed-confusables",
         description='A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.',
     )
-    dummy_variable_rgx: Optional[str] = Field(
+    dummy_variable_rgx: str | None = Field(
         None,
         alias="dummy-variable-rgx",
         description='A regular expression used to identify "dummy" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.',
     )
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         None,
         description="A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    explicit_preview_rules: Optional[bool] = Field(
+    explicit_preview_rules: bool | None = Field(
         None,
         alias="explicit-preview-rules",
         description="Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
     )
-    extend_fixable: Optional[List[RuleSelector]] = Field(
+    extend_fixable: list[RuleSelector] | None = Field(
         None,
         alias="extend-fixable",
         description="A list of rule codes or prefixes to consider fixable, in addition to those specified by [`fixable`](#lint_fixable).",
     )
-    extend_ignore: Optional[List[RuleSelector]] = Field(
+    extend_ignore: list[RuleSelector] | None = Field(
         None,
         alias="extend-ignore",
         description="A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
     )
-    extend_per_file_ignores: Optional[Dict[str, Any]] = Field(
+    extend_per_file_ignores: dict[str, Any] | None = Field(
         None,
         alias="extend-per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).",
     )
-    extend_safe_fixes: Optional[List[RuleSelector]] = Field(
+    extend_safe_fixes: list[RuleSelector] | None = Field(
         None,
         alias="extend-safe-fixes",
         description="A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
     )
-    extend_select: Optional[List[RuleSelector]] = Field(
+    extend_select: list[RuleSelector] | None = Field(
         None,
         alias="extend-select",
         description="A list of rule codes or prefixes to enable, in addition to those specified by [`select`](#lint_select).",
     )
-    extend_unfixable: Optional[List[RuleSelector]] = Field(
+    extend_unfixable: list[RuleSelector] | None = Field(
         None,
         alias="extend-unfixable",
         description="A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by [`unfixable`](#lint_unfixable).",
     )
-    extend_unsafe_fixes: Optional[List[RuleSelector]] = Field(
+    extend_unsafe_fixes: list[RuleSelector] | None = Field(
         None,
         alias="extend-unsafe-fixes",
         description="A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
     )
-    external: Optional[List[str]] = Field(
+    external: list[str] | None = Field(
         None,
         description="A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
     )
-    fixable: Optional[List[RuleSelector]] = Field(
+    fixable: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
     )
-    flake8_annotations: Optional[Flake8AnnotationsOptions] = Field(
+    flake8_annotations: Flake8AnnotationsOptions | None = Field(
         None,
         alias="flake8-annotations",
         description="Options for the `flake8-annotations` plugin.",
     )
-    flake8_bandit: Optional[Flake8BanditOptions] = Field(
+    flake8_bandit: Flake8BanditOptions | None = Field(
         None,
         alias="flake8-bandit",
         description="Options for the `flake8-bandit` plugin.",
     )
-    flake8_boolean_trap: Optional[Flake8BooleanTrapOptions] = Field(
+    flake8_boolean_trap: Flake8BooleanTrapOptions | None = Field(
         None,
         alias="flake8-boolean-trap",
         description="Options for the `flake8-boolean-trap` plugin.",
     )
-    flake8_bugbear: Optional[Flake8BugbearOptions] = Field(
+    flake8_bugbear: Flake8BugbearOptions | None = Field(
         None,
         alias="flake8-bugbear",
         description="Options for the `flake8-bugbear` plugin.",
     )
-    flake8_builtins: Optional[Flake8BuiltinsOptions] = Field(
+    flake8_builtins: Flake8BuiltinsOptions | None = Field(
         None,
         alias="flake8-builtins",
         description="Options for the `flake8-builtins` plugin.",
     )
-    flake8_comprehensions: Optional[Flake8ComprehensionsOptions] = Field(
+    flake8_comprehensions: Flake8ComprehensionsOptions | None = Field(
         None,
         alias="flake8-comprehensions",
         description="Options for the `flake8-comprehensions` plugin.",
     )
-    flake8_copyright: Optional[Flake8CopyrightOptions] = Field(
+    flake8_copyright: Flake8CopyrightOptions | None = Field(
         None,
         alias="flake8-copyright",
         description="Options for the `flake8-copyright` plugin.",
     )
-    flake8_errmsg: Optional[Flake8ErrMsgOptions] = Field(
+    flake8_errmsg: Flake8ErrMsgOptions | None = Field(
         None,
         alias="flake8-errmsg",
         description="Options for the `flake8-errmsg` plugin.",
     )
-    flake8_gettext: Optional[Flake8GetTextOptions] = Field(
+    flake8_gettext: Flake8GetTextOptions | None = Field(
         None,
         alias="flake8-gettext",
         description="Options for the `flake8-gettext` plugin.",
     )
-    flake8_implicit_str_concat: Optional[Flake8ImplicitStrConcatOptions] = Field(
+    flake8_implicit_str_concat: Flake8ImplicitStrConcatOptions | None = Field(
         None,
         alias="flake8-implicit-str-concat",
         description="Options for the `flake8-implicit-str-concat` plugin.",
     )
-    flake8_import_conventions: Optional[Flake8ImportConventionsOptions] = Field(
+    flake8_import_conventions: Flake8ImportConventionsOptions | None = Field(
         None,
         alias="flake8-import-conventions",
         description="Options for the `flake8-import-conventions` plugin.",
     )
-    flake8_pytest_style: Optional[Flake8PytestStyleOptions] = Field(
+    flake8_pytest_style: Flake8PytestStyleOptions | None = Field(
         None,
         alias="flake8-pytest-style",
         description="Options for the `flake8-pytest-style` plugin.",
     )
-    flake8_quotes: Optional[Flake8QuotesOptions] = Field(
+    flake8_quotes: Flake8QuotesOptions | None = Field(
         None,
         alias="flake8-quotes",
         description="Options for the `flake8-quotes` plugin.",
     )
-    flake8_self: Optional[Flake8SelfOptions] = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
-    flake8_tidy_imports: Optional[Flake8TidyImportsOptions] = Field(
+    flake8_self: Flake8SelfOptions | None = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
+    flake8_tidy_imports: Flake8TidyImportsOptions | None = Field(
         None,
         alias="flake8-tidy-imports",
         description="Options for the `flake8-tidy-imports` plugin.",
     )
-    flake8_type_checking: Optional[Flake8TypeCheckingOptions] = Field(
+    flake8_type_checking: Flake8TypeCheckingOptions | None = Field(
         None,
         alias="flake8-type-checking",
         description="Options for the `flake8-type-checking` plugin.",
     )
-    flake8_unused_arguments: Optional[Flake8UnusedArgumentsOptions] = Field(
+    flake8_unused_arguments: Flake8UnusedArgumentsOptions | None = Field(
         None,
         alias="flake8-unused-arguments",
         description="Options for the `flake8-unused-arguments` plugin.",
     )
-    future_annotations: Optional[bool] = Field(
+    future_annotations: bool | None = Field(
         None,
         alias="future-annotations",
         description="Whether to allow rules to add `from __future__ import annotations` in cases where this would simplify a fix or enable a new diagnostic.\n\nFor example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks if `__future__` annotations are enabled.",
     )
-    ignore: Optional[List[RuleSelector]] = Field(
+    ignore: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
     )
-    ignore_init_module_imports: Optional[bool] = Field(
+    ignore_init_module_imports: bool | None = Field(
         None,
         alias="ignore-init-module-imports",
         description="Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
     )
-    isort: Optional[IsortOptions] = Field(None, description="Options for the `isort` plugin.")
-    logger_objects: Optional[List[str]] = Field(
+    isort: IsortOptions | None = Field(None, description="Options for the `isort` plugin.")
+    logger_objects: list[str] | None = Field(
         None,
         alias="logger-objects",
         description='A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `"logging_setup.logger"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).',
     )
-    mccabe: Optional[McCabeOptions] = Field(None, description="Options for the `mccabe` plugin.")
-    pep8_naming: Optional[Pep8NamingOptions] = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
-    per_file_ignores: Optional[Dict[str, Any]] = Field(
+    mccabe: McCabeOptions | None = Field(None, description="Options for the `mccabe` plugin.")
+    pep8_naming: Pep8NamingOptions | None = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
+    per_file_ignores: dict[str, Any] | None = Field(
         None,
         alias="per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
     )
-    preview: Optional[bool] = Field(
+    preview: bool | None = Field(
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules and fixes.",
     )
-    pycodestyle: Optional[PycodestyleOptions] = Field(None, description="Options for the `pycodestyle` plugin.")
-    pydoclint: Optional[PydoclintOptions] = Field(None, description="Options for the `pydoclint` plugin.")
-    pydocstyle: Optional[PydocstyleOptions] = Field(None, description="Options for the `pydocstyle` plugin.")
-    pyflakes: Optional[PyflakesOptions] = Field(None, description="Options for the `pyflakes` plugin.")
-    pylint: Optional[PylintOptions] = Field(None, description="Options for the `pylint` plugin.")
-    pyupgrade: Optional[PyUpgradeOptions] = Field(None, description="Options for the `pyupgrade` plugin.")
-    ruff: Optional[RuffOptions] = Field(None, description="Options for the `ruff` plugin")
-    select: Optional[List[RuleSelector]] = Field(
+    pycodestyle: PycodestyleOptions | None = Field(None, description="Options for the `pycodestyle` plugin.")
+    pydoclint: PydoclintOptions | None = Field(None, description="Options for the `pydoclint` plugin.")
+    pydocstyle: PydocstyleOptions | None = Field(None, description="Options for the `pydocstyle` plugin.")
+    pyflakes: PyflakesOptions | None = Field(None, description="Options for the `pyflakes` plugin.")
+    pylint: PylintOptions | None = Field(None, description="Options for the `pylint` plugin.")
+    pyupgrade: PyUpgradeOptions | None = Field(None, description="Options for the `pyupgrade` plugin.")
+    ruff: RuffOptions | None = Field(None, description="Options for the `ruff` plugin")
+    select: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
     )
-    task_tags: Optional[List[str]] = Field(
+    task_tags: list[str] | None = Field(
         None,
         alias="task-tags",
         description='A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if [`ignore-overlong-task-comments`](#lint_pycodestyle_ignore-overlong-task-comments) is set to `true`.',
     )
-    typing_extensions: Optional[bool] = Field(
+    typing_extensions: bool | None = Field(
         None,
         alias="typing-extensions",
         description="Whether to allow imports from the third-party `typing_extensions` module for Python versions before a symbol was added to the first-party `typing` module.\n\nMany rules try to import symbols from the `typing` module but fall back to `typing_extensions` for earlier versions of Python. This option can be used to disable this fallback behavior in cases where `typing_extensions` is not installed.",
     )
-    typing_modules: Optional[List[str]] = Field(
+    typing_modules: list[str] | None = Field(
         None,
         alias="typing-modules",
         description="A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
     )
-    unfixable: Optional[List[RuleSelector]] = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
+    unfixable: list[RuleSelector] | None = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
 
 
 class Options(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    allowed_confusables: Optional[List[constr(min_length=1, max_length=1)]] = Field(
+    allowed_confusables: list[constr(min_length=1, max_length=1)] | None = Field(
         None,
         alias="allowed-confusables",
         description='A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.',
     )
-    analyze: Optional[AnalyzeOptions] = Field(None, description="Options to configure import map generation.")
-    builtins: Optional[List[str]] = Field(
+    analyze: AnalyzeOptions | None = Field(None, description="Options to configure import map generation.")
+    builtins: list[str] | None = Field(
         None,
         description="A list of builtins to treat as defined references, in addition to the system builtins.",
     )
-    cache_dir: Optional[str] = Field(
+    cache_dir: str | None = Field(
         None,
         alias="cache-dir",
         description="A path to the cache directory.\n\nBy default, Ruff stores cache results in a `.ruff_cache` directory in the current project root.\n\nHowever, Ruff will also respect the `RUFF_CACHE_DIR` environment variable, which takes precedence over that default.\n\nThis setting will override even the `RUFF_CACHE_DIR` environment variable, if set.",
     )
-    dummy_variable_rgx: Optional[str] = Field(
+    dummy_variable_rgx: str | None = Field(
         None,
         alias="dummy-variable-rgx",
         description='A regular expression used to identify "dummy" variables, or those which should be ignored when enforcing (e.g.) unused-variable rules. The default expression matches `_`, `__`, and `_var`, but not `_var_`.',
     )
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         None,
         description="A list of file patterns to exclude from formatting and linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
     )
-    explicit_preview_rules: Optional[bool] = Field(
+    explicit_preview_rules: bool | None = Field(
         None,
         alias="explicit-preview-rules",
         description="Whether to require exact codes to select preview rules. When enabled, preview rules will not be selected by prefixes — the full code of each preview rule will be required to enable the rule.",
     )
-    extend: Optional[str] = Field(
+    extend: str | None = Field(
         None,
         description="A path to a local `pyproject.toml` file to merge into this configuration. User home directory and environment variables will be expanded.\n\nTo resolve the current `pyproject.toml` file, Ruff will first resolve this base configuration file, then merge in any properties defined in the current configuration file.",
     )
-    extend_exclude: Optional[List[str]] = Field(
+    extend_exclude: list[str] | None = Field(
         None,
         alias="extend-exclude",
         description="A list of file patterns to omit from formatting and linting, in addition to those specified by [`exclude`](#exclude).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    extend_fixable: Optional[List[RuleSelector]] = Field(
+    extend_fixable: list[RuleSelector] | None = Field(
         None,
         alias="extend-fixable",
         description="A list of rule codes or prefixes to consider fixable, in addition to those specified by [`fixable`](#lint_fixable).",
     )
-    extend_ignore: Optional[List[RuleSelector]] = Field(
+    extend_ignore: list[RuleSelector] | None = Field(
         None,
         alias="extend-ignore",
         description="A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
     )
-    extend_include: Optional[List[str]] = Field(
+    extend_include: list[str] | None = Field(
         None,
         alias="extend-include",
         description="A list of file patterns to include when linting, in addition to those specified by [`include`](#include).\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    extend_per_file_ignores: Optional[Dict[str, Any]] = Field(
+    extend_per_file_ignores: dict[str, Any] | None = Field(
         None,
         alias="extend-per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).",
     )
-    extend_safe_fixes: Optional[List[RuleSelector]] = Field(
+    extend_safe_fixes: list[RuleSelector] | None = Field(
         None,
         alias="extend-safe-fixes",
         description="A list of rule codes or prefixes for which unsafe fixes should be considered safe.",
     )
-    extend_select: Optional[List[RuleSelector]] = Field(
+    extend_select: list[RuleSelector] | None = Field(
         None,
         alias="extend-select",
         description="A list of rule codes or prefixes to enable, in addition to those specified by [`select`](#lint_select).",
     )
-    extend_unfixable: Optional[List[RuleSelector]] = Field(
+    extend_unfixable: list[RuleSelector] | None = Field(
         None,
         alias="extend-unfixable",
         description="A list of rule codes or prefixes to consider non-auto-fixable, in addition to those specified by [`unfixable`](#lint_unfixable).",
     )
-    extend_unsafe_fixes: Optional[List[RuleSelector]] = Field(
+    extend_unsafe_fixes: list[RuleSelector] | None = Field(
         None,
         alias="extend-unsafe-fixes",
         description="A list of rule codes or prefixes for which safe fixes should be considered unsafe.",
     )
-    external: Optional[List[str]] = Field(
+    external: list[str] | None = Field(
         None,
         description="A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
     )
-    fix: Optional[bool] = Field(
+    fix: bool | None = Field(
         None,
         description="Enable fix behavior by-default when running `ruff` (overridden by the `--fix` and `--no-fix` command-line flags). Only includes automatic fixes unless `--unsafe-fixes` is provided.",
     )
-    fix_only: Optional[bool] = Field(
+    fix_only: bool | None = Field(
         None,
         alias="fix-only",
         description="Like [`fix`](#fix), but disables reporting on leftover violation. Implies [`fix`](#fix).",
     )
-    fixable: Optional[List[RuleSelector]] = Field(
+    fixable: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to consider fixable. By default, all rules are considered fixable.",
     )
-    flake8_annotations: Optional[Flake8AnnotationsOptions] = Field(
+    flake8_annotations: Flake8AnnotationsOptions | None = Field(
         None,
         alias="flake8-annotations",
         description="Options for the `flake8-annotations` plugin.",
     )
-    flake8_bandit: Optional[Flake8BanditOptions] = Field(
+    flake8_bandit: Flake8BanditOptions | None = Field(
         None,
         alias="flake8-bandit",
         description="Options for the `flake8-bandit` plugin.",
     )
-    flake8_boolean_trap: Optional[Flake8BooleanTrapOptions] = Field(
+    flake8_boolean_trap: Flake8BooleanTrapOptions | None = Field(
         None,
         alias="flake8-boolean-trap",
         description="Options for the `flake8-boolean-trap` plugin.",
     )
-    flake8_bugbear: Optional[Flake8BugbearOptions] = Field(
+    flake8_bugbear: Flake8BugbearOptions | None = Field(
         None,
         alias="flake8-bugbear",
         description="Options for the `flake8-bugbear` plugin.",
     )
-    flake8_builtins: Optional[Flake8BuiltinsOptions] = Field(
+    flake8_builtins: Flake8BuiltinsOptions | None = Field(
         None,
         alias="flake8-builtins",
         description="Options for the `flake8-builtins` plugin.",
     )
-    flake8_comprehensions: Optional[Flake8ComprehensionsOptions] = Field(
+    flake8_comprehensions: Flake8ComprehensionsOptions | None = Field(
         None,
         alias="flake8-comprehensions",
         description="Options for the `flake8-comprehensions` plugin.",
     )
-    flake8_copyright: Optional[Flake8CopyrightOptions] = Field(
+    flake8_copyright: Flake8CopyrightOptions | None = Field(
         None,
         alias="flake8-copyright",
         description="Options for the `flake8-copyright` plugin.",
     )
-    flake8_errmsg: Optional[Flake8ErrMsgOptions] = Field(
+    flake8_errmsg: Flake8ErrMsgOptions | None = Field(
         None,
         alias="flake8-errmsg",
         description="Options for the `flake8-errmsg` plugin.",
     )
-    flake8_gettext: Optional[Flake8GetTextOptions] = Field(
+    flake8_gettext: Flake8GetTextOptions | None = Field(
         None,
         alias="flake8-gettext",
         description="Options for the `flake8-gettext` plugin.",
     )
-    flake8_implicit_str_concat: Optional[Flake8ImplicitStrConcatOptions] = Field(
+    flake8_implicit_str_concat: Flake8ImplicitStrConcatOptions | None = Field(
         None,
         alias="flake8-implicit-str-concat",
         description="Options for the `flake8-implicit-str-concat` plugin.",
     )
-    flake8_import_conventions: Optional[Flake8ImportConventionsOptions] = Field(
+    flake8_import_conventions: Flake8ImportConventionsOptions | None = Field(
         None,
         alias="flake8-import-conventions",
         description="Options for the `flake8-import-conventions` plugin.",
     )
-    flake8_pytest_style: Optional[Flake8PytestStyleOptions] = Field(
+    flake8_pytest_style: Flake8PytestStyleOptions | None = Field(
         None,
         alias="flake8-pytest-style",
         description="Options for the `flake8-pytest-style` plugin.",
     )
-    flake8_quotes: Optional[Flake8QuotesOptions] = Field(
+    flake8_quotes: Flake8QuotesOptions | None = Field(
         None,
         alias="flake8-quotes",
         description="Options for the `flake8-quotes` plugin.",
     )
-    flake8_self: Optional[Flake8SelfOptions] = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
-    flake8_tidy_imports: Optional[Flake8TidyImportsOptions] = Field(
+    flake8_self: Flake8SelfOptions | None = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
+    flake8_tidy_imports: Flake8TidyImportsOptions | None = Field(
         None,
         alias="flake8-tidy-imports",
         description="Options for the `flake8-tidy-imports` plugin.",
     )
-    flake8_type_checking: Optional[Flake8TypeCheckingOptions] = Field(
+    flake8_type_checking: Flake8TypeCheckingOptions | None = Field(
         None,
         alias="flake8-type-checking",
         description="Options for the `flake8-type-checking` plugin.",
     )
-    flake8_unused_arguments: Optional[Flake8UnusedArgumentsOptions] = Field(
+    flake8_unused_arguments: Flake8UnusedArgumentsOptions | None = Field(
         None,
         alias="flake8-unused-arguments",
         description="Options for the `flake8-unused-arguments` plugin.",
     )
-    force_exclude: Optional[bool] = Field(
+    force_exclude: bool | None = Field(
         None,
         alias="force-exclude",
         description="Whether to enforce [`exclude`](#exclude) and [`extend-exclude`](#extend-exclude) patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
     )
-    format: Optional[FormatOptions] = Field(None, description="Options to configure code formatting.")
-    ignore: Optional[List[RuleSelector]] = Field(
+    format: FormatOptions | None = Field(None, description="Options to configure code formatting.")
+    ignore: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
     )
-    ignore_init_module_imports: Optional[bool] = Field(
+    ignore_init_module_imports: bool | None = Field(
         None,
         alias="ignore-init-module-imports",
         description="Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
     )
-    include: Optional[List[str]] = Field(
+    include: list[str] | None = Field(
         None,
         description="A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension. `pyproject.toml` is included here not for configuration but because we lint whether e.g. the `[project]` matches the schema.\n\nNotebook files (`.ipynb` extension) are included by default on Ruff 0.6.0+.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    indent_width: Optional[IndentWidth] = Field(
+    indent_width: IndentWidth | None = Field(
         None,
         alias="indent-width",
         description="The number of spaces per indentation level (tab).\n\nUsed by the formatter and when enforcing long-line violations (like `E501`) to determine the visual width of a tab.\n\nThis option changes the number of spaces the formatter inserts when using soft-tabs (`indent-style = space`).\n\nPEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).",
     )
-    isort: Optional[IsortOptions] = Field(None, description="Options for the `isort` plugin.")
-    line_length: Optional[LineLength] = Field(
+    isort: IsortOptions | None = Field(None, description="Options for the `isort` plugin.")
+    line_length: LineLength | None = Field(
         None,
         alias="line-length",
         description="The line length to use when enforcing long-lines violations (like `E501`) and at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#lint_pycodestyle_max-line-length) to configure different lengths for `E501` and the formatter.",
     )
-    lint: Optional[LintOptions] = None
-    logger_objects: Optional[List[str]] = Field(
+    lint: LintOptions | None = None
+    logger_objects: list[str] | None = Field(
         None,
         alias="logger-objects",
         description='A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `"logging_setup.logger"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).',
     )
-    mccabe: Optional[McCabeOptions] = Field(None, description="Options for the `mccabe` plugin.")
-    namespace_packages: Optional[List[str]] = Field(
+    mccabe: McCabeOptions | None = Field(None, description="Options for the `mccabe` plugin.")
+    namespace_packages: list[str] | None = Field(
         None,
         alias="namespace-packages",
         description="Mark the specified directories as namespace packages. For the purpose of module resolution, Ruff will treat those directories and all their subdirectories as if they contained an `__init__.py` file.",
     )
-    output_format: Optional[OutputFormat] = Field(
+    output_format: OutputFormat | None = Field(
         None,
         alias="output-format",
         description='The style in which violation messages should be formatted: `"full"` (default) (shows source), `"concise"`, `"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub Actions annotations), `"gitlab"` (GitLab CI code quality report), `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).',
     )
-    pep8_naming: Optional[Pep8NamingOptions] = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
-    per_file_ignores: Optional[Dict[str, Any]] = Field(
+    pep8_naming: Pep8NamingOptions | None = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
+    per_file_ignores: dict[str, Any] | None = Field(
         None,
         alias="per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
     )
-    per_file_target_version: Optional[Dict[str, Any]] = Field(
+    per_file_target_version: dict[str, Any] | None = Field(
         None,
         alias="per-file-target-version",
         description='A list of mappings from glob-style file pattern to Python version to use when checking the corresponding file(s).\n\nThis may be useful for overriding the global Python version settings in `target-version` or `requires-python` for a subset of files. For example, if you have a project with a minimum supported Python version of 3.9 but a subdirectory of developer scripts that want to use a newer feature like the `match` statement from Python 3.10, you can use `per-file-target-version` to specify `"developer_scripts/*.py" = "py310"`.\n\nThis setting is used by the linter to enforce any enabled version-specific lint rules, as well as by the formatter for any version-specific formatting options, such as parenthesizing context managers on Python 3.10+.',
     )
-    preview: Optional[bool] = Field(
+    preview: bool | None = Field(
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules, fixes, and formatting.",
     )
-    pycodestyle: Optional[PycodestyleOptions] = Field(None, description="Options for the `pycodestyle` plugin.")
-    pydocstyle: Optional[PydocstyleOptions] = Field(None, description="Options for the `pydocstyle` plugin.")
-    pyflakes: Optional[PyflakesOptions] = Field(None, description="Options for the `pyflakes` plugin.")
-    pylint: Optional[PylintOptions] = Field(None, description="Options for the `pylint` plugin.")
-    pyupgrade: Optional[PyUpgradeOptions] = Field(None, description="Options for the `pyupgrade` plugin.")
-    required_version: Optional[RequiredVersion] = Field(
+    pycodestyle: PycodestyleOptions | None = Field(None, description="Options for the `pycodestyle` plugin.")
+    pydocstyle: PydocstyleOptions | None = Field(None, description="Options for the `pydocstyle` plugin.")
+    pyflakes: PyflakesOptions | None = Field(None, description="Options for the `pyflakes` plugin.")
+    pylint: PylintOptions | None = Field(None, description="Options for the `pylint` plugin.")
+    pyupgrade: PyUpgradeOptions | None = Field(None, description="Options for the `pyupgrade` plugin.")
+    required_version: RequiredVersion | None = Field(
         None,
         alias="required-version",
         description="Enforce a requirement on the version of Ruff, to enforce at runtime. If the version of Ruff does not meet the requirement, Ruff will exit with an error.\n\nUseful for unifying results across many environments, e.g., with a `pyproject.toml` file.\n\nAccepts a [PEP 440](https://peps.python.org/pep-0440/) specifier, like `==0.3.1` or `>=0.3.1`.",
     )
-    respect_gitignore: Optional[bool] = Field(
+    respect_gitignore: bool | None = Field(
         None,
         alias="respect-gitignore",
         description="Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
     )
-    select: Optional[List[RuleSelector]] = Field(
+    select: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
     )
-    show_fixes: Optional[bool] = Field(
+    show_fixes: bool | None = Field(
         None,
         alias="show-fixes",
         description="Whether to show an enumeration of all fixed lint violations (overridden by the `--show-fixes` command-line flag).",
     )
-    src: Optional[List[str]] = Field(
+    src: list[str] | None = Field(
         None,
         description='The directories to consider when resolving first- vs. third-party imports.\n\nWhen omitted, the `src` directory will typically default to including both:\n\n1. The directory containing the nearest `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (the "project root"). 2. The `"src"` subdirectory of the project root.\n\nThese defaults ensure that Ruff supports both flat layouts and `src` layouts out-of-the-box. (If a configuration file is explicitly provided (e.g., via the `--config` command-line flag), the current working directory will be considered the project root.)\n\nAs an example, consider an alternative project structure, like:\n\n```text my_project ├── pyproject.toml └── lib └── my_package ├── __init__.py ├── foo.py └── bar.py ```\n\nIn this case, the `./lib` directory should be included in the `src` option (e.g., `src = ["lib"]`), such that when resolving imports, `my_package.foo` is considered first-party.\n\nThis field supports globs. For example, if you have a series of Python packages in a `python_modules` directory, `src = ["python_modules/*"]` would expand to incorporate all packages in that directory. User home directory and environment variables will also be expanded.',
     )
-    target_version: Optional[PythonVersion] = Field(
+    target_version: PythonVersion | None = Field(
         None,
         alias="target-version",
         description='The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = "py310"`.\n\nIf you\'re already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it\'s based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = "py38"`:\n\n```toml [project] requires-python = ">=3.8" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version) for a complete description of how the `target-version` is determined when left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax) before it is available at runtime, as long as the stub does not make use of new *syntax*. For example, a type checker will understand `int | str` in a stub as being a `Union` type annotation, even if the type checker is run using Python 3.9, despite the fact that the `|` operator can only be used to create union types at runtime on Python 3.10+. As such, Ruff will often recommend newer features in a stub file than it would for an equivalent runtime file with the same target version.',
     )
-    task_tags: Optional[List[str]] = Field(
+    task_tags: list[str] | None = Field(
         None,
         alias="task-tags",
         description='A list of task tags to recognize (e.g., "TODO", "FIXME", "XXX").\n\nComments starting with these tags will be ignored by commented-out code detection (`ERA`), and skipped by line-length rules (`E501`) if [`ignore-overlong-task-comments`](#lint_pycodestyle_ignore-overlong-task-comments) is set to `true`.',
     )
-    typing_modules: Optional[List[str]] = Field(
+    typing_modules: list[str] | None = Field(
         None,
         alias="typing-modules",
         description="A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
     )
-    unfixable: Optional[List[RuleSelector]] = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
-    unsafe_fixes: Optional[bool] = Field(
+    unfixable: list[RuleSelector] | None = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
+    unsafe_fixes: bool | None = Field(
         None,
         alias="unsafe-fixes",
         description="Enable application of unsafe fixes. If excluded, a hint will be displayed when unsafe fixes are available. If set to false, the hint will be hidden.",

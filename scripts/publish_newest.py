@@ -39,9 +39,7 @@ def find_newest_package_files(package_name: str, dist_dir: Path) -> list[Path]:
 
     for file_path in all_files:
         # Try both patterns
-        match = wheel_pattern.match(file_path.name) or tarball_pattern.match(
-            file_path.name
-        )
+        match = wheel_pattern.match(file_path.name) or tarball_pattern.match(file_path.name)
         if match:
             version_str = match.group(1)
             try:
@@ -50,9 +48,7 @@ def find_newest_package_files(package_name: str, dist_dir: Path) -> list[Path]:
                     version_files[version] = []
                 version_files[version].append(file_path)
             except Exception as e:
-                print(
-                    f"Warning: Could not parse version '{version_str}' from {file_path.name}: {e}"
-                )
+                print(f"Warning: Could not parse version '{version_str}' from {file_path.name}: {e}")
 
     if not version_files:
         print(f"No valid version files found for '{package_name}'")
@@ -102,13 +98,9 @@ def publish_files(file_paths: list[Path], dry_run: bool = False) -> bool:
         return False
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Publish only the newest version of a package from dist directory"
-    )
-    parser.add_argument(
-        "package_name", help="Name of the package to publish (e.g., 'we-love-string')"
-    )
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Publish only the newest version of a package from dist directory")
+    parser.add_argument("package_name", help="Name of the package to publish (e.g., 'we-love-string')")
     parser.add_argument(
         "--dist-dir",
         type=Path,

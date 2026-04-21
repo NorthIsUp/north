@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import UserString
 from functools import cached_property
 from typing import ClassVar, Literal, Self, _LiteralGenericAlias, get_args
 
@@ -9,28 +10,26 @@ from .base32 import decode as b32decode
 from .base32 import encode as b32encode
 
 
-class TypeId[Prefix: _LiteralGenericAlias](str):
+class TypeId[Prefix: _LiteralGenericAlias](UserString):
     __typeid_prefix__: ClassVar[_LiteralGenericAlias]
     __typeid_prefix_str__: ClassVar[str]
 
-    def __new__(cls, id: str | uuid6.UUID) -> Self:
+    def __init__(self, id: str | uuid6.UUID) -> None:
         match id:
             case str() as s:
                 if "_" in s:
-                    prefix, s = s.split("_")
-                    if prefix != cls.__typeid_prefix_str__:
-                        raise ValueError(f"Invalid prefix for {cls.__name__}: {prefix}")
-
+                    prefix, s = s.split("_", 1)
+                    if type(self) is not TypeId and prefix != self.__typeid_prefix_str__:
+                        raise ValueError(f"Invalid prefix for {type(self).__name__}: {prefix}")
             case uuid6.UUID() as u:
-                s = cls._convert_uuid_to_b32(u)
+                s = self._convert_uuid_to_b32(u)
             case _:
                 raise ValueError(f"Invalid id: {id}")
 
-        # For base TypeId class, use the string as-is
-        if cls is TypeId:
-            return super().__new__(cls, s)
-
-        return super().__new__(cls, f"{cls.__typeid_prefix_str__}_{s}")
+        if type(self) is TypeId:
+            super().__init__(s)
+        else:
+            super().__init__(f"{self.__typeid_prefix_str__}_{s}")
 
     def __repr__(self) -> str:
         return f"TypeId['{self.prefix_str}']({self.suffix!r})"

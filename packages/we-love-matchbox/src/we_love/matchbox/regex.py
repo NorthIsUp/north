@@ -1,6 +1,7 @@
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, ClassVar
+from typing import ClassVar
 
 MatchFuncT = Callable[[re.Pattern[str], str, int, int], re.Match[str] | None]
 
@@ -17,7 +18,10 @@ class RegexMatch:
     def __post_init__(self) -> None:
         self.compiled_pattern = re.compile(self.pattern, self.flags)
 
-    def __eq__(self, other: str) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, str):  # only implemented for str comparison
+            raise NotImplementedError()
+
         self._match = self.match_func(self.compiled_pattern, other, 0, len(other))
         return self._match is not None
 

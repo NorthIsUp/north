@@ -11,7 +11,7 @@ The library now uses slow, mesmerizing animations with full-circle progression f
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 # Duration: 30 seconds (slow, hypnotic)
 # FPS: 30
 # Total frames: 900
@@ -59,7 +59,7 @@ from we_love.avatars import AvatarGeneratorConfig, avatar, Avatar
 
 # Faster for testing/thumbnails
 config = AvatarGeneratorConfig(duration=5.0)
-Avatar(avatar('test', config)).save_gif('fast.gif', optimize=False)
+Avatar(avatar("test", config)).save_gif("fast.gif", optimize=False)
 # 25% faster encoding!
 ```
 
@@ -67,7 +67,7 @@ Avatar(avatar('test', config)).save_gif('fast.gif', optimize=False)
 ```python
 # Even slower for desktop backgrounds
 config = AvatarGeneratorConfig(duration=60.0)  # 1 minute!
-Avatar(avatar('test', config)).save_gif('ultra_slow.gif')
+Avatar(avatar("test", config)).save_gif("ultra_slow.gif")
 ```
 
 ### Match Music/Video
@@ -75,9 +75,9 @@ Avatar(avatar('test', config)).save_gif('ultra_slow.gif')
 # Sync to your content
 config = AvatarGeneratorConfig(
     duration=15.0,  # 15 second loop
-    fps=60,         # Smooth 60fps
+    fps=60,  # Smooth 60fps
 )
-Avatar(avatar('test', config)).save_gif('music_sync.gif')
+Avatar(avatar("test", config)).save_gif("music_sync.gif")
 ```
 
 ## File Sizes
@@ -114,7 +114,7 @@ config = AvatarGeneratorConfig(
     duration=10.0,  # Still slow and mesmerizing
 )
 
-Avatar(avatar('test', config)).save_gif('smaller.gif')
+Avatar(avatar("test", config)).save_gif("smaller.gif")
 ```
 
 ## Aurora Examples
@@ -139,11 +139,11 @@ Since 30-second animations generate 900 frames, you can enable a progress bar to
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 av = Avatar(config)
 
 # Enable progress bar
-av.save_gif('avatar.gif', progress=True)
+av.save_gif("avatar.gif", progress=True)
 
 # Shows:
 # Rendering frames: 100%|████████| 900/900 [00:05<00:00, 164.03frame/s]

@@ -14,7 +14,7 @@ uv add we-love-avatars
 from we_love.avatars import avatar, Avatar
 
 # Generate unique avatar from any string
-Avatar(avatar('alice@example.com')).save_gif('alice.gif')
+Avatar(avatar("alice@example.com")).save_gif("alice.gif")
 ```
 
 That's it! You now have a unique animated avatar. Same seed always produces the same avatar (perfect for user profiles!).
@@ -24,14 +24,14 @@ That's it! You now have a unique animated avatar. Same seed always produces the 
 For maximum speed, use all your CPU cores:
 
 ```python
-Avatar(avatar('alice@example.com')).save_gif(
-    'alice.gif',
-    parallel=True,    # ⚡ Use all CPU cores
-    optimize=False,   # ⚡ Fast encoding
-    progress=True,    # See the speed!
+Avatar(avatar("alice@example.com")).save_gif(
+    "alice.gif",
+    parallel=True,  # ⚡ Use all CPU cores
+    optimize=False,  # ⚡ Fast encoding
+    progress=True,  # See the speed!
 )
 
-# Shows: 
+# Shows:
 # Rendering frames (16 cores): 100%|████| 900/900 [00:02<00:00, 392fps]
 # Encoding GIF (900 frames, 256 colors, fast)...
 # ✓ Saved alice.gif (77.8 MB)
@@ -43,11 +43,11 @@ Avatar(avatar('alice@example.com')).save_gif(
 
 ```python
 # Different users get different avatars
-Avatar(avatar('bob@example.com')).save_gif('bob.gif')
-Avatar(avatar('charlie@example.com')).save_gif('charlie.gif')
+Avatar(avatar("bob@example.com")).save_gif("bob.gif")
+Avatar(avatar("charlie@example.com")).save_gif("charlie.gif")
 
 # Username as seed
-Avatar(avatar('cool_user_123')).save_gif('user.gif')
+Avatar(avatar("cool_user_123")).save_gif("user.gif")
 ```
 
 ## Customize It
@@ -68,17 +68,15 @@ config = AvatarConfig(
     height=512,
     fps=30,
     duration=2.0,
-    
     # Gradient background
     gradient_config=GradientConfig(
         colors=[
-            (255, 0, 128),   # Pink
-            (128, 0, 255),   # Purple  
-            (0, 128, 255),   # Blue
+            (255, 0, 128),  # Pink
+            (128, 0, 255),  # Purple
+            (0, 128, 255),  # Blue
         ],
         gradient_type=GradientType.RADIAL,
     ),
-    
     # Animated loops
     loop_configs=[
         LoopConfig(
@@ -92,7 +90,7 @@ config = AvatarConfig(
 )
 
 avatar = Avatar(config)
-avatar.save_gif('custom-avatar.gif')
+avatar.save_gif("custom-avatar.gif")
 ```
 
 ## Try Different Loop Types
@@ -120,7 +118,7 @@ LoopConfig(
 Stack multiple loops for complex animations:
 
 ```python
-loop_configs=[
+loop_configs = [
     LoopConfig(loop_type=LoopType.LISSAJOUS, size=0.7),
     LoopConfig(loop_type=LoopType.CIRCLE, size=0.4, speed=2.0),
     LoopConfig(loop_type=LoopType.ROSE, petals=5, size=0.5),
@@ -182,10 +180,10 @@ from we_love.avatars import Avatar, AvatarConfig, GradientConfig, GradientType, 
 config = AvatarConfig(
     gradient_config=GradientConfig(
         colors=[
-            (10, 80, 60),    # Deep teal
+            (10, 80, 60),  # Deep teal
             (40, 120, 180),  # Sky blue
-            (80, 60, 180),   # Purple
-            (120, 200, 160), # Bright teal
+            (80, 60, 180),  # Purple
+            (120, 200, 160),  # Bright teal
         ],
         gradient_type=GradientType.AURORA,  # ✨ Aurora effect!
         smooth_loop=True,
@@ -199,7 +197,7 @@ config = AvatarConfig(
     ],
 )
 
-Avatar(config).save_gif('aurora.gif')
+Avatar(config).save_gif("aurora.gif")
 ```
 
 Run examples: `mise run aurora`

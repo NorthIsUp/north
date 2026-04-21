@@ -14,6 +14,7 @@ classifiers = [
 dependencies = [
   "we-love-pydantic",
   "we-love-registry",
+  "we-love-string",
   "pydantic>=2",
   "argcomplete",
 ]
@@ -25,7 +26,11 @@ module-name = "we_love"
 [tool.uv.sources]
 we-love-pydantic = { path = "../we-love-pydantic" }
 we-love-registry = { path = "../we-love-registry" }
+we-love-string   = { path = "../we-love-string" }
 
 [tool.pyright]
 venv     = ".venv"
 venvPath = "."
+
+[dependency-groups]
+dev = ["pytest>=9"]

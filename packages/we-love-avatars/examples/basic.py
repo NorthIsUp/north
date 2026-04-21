@@ -13,8 +13,8 @@ from we_love.avatars import (
 def example_default() -> None:
     """Create an avatar with default settings."""
     avatar = Avatar()
-    avatar.save_gif('output/default.gif')
-    print('Created: output/default.gif')
+    avatar.save_gif("output/default.gif")
+    print("Created: output/default.gif")
 
 
 def example_lissajous() -> None:
@@ -44,8 +44,8 @@ def example_lissajous() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/lissajous.gif')
-    print('Created: output/lissajous.gif')
+    avatar.save_gif("output/lissajous.gif")
+    print("Created: output/lissajous.gif")
 
 
 def example_rose() -> None:
@@ -70,8 +70,8 @@ def example_rose() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/rose.gif')
-    print('Created: output/rose.gif')
+    avatar.save_gif("output/rose.gif")
+    print("Created: output/rose.gif")
 
 
 def example_multiple_loops() -> None:
@@ -112,8 +112,8 @@ def example_multiple_loops() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/multiple.gif')
-    print('Created: output/multiple.gif')
+    avatar.save_gif("output/multiple.gif")
+    print("Created: output/multiple.gif")
 
 
 def example_epitrochoid() -> None:
@@ -138,14 +138,14 @@ def example_epitrochoid() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/epitrochoid.gif')
-    print('Created: output/epitrochoid.gif')
+    avatar.save_gif("output/epitrochoid.gif")
+    print("Created: output/epitrochoid.gif")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     example_default()
     example_lissajous()
     example_rose()
     example_multiple_loops()
     example_epitrochoid()
-    print('\nAll examples generated successfully!')
+    print("\nAll examples generated successfully!")

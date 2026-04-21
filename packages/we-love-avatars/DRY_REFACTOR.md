@@ -38,28 +38,16 @@ width_pct = random.uniform(LINE_WIDTH_MIN_PCT, LINE_WIDTH_MAX_PCT)
 **Before**: List repeated in 2 places
 ```python
 # In _generate_loop_color:
-colors = [
-    (255, 255, 240),
-    (255, 240, 200),
-    ...
-]
+colors = [(255, 255, 240), (255, 240, 200), ...]
 
 # In random loop generation:
-color=random.choice([
-    (255, 255, 240),
-    (255, 240, 200),
-    ...
-])
+color = random.choice([(255, 255, 240), (255, 240, 200), ...])
 ```
 
 **After**: Single definition
 ```python
 # constants.py
-LOOP_COLORS = [
-    (255, 255, 240),
-    (255, 240, 200),
-    ...
-]
+LOOP_COLORS = [(255, 255, 240), (255, 240, 200), ...]
 
 # Used everywhere
 random.choice(LOOP_COLORS)
@@ -69,10 +57,7 @@ random.choice(LOOP_COLORS)
 
 **Before**: 6 color pairs defined inline
 ```python
-color_pairs = [
-    ((35, 100, 100), (65, 118, 175)),
-    ...
-]
+color_pairs = [((35, 100, 100), (65, 118, 175)), ...]
 ```
 
 **After**: Constants module
@@ -111,6 +96,7 @@ pos = (pos - pos.min()) / (pos.max() - pos.min())
 def _normalize_position(self, pos):
     return (pos - pos.min()) / (pos.max() - pos.min())
 
+
 # Used everywhere
 pos = self._normalize_position(pos)
 ```
@@ -129,7 +115,7 @@ loop_types = [LoopType.EPITROCHOID, LoopType.LISSAJOUS, LoopType.ROSE]
 **After**: Single constant
 ```python
 # constants.py
-PREFERRED_LOOP_TYPES = ['epitrochoid', 'lissajous', 'rose']
+PREFERRED_LOOP_TYPES = ["epitrochoid", "lissajous", "rose"]
 
 # Both use:
 loop_types = [LoopType[t.upper()] for t in PREFERRED_LOOP_TYPES]

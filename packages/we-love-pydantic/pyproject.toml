@@ -12,7 +12,10 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["stringcase", "pydantic>=2", "rich"]
+dependencies = ["stringcase", "pydantic>=2", "rich", "we-love-string"]
+
+[tool.uv.sources]
+we-love-string = { path = "../we-love-string" }
 
 [tool.uv.build-backend]
 namespace   = true
@@ -21,3 +24,6 @@ module-name = "we_love"
 [tool.pyright]
 venv     = ".venv"
 venvPath = "."
+
+[dependency-groups]
+dev = ["pytest>=9"]

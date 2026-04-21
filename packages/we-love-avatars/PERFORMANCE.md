@@ -25,11 +25,11 @@ Encoding GIF (900 frames, 256 colors, optimized)...
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 av = Avatar(config)
 
 # Fast encoding (3 seconds faster!)
-av.save_gif('avatar.gif', optimize=False, progress=True)
+av.save_gif("avatar.gif", optimize=False, progress=True)
 ```
 
 **Results** (900 frames):
@@ -71,7 +71,7 @@ config_gen = AvatarGeneratorConfig(
 
 ```python
 config_gen = AvatarGeneratorConfig(
-    width=256,   # Instead of 512
+    width=256,  # Instead of 512
     height=256,
     duration=30.0,
 )
@@ -90,11 +90,11 @@ config_gen = AvatarGeneratorConfig(
     duration=10.0,
 )
 
-config = avatar('fast', config_gen)
+config = avatar("fast", config_gen)
 av = Avatar(config)
 
 # Fast encode, no optimization
-av.save_gif('fast.gif', optimize=False, progress=True)
+av.save_gif("fast.gif", optimize=False, progress=True)
 
 # Result: ~2 seconds total (vs 15 seconds)
 # 87% faster!
@@ -134,7 +134,7 @@ config_gen = AvatarGeneratorConfig(
     fps=20,
     duration=5.0,
 )
-av.save_gif('test.gif', optimize=False, progress=True)
+av.save_gif("test.gif", optimize=False, progress=True)
 ```
 
 ### Production/Final Output
@@ -146,7 +146,7 @@ config_gen = AvatarGeneratorConfig(
     fps=30,
     duration=30.0,
 )
-av.save_gif('final.gif', optimize=True, progress=True)
+av.save_gif("final.gif", optimize=True, progress=True)
 ```
 
 ### Web/Social Media
@@ -158,7 +158,7 @@ config_gen = AvatarGeneratorConfig(
     fps=20,
     duration=10.0,
 )
-av.save_gif('web.gif', optimize=False, progress=True)
+av.save_gif("web.gif", optimize=False, progress=True)
 ```
 
 ## Understanding the Times
@@ -205,10 +205,10 @@ Currently, frames render sequentially. Future optimization could:
 **Quick comparison:**
 ```python
 # Slow but small (default)
-av.save_gif('avatar.gif')  # 15s, 22MB
+av.save_gif("avatar.gif")  # 15s, 22MB
 
 # Fast but larger (recommended for dev)
-av.save_gif('avatar.gif', optimize=False)  # 12s, 26MB
+av.save_gif("avatar.gif", optimize=False)  # 12s, 26MB
 ```
 
 The encoding message now shows you exactly what's happening, so no more wondering! 🚀

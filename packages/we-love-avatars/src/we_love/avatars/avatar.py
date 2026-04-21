@@ -83,9 +83,7 @@ class Avatar:
 
         return img
 
-    def render_all_frames(
-        self, progress: bool = False, parallel: bool = False, workers: int | None = None
-    ) -> list[Image.Image]:
+    def render_all_frames(self, progress: bool = False, parallel: bool = False, workers: int | None = None) -> list[Image.Image]:
         """Render all frames of the animation.
 
         Args:

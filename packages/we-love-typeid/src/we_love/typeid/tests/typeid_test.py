@@ -5,7 +5,7 @@ from we_love.typeid import TypeId
 TestId = TypeId[Literal["test"]]
 
 
-def test_ids():
+def test_ids() -> None:
     assert TestId("hi") == TestId("hi")
     assert TestId("hi") != TestId("hi2")
     assert TestId("hi") != TestId("test_1234")
@@ -59,7 +59,7 @@ def test_type_safety() -> None:
     # but we can't test that at runtime without a type checker
 
 
-def test_values1():
+def test_values1() -> None:
     typeid = "enc_01jp36hnz4fvmvm4bge859pb5r"
     expected_uuid = "01958668-d7e4-7ee9-ba11-70720a9b2cb8"
 
@@ -68,7 +68,7 @@ def test_values1():
     assert enc.uuid_str == expected_uuid
 
 
-def test_values():
+def test_values() -> None:
     typeid = "enc_01jp36hnz4fvmvm4bge859pb5r"
     prefix, suffix = typeid.split("_")
     expected_uuid = "01958668-d7e4-7ee9-ba11-70720a9b2cb8"

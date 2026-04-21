@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import logging
-from collections.abc import Callable
 from functools import wraps
-from types import TracebackType
-from typing import ParamSpec, Self, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, Self, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +64,7 @@ class Suppress:
             if msg := self.format_msg(exc_type, exc_value):
                 logger.debug(msg)
             return True
-        if issubclass(exc_type, BaseExceptionGroup) and isinstance(
-            exc_value, BaseExceptionGroup
-        ):
+        if issubclass(exc_type, BaseExceptionGroup) and isinstance(exc_value, BaseExceptionGroup):
             # exc_value is a BaseExceptionGroup
             # exc_match are the exceptions in the group that are in self.exceptions
             # exc_rest is the rest of the exceptions in the group

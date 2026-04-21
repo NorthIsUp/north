@@ -13,10 +13,10 @@ from we_love.avatars import Avatar, AvatarConfig, GradientConfig, GradientType, 
 config = AvatarConfig(
     gradient_config=GradientConfig(
         colors=[
-            (10, 80, 60),    # Deep teal
-            (40, 120, 180),  # Sky blue  
-            (80, 60, 180),   # Purple
-            (120, 200, 160), # Bright teal
+            (10, 80, 60),  # Deep teal
+            (40, 120, 180),  # Sky blue
+            (80, 60, 180),  # Purple
+            (120, 200, 160),  # Bright teal
             (40, 100, 140),  # Ocean blue
         ],
         gradient_type=GradientType.AURORA,
@@ -32,7 +32,7 @@ config = AvatarConfig(
     ],
 )
 
-Avatar(config).save_gif('aurora.gif')
+Avatar(config).save_gif("aurora.gif")
 ```
 
 **How it works**: Combines **5 wave layers** (horizontal, vertical, diagonal, radial, modulation) with **temporal evolution** - patterns evolve over 30 seconds, not just shift! Creates truly multi-dimensional aurora effect.
@@ -43,7 +43,7 @@ Chaotic multi-frequency waves creating energetic, plasma-like gradients.
 ```python
 gradient_config = GradientConfig(
     colors=[
-        (255, 60, 120),   # Hot pink
+        (255, 60, 120),  # Hot pink
         (200, 100, 255),  # Violet
         (100, 150, 255),  # Sky blue
         (120, 255, 200),  # Cyan
@@ -63,43 +63,37 @@ The generator now includes 6 ultra-smooth, aurora-inspired color palettes with 8
 ### 1. Aurora Borealis (green → teal → blue → purple)
 Smooth progression through classic northern lights colors:
 ```python
-[(10, 80, 60), (20, 100, 100), (40, 120, 140), (60, 120, 180), 
- (80, 100, 180), (90, 80, 170), (70, 100, 150)]
+[(10, 80, 60), (20, 100, 100), (40, 120, 140), (60, 120, 180), (80, 100, 180), (90, 80, 170), (70, 100, 150)]
 ```
 
 ### 2. Northern Lights (pink → purple → blue)
 Smooth pink-to-purple gradations with NO harsh transitions:
 ```python
-[(140, 80, 160), (130, 70, 170), (120, 60, 180), (110, 60, 190), 
- (100, 70, 200), (90, 80, 200), (110, 70, 185)]
+[(140, 80, 160), (130, 70, 170), (120, 60, 180), (110, 60, 190), (100, 70, 200), (90, 80, 200), (110, 70, 185)]
 ```
 
 ### 3. Ethereal Rainbow (smooth spectrum)
 Gentle progression through soft rainbow hues:
 ```python
-[(200, 80, 140), (180, 100, 180), (140, 120, 220), (100, 150, 240), 
- (120, 200, 220), (140, 220, 200), (160, 180, 180)]
+[(200, 80, 140), (180, 100, 180), (140, 120, 220), (100, 150, 240), (120, 200, 220), (140, 220, 200), (160, 180, 180)]
 ```
 
 ### 4. Cosmic Teal (cyan → blue → purple)
 Smooth aquatic to celestial transition:
 ```python
-[(60, 180, 200), (70, 160, 210), (80, 140, 220), (90, 120, 220), 
- (100, 100, 210), (110, 90, 200), (80, 130, 215)]
+[(60, 180, 200), (70, 160, 210), (80, 140, 220), (90, 120, 220), (100, 100, 210), (110, 90, 200), (80, 130, 215)]
 ```
 
 ### 5. Mystic Violet (smooth purple gradations)
 Seamless deep-to-light purple progression:
 ```python
-[(80, 40, 120), (100, 50, 150), (120, 60, 180), (140, 80, 200), 
- (150, 100, 210), (130, 70, 190), (110, 55, 165)]
+[(80, 40, 120), (100, 50, 150), (120, 60, 180), (140, 80, 200), (150, 100, 210), (130, 70, 190), (110, 55, 165)]
 ```
 
 ### 6. Ocean Aurora (blue → teal → cyan)
 Smooth oceanic color flow:
 ```python
-[(40, 100, 160), (50, 130, 180), (60, 160, 200), (70, 180, 210), 
- (80, 200, 200), (70, 190, 190), (60, 170, 180)]
+[(40, 100, 160), (50, 130, 180), (60, 160, 200), (70, 180, 210), (80, 200, 200), (70, 190, 190), (60, 170, 180)]
 ```
 
 ## 🌈 All 7 Gradient Types
@@ -135,8 +129,8 @@ The seed-based generator now preferentially creates aurora/plasma gradients:
 from we_love.avatars import avatar, Avatar
 
 # These will likely get aurora or plasma gradients
-Avatar(avatar('alice')).save_gif('alice.gif')
-Avatar(avatar('bob')).save_gif('bob.gif')
+Avatar(avatar("alice")).save_gif("alice.gif")
+Avatar(avatar("bob")).save_gif("bob.gif")
 ```
 
 Priority gradient types (when `enable_wave_gradients=True`):

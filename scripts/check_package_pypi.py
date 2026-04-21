@@ -92,9 +92,7 @@ def check_package_exists_on_pypi(package_name: str, dist_dir: Path) -> bool:
     Check if any package files in dist directory already exist on PyPI.
     Returns True if any file already exists, False otherwise.
     """
-    print(
-        f"Checking if '{package_name}' files in dist are already published on PyPI..."
-    )
+    print(f"Checking if '{package_name}' files in dist are already published on PyPI...")
 
     # Find local package files
     local_files = find_package_files(package_name, dist_dir)
@@ -145,13 +143,9 @@ def check_package_exists_on_pypi(package_name: str, dist_dir: Path) -> bool:
         return False
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Check if package files in dist directory already exist on PyPI"
-    )
-    parser.add_argument(
-        "package_name", help="Name of the package to check (e.g., 'we-love-string')"
-    )
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Check if package files in dist directory already exist on PyPI")
+    parser.add_argument("package_name", help="Name of the package to check (e.g., 'we-love-string')")
     parser.add_argument(
         "--dist-dir",
         type=Path,

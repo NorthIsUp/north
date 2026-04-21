@@ -17,7 +17,7 @@ gradient = GradientConfig(
     gradient_type=GradientType.WAVE,
     wave_frequency=2.5,  # How many waves
     wave_amplitude=0.4,  # Wave intensity
-    angle=45,            # Wave direction
+    angle=45,  # Wave direction
 )
 ```
 
@@ -45,8 +45,8 @@ from we_love.avatars import LoopConfig, LoopType
 
 loop = LoopConfig(
     loop_type=LoopType.EPITROCHOID,
-    size=1.8,       # Zoom in (>1.0 shows only part of the curve)
-    offset_x=0.4,   # Move right (range: -1 to 1)
+    size=1.8,  # Zoom in (>1.0 shows only part of the curve)
+    offset_x=0.4,  # Move right (range: -1 to 1)
     offset_y=-0.3,  # Move up (range: -1 to 1)
 )
 ```
@@ -75,7 +75,6 @@ config = AvatarConfig(
     height=512,
     fps=30,
     duration=4.0,
-    
     # Smooth wave gradient
     gradient_config=GradientConfig(
         colors=[
@@ -90,7 +89,6 @@ config = AvatarConfig(
         angle=45,
         smooth_loop=True,  # ✨ Seamless looping
     ),
-    
     # Zoomed, off-center epitrochoid
     loop_configs=[
         LoopConfig(
@@ -99,7 +97,7 @@ config = AvatarConfig(
             width=4,
             r_major=0.4,
             r_minor=0.15,
-            size=1.8,      # ✨ Zoomed in
+            size=1.8,  # ✨ Zoomed in
             offset_x=0.4,  # ✨ Off-center
             offset_y=-0.3,
             speed=0.8,
@@ -108,7 +106,7 @@ config = AvatarConfig(
 )
 
 avatar = Avatar(config)
-avatar.save_gif('beautiful_avatar.gif')
+avatar.save_gif("beautiful_avatar.gif")
 ```
 
 ## 📊 All Gradient Types
@@ -142,7 +140,7 @@ For smooth, professional gradients:
 1. **Use 3-5 colors** for best results
 2. **Repeat first/last color** for seamless loops:
    ```python
-   colors=[(30, 30, 60), (100, 80, 140), (30, 30, 60)]
+   colors = [(30, 30, 60), (100, 80, 140), (30, 30, 60)]
    ```
 3. **Stay in same hue family** for cohesive look
 4. **Always enable smooth_loop** for animations

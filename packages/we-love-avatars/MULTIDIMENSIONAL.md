@@ -231,7 +231,7 @@ mise run aurora
 from we_love.avatars import avatar, Avatar
 
 # Automatically gets multi-dimensional gradients
-Avatar(avatar('your-seed')).save_gif('avatar.gif', progress=True, optimize=False)
+Avatar(avatar("your-seed")).save_gif("avatar.gif", progress=True, optimize=False)
 ```
 
 ## Why This Matters

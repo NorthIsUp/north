@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import builtins
 from collections.abc import Collection, Sequence
+from itertools import starmap
 from types import GenericAlias
 from typing import Any, TypeGuard
 
@@ -30,9 +31,7 @@ def is_sequence_of[T](val: Sequence[object], cls: type[T]) -> TypeGuard[Sequence
     return isinstance(val, Sequence) and match_type(val, Sequence[cls])
 
 
-def is_collection_of[T](
-    val: Collection[object], cls: type[T]
-) -> TypeGuard[Collection[T]]:
+def is_collection_of[T](val: Collection[object], cls: type[T]) -> TypeGuard[Collection[T]]:
     return isinstance(val, Collection) and match_type(val, Collection[cls])
 
 
@@ -54,10 +53,7 @@ def match_type[T](val: Any, cls: T) -> TypeGuard[T]:
                 return False
 
             # Validate args are valid type specifications
-            if not all(
-                isinstance(v, builtins.type) or isinstance(v, GenericAlias) or v is ...
-                for v in args
-            ):
+            if not all(isinstance(v, (builtins.type, GenericAlias)) or v is ... for v in args):
                 raise ValueError(f"Invalid type arguments: {args}")
 
             match origin:
@@ -72,30 +68,21 @@ def match_type[T](val: Any, cls: T) -> TypeGuard[T]:
                     if len(val) != len(args):
                         return False
                     print(f"val: {val}, args: {args}")
-                    return all(
-                        match_type(v, arg) for v, arg in zip(val, args, strict=False)
-                    )
+                    return all(starmap(match_type, zip(val, args, strict=False)))
 
                 case builtins.list | builtins.set | builtins.frozenset:
                     # For these collections, there should be exactly one type arg
                     if len(args) != 1:
-                        raise ValueError(
-                            f"{origin.__name__} should have exactly 1 type argument, got {len(args)}"
-                        )
+                        raise ValueError(f"{origin.__name__} should have exactly 1 type argument, got {len(args)}")
                     element_type = args[0]
                     return all(match_type(v, element_type) for v in val)
 
                 case builtins.dict:
                     # Dict should have exactly 2 type args (key, value)
                     if len(args) != 2:
-                        raise ValueError(
-                            f"dict should have exactly 2 type arguments, got {len(args)}"
-                        )
+                        raise ValueError(f"dict should have exactly 2 type arguments, got {len(args)}")
                     key_type, value_type = args
-                    return all(
-                        match_type(k, key_type) and match_type(v, value_type)
-                        for k, v in val.items()
-                    )
+                    return all(match_type(k, key_type) and match_type(v, value_type) for k, v in val.items())
 
                 case _:
                     raise ValueError(f"Unsupported generic origin: {origin}")

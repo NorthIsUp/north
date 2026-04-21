@@ -19,13 +19,13 @@ def example_aurora_borealis() -> None:
         duration=30.0,  # Slow, mesmerizing aurora flow
         gradient_config=GradientConfig(
             colors=[
-                (30, 95, 95),    # Teal (start)
+                (30, 95, 95),  # Teal (start)
                 (40, 105, 120),  # Teal-cyan
                 (50, 112, 145),  # Cyan-blue
                 (60, 113, 168),  # Sky blue (peak)
                 (50, 112, 145),  # Cyan-blue (mirror)
                 (40, 105, 120),  # Teal-cyan (mirror)
-                (30, 95, 95),    # Teal (end = start)
+                (30, 95, 95),  # Teal (end = start)
             ],
             gradient_type=GradientType.AURORA,
             smooth_loop=True,
@@ -97,11 +97,11 @@ def example_cosmic_plasma() -> None:
         gradient_config=GradientConfig(
             colors=[
                 (165, 95, 170),  # Pink-purple (start)
-                (150, 110, 195), # Lavender
-                (135, 128, 210), # Light purple
-                (120, 145, 218), # Sky blue (peak)
-                (135, 128, 210), # Light purple (mirror)
-                (150, 110, 195), # Lavender (mirror)
+                (150, 110, 195),  # Lavender
+                (135, 128, 210),  # Light purple
+                (120, 145, 218),  # Sky blue (peak)
+                (135, 128, 210),  # Light purple (mirror)
+                (150, 110, 195),  # Lavender (mirror)
                 (165, 95, 170),  # Pink-purple (end = start)
             ],
             gradient_type=GradientType.PLASMA,
@@ -135,13 +135,13 @@ def example_ethereal_rainbow() -> None:
         gradient_config=GradientConfig(
             colors=[
                 (180, 90, 160),  # Soft pink-purple
-                (170, 100, 175), # Pink-lavender
-                (160, 110, 190), # Lavender
-                (145, 120, 205), # Light purple
-                (130, 135, 215), # Purple-blue
-                (120, 150, 220), # Sky blue
-                (125, 165, 215), # Blue-cyan
-                (135, 180, 205), # Cyan-teal
+                (170, 100, 175),  # Pink-lavender
+                (160, 110, 190),  # Lavender
+                (145, 120, 205),  # Light purple
+                (130, 135, 215),  # Purple-blue
+                (120, 150, 220),  # Sky blue
+                (125, 165, 215),  # Blue-cyan
+                (135, 180, 205),  # Cyan-teal
             ],
             gradient_type=GradientType.AURORA,
             smooth_loop=True,

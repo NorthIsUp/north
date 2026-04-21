@@ -52,9 +52,9 @@ All 6 palettes now have **maximum distances under 35 units**:
 **After colors** (8 smooth steps):
 ```python
 [
-    (180, 90, 160),   # Soft pink-purple
+    (180, 90, 160),  # Soft pink-purple
     (170, 100, 175),  # +17 units
-    (160, 110, 190),  # +19 units  
+    (160, 110, 190),  # +19 units
     (145, 120, 205),  # +23 units (max)
     (130, 135, 215),  # +22 units
     (120, 150, 220),  # +22 units
@@ -115,16 +115,16 @@ Test any seed:
 from we_love.avatars import avatar
 import math
 
-config = avatar('your-seed')
+config = avatar("your-seed")
 colors = config.gradient_config.colors
 
 print(f"Palette has {len(colors)} colors")
 print("Transitions:")
 for i in range(len(colors) - 1):
-    c1, c2 = colors[i], colors[i+1]
-    dist = math.sqrt(sum((a - b)**2 for a, b in zip(c1, c2)))
+    c1, c2 = colors[i], colors[i + 1]
+    dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(c1, c2)))
     status = "✅" if dist < 35 else "⚠️"
-    print(f"  {i} → {i+1}: {dist:.1f} units {status}")
+    print(f"  {i} → {i + 1}: {dist:.1f} units {status}")
 ```
 
 **Result**: All transitions < 35 units! ✅

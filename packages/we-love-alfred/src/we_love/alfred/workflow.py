@@ -45,8 +45,8 @@ def _just_netloc(url: str) -> str:
 class AwsAccount(AlfredBaseModel):
     id: str
     name: str
-    services: Sequence[str] = ()
-    role_names: Sequence[str] = ("AdministratorAccess",)
+    services: list[str] | tuple[str, ...] = ()
+    role_names: list[str] | tuple[str, ...] = ("AdministratorAccess",)
 
     @classmethod
     def model_validate_list(cls, v: Any) -> list[Self]:
@@ -212,7 +212,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         content = f"{title} {subtitle} {arg}"
         return hashlib.sha256(content.encode()).hexdigest()
 
-    async def process_icon(  # noqa: PLR0912
+    async def process_icon(
         self,
         icon_type: str,
         value: str,
@@ -333,7 +333,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
                         pass
                     case (str(url), str(filename)):
                         icon_path = icon_path.with_name(filename)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self.logger.debug(f"Failed to resolve icon URL for '{icon_path}'")
                 return None
 
@@ -362,7 +362,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
             **kwargs,
         })
 
-    async def add_item(  # noqa: PLR0912
+    async def add_item(
         self,
         item_type: str,
         *,
@@ -550,10 +550,11 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
     def add_config_items(self) -> None:
         """Add configuration menu items."""
-        cache_path = self.icon_cache / "*"
+        icon_glob = self.icon_cache / "*"
+        menu_cache = "${XDG_CACHE_HOME:-$HOME/.cache}/alfred/maxcare-menu.json"
         self.add_exec(
             "clear cache",
-            f'[[ -d "{self.icon_cache}/" ]] && rm "{cache_path}"',
+            f'[[ -d "{self.icon_cache}/" ]] && rm "{icon_glob}"; rm -f "{menu_cache}" "/tmp/alfred/maxcare-menu.json"',
         )
 
     def add_dev_workflow(self, editors: Sequence[str] = ("cursor", "vscode", "vscode-insiders", "xcode")) -> None:
@@ -603,8 +604,8 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         """Print the complete Alfred menu JSON."""
         print(self.format_menu())
 
-    @a.cache
     @classmethod
+    @a.cache
     async def cache_path(cls) -> AsyncPath:
         cache_tail = AsyncPath("alfred/maxcare-menu.json")
         if xdg_cache_home := os.environ.get("XDG_CACHE_HOME"):

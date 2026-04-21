@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union
-
 from pydantic import BaseModel, Extra, Field, constr
 
 
@@ -21,7 +19,7 @@ class FileDirective(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    file: Union[str, List[str]]
+    file: str | list[str]
 
 
 class AttrDirective(BaseModel):
@@ -35,19 +33,19 @@ class Find(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    where: Optional[List[str]] = Field(
+    where: list[str] | None = Field(
         None,
         description="Directories to be searched for packages (Unix-style relative path)",
     )
-    exclude: Optional[List[str]] = Field(
+    exclude: list[str] | None = Field(
         None,
         description="Exclude packages that match the values listed in this field. Can container shell-style wildcards (e.g. ``'pkg.*'``)",
     )
-    include: Optional[List[str]] = Field(
+    include: list[str] | None = Field(
         None,
         description="Restrict the found packages to just the ones listed in this field. Can container shell-style wildcards (e.g. ``'pkg.*'``)",
     )
-    namespaces: Optional[bool] = Field(
+    namespaces: bool | None = Field(
         None,
         description="When ``True``, directories without a ``__init__.py`` file will also be scanned for :pep:`420`-style implicit namespaces",
     )
@@ -57,7 +55,7 @@ class FindDirective1(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    find: Optional[Find] = Field(
+    find: Find | None = Field(
         None,
         description="Dynamic `package discovery <https://setuptools.pypa.io/en/latest/userguide/package_discovery.html>`_.",
     )
@@ -68,14 +66,14 @@ class FileDirectiveForDependencies(FileDirective):
 
 
 class File(BaseModel):
-    __root__: Union[str, List[str]]
+    __root__: str | list[str]
 
 
 class FindDirective(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    find: Optional[Find] = Field(
+    find: Find | None = Field(
         None,
         description="Dynamic `package discovery <https://setuptools.pypa.io/en/latest/userguide/package_discovery.html>`_.",
     )
@@ -85,7 +83,7 @@ class Readme(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    content_type: Optional[str] = Field(None, alias="content-type")
+    content_type: str | None = Field(None, alias="content-type")
     file: File
 
 
@@ -93,91 +91,91 @@ class Dynamic(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    version: Optional[Union[AttrDirective, FileDirective]] = Field(
+    version: AttrDirective | FileDirective | None = Field(
         None,
         description="A version dynamically loaded via either the ``attr:`` or ``file:`` directives. Please make sure the given file or attribute respects :pep:`440`. Also ensure to set ``project.dynamic`` accordingly.",
     )
-    classifiers: Optional[FileDirective] = None
-    description: Optional[FileDirective] = None
-    entry_points: Optional[FileDirective] = Field(None, alias="entry-points")
-    dependencies: Optional[FileDirectiveForDependencies] = None
-    optional_dependencies: Optional[Dict[constr(regex=r".+"), FileDirectiveForDependencies]] = Field(None, alias="optional-dependencies")
-    readme: Optional[Union[FileDirective, Readme]] = None
+    classifiers: FileDirective | None = None
+    description: FileDirective | None = None
+    entry_points: FileDirective | None = Field(None, alias="entry-points")
+    dependencies: FileDirectiveForDependencies | None = None
+    optional_dependencies: dict[constr(regex=r".+"), FileDirectiveForDependencies] | None = Field(None, alias="optional-dependencies")
+    readme: FileDirective | Readme | None = None
 
 
 class ToolSetuptoolsTable(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    platforms: Optional[List[str]] = None
-    provides: Optional[List[str]] = Field(
+    platforms: list[str] | None = None
+    provides: list[str] | None = Field(
         None,
         description="Package and virtual package names contained within this package **(not supported by pip)**",
     )
-    obsoletes: Optional[List[str]] = Field(
+    obsoletes: list[str] | None = Field(
         None,
         description="Packages which this package renders obsolete **(not supported by pip)**",
     )
-    zip_safe: Optional[bool] = Field(
+    zip_safe: bool | None = Field(
         None,
         alias="zip-safe",
         description="Whether the project can be safely installed and run from a zip file. **OBSOLETE**: only relevant for ``pkg_resources``, ``easy_install`` and ``setup.py install`` in the context of ``eggs`` (**DEPRECATED**).",
     )
-    script_files: Optional[List[str]] = Field(
+    script_files: list[str] | None = Field(
         None,
         alias="script-files",
         description="Legacy way of defining scripts (entry-points are preferred). Equivalent to the ``script`` keyword in ``setup.py`` (it was renamed to avoid confusion with entry-point based ``project.scripts`` defined in :pep:`621`). **DISCOURAGED**: generic script wrappers are tricky and may not work properly. Whenever possible, please use ``project.scripts`` instead.",
     )
-    eager_resources: Optional[List[str]] = Field(
+    eager_resources: list[str] | None = Field(
         None,
         alias="eager-resources",
         description="Resources that should be extracted together, if any of them is needed, or if any C extensions included in the project are imported. **OBSOLETE**: only relevant for ``pkg_resources``, ``easy_install`` and ``setup.py install`` in the context of ``eggs`` (**DEPRECATED**).",
     )
-    packages: Optional[Union[List[PackageName], FindDirective]] = Field(
+    packages: list[PackageName] | FindDirective | None = Field(
         None,
         description="Packages that should be included in the distribution. It can be given either as a list of package identifiers or as a ``dict``-like structure with a single key ``find`` which corresponds to a dynamic call to ``setuptools.config.expand.find_packages`` function. The ``find`` key is associated with a nested ``dict``-like structure that can contain ``where``, ``include``, ``exclude`` and ``namespaces`` keys, mimicking the keyword arguments of the associated function.",
     )
-    package_dir: Optional[Dict[constr(regex=r"^.*$"), str]] = Field(
+    package_dir: dict[constr(regex=r"^.*$"), str] | None = Field(
         None,
         alias="package-dir",
         description=":class:`dict`-like structure mapping from package names to directories where their code can be found. The empty string (as key) means that all packages are contained inside the given directory will be included in the distribution.",
     )
-    package_data: Optional[Dict[constr(regex=r"^.*$"), List[str]]] = Field(
+    package_data: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
         None,
         alias="package-data",
         description="Mapping from package names to lists of glob patterns. Usually this option is not needed when using ``include-package-data = true`` For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    include_package_data: Optional[bool] = Field(
+    include_package_data: bool | None = Field(
         None,
         alias="include-package-data",
         description="Automatically include any data files inside the package directories that are specified by ``MANIFEST.in`` For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    exclude_package_data: Optional[Dict[constr(regex=r"^.*$"), List[str]]] = Field(
+    exclude_package_data: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
         None,
         alias="exclude-package-data",
         description="Mapping from package names to lists of glob patterns that should be excluded For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    namespace_packages: Optional[List[str]] = Field(
+    namespace_packages: list[str] | None = Field(
         None,
         alias="namespace-packages",
         description="**DEPRECATED**: use implicit namespaces instead (:pep:`420`).",
     )
-    py_modules: Optional[List[str]] = Field(None, alias="py-modules", description="Modules that setuptools will manipulate")
-    data_files: Optional[Dict[constr(regex=r"^.*$"), List[str]]] = Field(
+    py_modules: list[str] | None = Field(None, alias="py-modules", description="Modules that setuptools will manipulate")
+    data_files: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
         None,
         alias="data-files",
         description="``dict``-like structure where each key represents a directory and the value is a list of glob patterns that should be installed in them. **DISCOURAGED**: please notice this might not work as expected with wheels. Whenever possible, consider using data files inside the package directories (or create a new namespace package that only contains data files). See `data files support <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    cmdclass: Optional[Dict[constr(regex=r"^.*$"), str]] = Field(
+    cmdclass: dict[constr(regex=r"^.*$"), str] | None = Field(
         None,
         description='Mapping of distutils-style command names to ``setuptools.Command`` subclasses which in turn should be represented by strings with a qualified class name (i.e., "dotted" form with module), e.g.::\n\n     cmdclass = {mycmd = "pkg.subpkg.module.CommandClass"}\n\n The command class should be a directly defined at the top-level of the containing module (no class nesting).',
     )
-    license_files: Optional[List[str]] = Field(
+    license_files: list[str] | None = Field(
         None,
         alias="license-files",
         description="**PROVISIONAL**: list of glob patterns for all license files being distributed. (likely to become standard with :pep:`639`). By default: ``['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']``",
     )
-    dynamic: Optional[Dynamic] = Field(
+    dynamic: Dynamic | None = Field(
         None,
         description="Instructions for loading :pep:`621`-related metadata dynamically",
     )

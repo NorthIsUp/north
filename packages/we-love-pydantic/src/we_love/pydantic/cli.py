@@ -41,6 +41,7 @@ from rich import console
 from rich.panel import Panel
 from rich.pretty import pprint, pretty_repr
 from we_love.pydantic.singleton import Singleton
+from we_love.string.case import spinalcase
 
 try:
     import argcomplete
@@ -342,7 +343,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
 
         self.cli_app._run_cli_cmd()
 
-    def build_parser_from_settings(  # noqa: PLR0912, PLR0914, PLR0915
+    def build_parser_from_settings(
         self,
         settings_cls: type[BaseSettings],
         parser: ArgumentParser,
@@ -558,7 +559,7 @@ class CliParser(BaseModel, arbitrary_types_allowed=True):
         return command, result
 
     @staticmethod
-    def _get_alias_names(  # noqa: PLR0912
+    def _get_alias_names(
         field_name: str,
         field_info: Any,
         alias_path_args: dict[str, str] | None = None,

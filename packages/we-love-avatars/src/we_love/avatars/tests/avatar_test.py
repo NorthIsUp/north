@@ -3,9 +3,7 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 from PIL import Image
-
 from we_love.avatars.avatar import Avatar, AvatarConfig
 from we_love.avatars.gradient import GradientConfig, GradientType
 from we_love.avatars.loop import LoopConfig, LoopType
@@ -72,13 +70,13 @@ def test_avatar_save_gif() -> None:
     avatar = Avatar(config)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = Path(tmpdir) / 'test.gif'
+        output_path = Path(tmpdir) / "test.gif"
         avatar.save_gif(output_path)
 
         assert output_path.exists()
         # Verify it's a valid GIF
         img = Image.open(output_path)
-        assert img.format == 'GIF'
+        assert img.format == "GIF"
 
 
 def test_avatar_save_png() -> None:
@@ -87,13 +85,13 @@ def test_avatar_save_png() -> None:
     avatar = Avatar(config)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = Path(tmpdir) / 'test.png'
+        output_path = Path(tmpdir) / "test.png"
         avatar.save_png(output_path)
 
         assert output_path.exists()
         # Verify it's a valid PNG
         img = Image.open(output_path)
-        assert img.format == 'PNG'
+        assert img.format == "PNG"
 
 
 def test_avatar_with_gradient() -> None:
@@ -131,7 +129,7 @@ def test_avatar_path_creation() -> None:
     avatar = Avatar(config)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        output_path = Path(tmpdir) / 'nested' / 'dir' / 'test.gif'
+        output_path = Path(tmpdir) / "nested" / "dir" / "test.gif"
         avatar.save_gif(output_path)
 
         assert output_path.exists()

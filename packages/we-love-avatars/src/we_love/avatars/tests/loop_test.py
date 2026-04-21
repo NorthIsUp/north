@@ -2,14 +2,13 @@
 
 import pytest
 from PIL import Image
-
 from we_love.avatars.loop import Loop, LoopConfig, LoopType
 
 
 @pytest.fixture
 def base_image() -> Image.Image:
     """Create a base image for testing."""
-    return Image.new('RGB', (200, 200), color=(0, 0, 0))
+    return Image.new("RGB", (200, 200), color=(0, 0, 0))
 
 
 def test_loop_default_config() -> None:

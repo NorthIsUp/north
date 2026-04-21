@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Extra, Field
 
@@ -17,7 +17,7 @@ class Platform(Enum):
 
 
 class Format(BaseModel):
-    config_path: Optional[str] = Field(
+    config_path: str | None = Field(
         None,
         alias="config-path",
         description="Path to default configuration",
@@ -26,13 +26,13 @@ class Format(BaseModel):
 
 
 class Metadata(BaseModel):
-    allow_direct_references: Optional[bool] = Field(
+    allow_direct_references: bool | None = Field(
         None,
         alias="allow-direct-references",
         description="Whether to allow direct references",
         title="Allow-Direct-References",
     )
-    allow_ambiguous_features: Optional[bool] = Field(
+    allow_ambiguous_features: bool | None = Field(
         None,
         alias="allow-ambiguous-features",
         description="Whether to allow ambiguous features",
@@ -45,113 +45,113 @@ class Override(BaseModel):
 
 
 class Overrides(BaseModel):
-    platform: Optional[Dict[str, Override]] = None
+    platform: dict[str, Override] | None = None
 
 
 class Env(BaseModel):
-    template: Optional[str] = Field(
+    template: str | None = Field(
         "default",
         description="Template environment to inherit from. Set to own name to make self referential (disable inheritance from “default”)",
         title="Template",
     )
-    detached: Optional[bool] = Field(
+    detached: bool | None = Field(
         False,
         description="Make the environment self-referential and skip project install",
         title="Detached",
     )
-    dependencies: Optional[List[str]] = Field(
+    dependencies: list[str] | None = Field(
         None,
         description="List of dependencies to install in the environment",
         title="Dependencies",
     )
-    extra_dependencies: Optional[List[str]] = Field(
+    extra_dependencies: list[str] | None = Field(
         None,
         alias="extra-dependencies",
         description="List of extra dependencies to install in the environment in addition to the template environment’s dependencies",
         title="Extra dependencies",
     )
-    features: Optional[List[str]] = Field(
+    features: list[str] | None = Field(
         None,
         description="List of optional dependency groups (extras) to install",
         title="Features (extras)",
     )
-    dev_mode: Optional[bool] = Field(
+    dev_mode: bool | None = Field(
         True,
         alias="dev-mode",
         description="Whether to install the project in development mode",
         title="Dev mode",
     )
-    skip_install: Optional[bool] = Field(
+    skip_install: bool | None = Field(
         False,
         alias="skip-install",
         description="Whether to skip installing the project",
         title="Skip install",
     )
-    env_vars: Optional[Dict[str, str]] = Field(
+    env_vars: dict[str, str] | None = Field(
         None,
         alias="env-vars",
         description="Environment variables to set",
         title="Environment variables",
     )
-    env_include: Optional[List[str]] = Field(
+    env_include: list[str] | None = Field(
         None,
         alias="env-include",
         description="Glob patterns of environment variables to include",
         title="Environment variable include",
     )
-    env_exclude: Optional[List[str]] = Field(
+    env_exclude: list[str] | None = Field(
         None,
         alias="env-exclude",
         description="Glob patterns of environment variables to exclude",
         title="Environment variable exclude",
     )
-    scripts: Optional[Dict[str, Union[str, List[str]]]] = Field(None, description="Dictionary of scripts to run", title="Scripts")
-    pre_install_commands: Optional[List[str]] = Field(
+    scripts: dict[str, str | list[str]] | None = Field(None, description="Dictionary of scripts to run", title="Scripts")
+    pre_install_commands: list[str] | None = Field(
         None,
         alias="pre-install-commands",
         description="List of commands to run before installing the project",
         title="Pre-install commands",
     )
-    post_install_commands: Optional[List[str]] = Field(
+    post_install_commands: list[str] | None = Field(
         None,
         alias="post-install-commands",
         description="List of commands to run after installing the project",
         title="Post-install commands",
     )
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="Python version to use or an absolute path to a python interpreter",
         title="Python version",
     )
-    platforms: Optional[List[Platform]] = Field(None, description="List of platforms to build for", title="Platforms")
-    description: Optional[str] = Field(
+    platforms: list[Platform] | None = Field(None, description="List of platforms to build for", title="Platforms")
+    description: str | None = Field(
         None,
         description="Description of the environment for the `env show` command",
         title="Description",
     )
-    type: Optional[str] = Field(
+    type: str | None = Field(
         "virtual",
         description='Type of environment. Without plugins, the only supported type is "virtual"',
         title="Type",
     )
-    matrix: Optional[List[Dict[str, List[str]]]] = Field(None, description="Matrix of environments", title="Matrix")
-    matrix_name_format: Optional[str] = Field(
+    matrix: list[dict[str, list[str]]] | None = Field(None, description="Matrix of environments", title="Matrix")
+    matrix_name_format: str | None = Field(
         "{value}",
         alias="matrix-name-format",
         description="Format string for matrix names, supporting {variable} and {value} placeholders",
         title="Matrix name format",
     )
-    overrides: Optional[Overrides] = None
-    requires: Optional[List[str]] = Field(None, description="Required environment plugins", title="Requires")
+    overrides: Overrides | None = None
+    requires: list[str] | None = Field(None, description="Required environment plugins", title="Requires")
 
 
 class Envs(BaseModel):
-    __root__: Dict[str, Env]
+    __root__: dict[str, Env]
 
 
 class CollectorEnv(BaseModel):
-    collectors: Optional[Dict[str, Dict[str, Any]]] = Field(None, description="Custom environment collectors", title="Collectors")
-    requires: Optional[List[str]] = Field(
+    collectors: dict[str, dict[str, Any]] | None = Field(None, description="Custom environment collectors", title="Collectors")
+    requires: list[str] | None = Field(
         None,
         description="Required environment collectors for automatic management",
         title="Requires",
@@ -159,24 +159,24 @@ class CollectorEnv(BaseModel):
 
 
 class Hook(BaseModel):
-    dependencies: Optional[List[str]] = Field(
+    dependencies: list[str] | None = Field(
         None,
         description="Additional dependencies installed in the build environment",
         title="Dependencies",
     )
-    require_runtime_dependencies: Optional[bool] = Field(
+    require_runtime_dependencies: bool | None = Field(
         False,
         alias="require-runtime-dependencies",
         description="Whether to install the project’s runtime dependencies",
         title="Require runtime dependencies",
     )
-    require_runtime_features: Optional[List[str]] = Field(
+    require_runtime_features: list[str] | None = Field(
         None,
         alias="require-runtime-features",
         description="A list of the project’s runtime features to install",
         title="Required runtime features",
     )
-    enable_by_default: Optional[bool] = Field(
+    enable_by_default: bool | None = Field(
         True,
         alias="enable-by-default",
         description="Whether to enable current hook (disable to control activation using environment variables)",
@@ -185,17 +185,17 @@ class Hook(BaseModel):
 
 
 class Hooks(BaseModel):
-    __root__: Dict[str, Hook]
+    __root__: dict[str, Hook]
 
 
 class Version(BaseModel):
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None,
         description="A relative path to a file containing the project version",
         title="Path",
     )
-    pattern: Optional[str] = Field(None, description="A regex pattern to extract the version", title="Pattern")
-    source: Optional[str] = Field(
+    pattern: str | None = Field(None, description="A regex pattern to extract the version", title="Pattern")
+    source: str | None = Field(
         None,
         description="A source to use for retrieving and updating the version.",
         title="Source",
@@ -203,17 +203,17 @@ class Version(BaseModel):
 
 
 class Repos(BaseModel):
-    main: Optional[Any] = None
-    test: Optional[Any] = None
+    main: Any | None = None
+    test: Any | None = None
 
 
 class PublishIndex(BaseModel):
-    disable: Optional[bool] = Field(
+    disable: bool | None = Field(
         False,
         description="Ask for confirmation when publishing to index",
         title="Confirmation",
     )
-    repos: Optional[Repos] = Field(
+    repos: Repos | None = Field(
         None,
         description="Define named repositories to publish to",
         title="Repositories",
@@ -221,7 +221,7 @@ class PublishIndex(BaseModel):
 
 
 class Publish(BaseModel):
-    index: Optional[PublishIndex] = None
+    index: PublishIndex | None = None
 
 
 class IgnoreVcs(BaseModel):
@@ -233,15 +233,15 @@ class IgnoreVcs(BaseModel):
 
 
 class Include(BaseModel):
-    __root__: List[str] = Field(..., description="List of glob patterns to include files", title="Include files")
+    __root__: list[str] = Field(..., description="List of glob patterns to include files", title="Include files")
 
 
 class Exclude(BaseModel):
-    __root__: List[str] = Field(..., description="List of glob patterns to exclude files", title="Exclude files")
+    __root__: list[str] = Field(..., description="List of glob patterns to exclude files", title="Exclude files")
 
 
 class Artifacts(BaseModel):
-    __root__: List[str] = Field(
+    __root__: list[str] = Field(
         ...,
         description="List of glob patterns to include VCS-ignored files",
         title="Artifact files",
@@ -249,7 +249,7 @@ class Artifacts(BaseModel):
 
 
 class OnlyInclude(BaseModel):
-    __root__: List[str] = Field(
+    __root__: list[str] = Field(
         ...,
         description="List of relative paths to directories or files to include, preventing directory traversal from project root. This option overrides any include patterns.",
         title="Only include specific paths",
@@ -257,149 +257,149 @@ class OnlyInclude(BaseModel):
 
 
 class Target(BaseModel):
-    ignore_vcs: Optional[IgnoreVcs] = Field(False, alias="ignore-vcs")
-    include: Optional[Include] = None
-    exclude: Optional[Exclude] = None
-    artifacts: Optional[Artifacts] = None
-    only_include: Optional[OnlyInclude] = Field(None, alias="only-include")
-    dependencies: Optional[List[str]] = Field(
+    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    include: Include | None = None
+    exclude: Exclude | None = None
+    artifacts: Artifacts | None = None
+    only_include: OnlyInclude | None = Field(None, alias="only-include")
+    dependencies: list[str] | None = Field(
         None,
         description="Additional dependencies to install in the environment",
         title="Dependencies",
     )
-    require_runtime_dependencies: Optional[bool] = Field(
+    require_runtime_dependencies: bool | None = Field(
         False,
         alias="require-runtime-dependencies",
         description="Whether to install the project’s runtime dependencies",
         title="Require runtime dependencies",
     )
-    require_runtime_features: Optional[List[str]] = Field(
+    require_runtime_features: list[str] | None = Field(
         None,
         alias="require-runtime-features",
         description="A list of the project’s runtime features to install",
         title="Required runtime features",
     )
-    versions: Optional[List[str]] = Field(None, description="List of versions to build", title="Versions")
-    packages: Optional[List[str]] = Field(None, description="List of packages to build", title="Packages")
-    force_include: Optional[Dict[str, str]] = Field(
+    versions: list[str] | None = Field(None, description="List of versions to build", title="Versions")
+    packages: list[str] | None = Field(None, description="List of packages to build", title="Packages")
+    force_include: dict[str, str] | None = Field(
         None,
         alias="force-include",
         description="Whether to force include files",
         title="Force include",
     )
-    only_packages: Optional[bool] = Field(
+    only_packages: bool | None = Field(
         None,
         alias="only-packages",
         description="Whether to only include non-artifact files in packages",
         title="Only packages",
     )
-    sources: Optional[Dict[str, str]] = Field(None, description="Rewrite relative paths", title="Sources")
+    sources: dict[str, str] | None = Field(None, description="Rewrite relative paths", title="Sources")
 
 
 class CustomTargets(BaseModel):
-    __root__: Dict[str, Target]
+    __root__: dict[str, Target]
 
 
 class Build1(BaseModel):
-    ignore_vcs: Optional[IgnoreVcs] = Field(False, alias="ignore-vcs")
-    include: Optional[Include] = None
-    exclude: Optional[Exclude] = None
-    artifacts: Optional[Artifacts] = None
-    only_packages: Optional[bool] = Field(
+    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    include: Include | None = None
+    exclude: Exclude | None = None
+    artifacts: Artifacts | None = None
+    only_packages: bool | None = Field(
         False,
         alias="only-packages",
         description="Whether to only include non-artifact files in packages",
         title="Excluding files outside packages",
     )
-    sources: Optional[Union[Dict[str, str], List[str]]] = Field(None, description="Rewrite relative paths", title="Sources")
-    skip_excluded_dirs: Optional[bool] = Field(
+    sources: dict[str, str] | list[str] | None = Field(None, description="Rewrite relative paths", title="Sources")
+    skip_excluded_dirs: bool | None = Field(
         False,
         alias="skip-excluded-dirs",
         description="Whether to skip excluded directories (for performance reasons)",
         title="Skip excluded dirs",
     )
-    reproducible: Optional[bool] = Field(True, description="Whether to make the build reproducible", title="Reproducible")
-    directory: Optional[str] = Field(
+    reproducible: bool | None = Field(True, description="Whether to make the build reproducible", title="Reproducible")
+    directory: str | None = Field(
         "dist",
         description="Directory to write build artifacts to",
         title="Output directory",
     )
-    dev_mode_dirs: Optional[Any] = Field(None, alias="dev-mode-dirs")
-    dev_mode_exact: Optional[bool] = Field(
+    dev_mode_dirs: Any | None = Field(None, alias="dev-mode-dirs")
+    dev_mode_exact: bool | None = Field(
         None,
         alias="dev-mode-exact",
         description="Whether to use an exact dev mode that doesn’t add whole directories to PYTHONPATH",
         title="Exact dev mode",
     )
-    targets: Optional[CustomTargets] = None
-    hooks: Optional[Hooks] = None
+    targets: CustomTargets | None = None
+    hooks: Hooks | None = None
 
 
 class Build2(BaseModel):
-    ignore_vcs: Optional[IgnoreVcs] = Field(False, alias="ignore-vcs")
-    include: Optional[Include] = None
-    exclude: Optional[Exclude] = None
-    artifacts: Optional[Artifacts] = None
-    only_packages: Optional[bool] = Field(
+    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    include: Include | None = None
+    exclude: Exclude | None = None
+    artifacts: Artifacts | None = None
+    only_packages: bool | None = Field(
         False,
         alias="only-packages",
         description="Whether to only include non-artifact files in packages",
         title="Excluding files outside packages",
     )
-    sources: Optional[Union[Dict[str, str], List[str]]] = Field(None, description="Rewrite relative paths", title="Sources")
-    skip_excluded_dirs: Optional[bool] = Field(
+    sources: dict[str, str] | list[str] | None = Field(None, description="Rewrite relative paths", title="Sources")
+    skip_excluded_dirs: bool | None = Field(
         False,
         alias="skip-excluded-dirs",
         description="Whether to skip excluded directories (for performance reasons)",
         title="Skip excluded dirs",
     )
-    reproducible: Optional[bool] = Field(True, description="Whether to make the build reproducible", title="Reproducible")
-    directory: Optional[str] = Field(
+    reproducible: bool | None = Field(True, description="Whether to make the build reproducible", title="Reproducible")
+    directory: str | None = Field(
         "dist",
         description="Directory to write build artifacts to",
         title="Output directory",
     )
-    dev_mode_dirs: Optional[List[str]] = Field(
+    dev_mode_dirs: list[str] | None = Field(
         None,
         alias="dev-mode-dirs",
         description="List of directories to add to PYTHONPATH in development mode",
         title="Dev mode directories",
     )
-    dev_mode_exact: Optional[Any] = Field(None, alias="dev-mode-exact")
-    targets: Optional[CustomTargets] = None
-    hooks: Optional[Hooks] = None
+    dev_mode_exact: Any | None = Field(None, alias="dev-mode-exact")
+    targets: CustomTargets | None = None
+    hooks: Hooks | None = None
 
 
 class Build(BaseModel):
-    __root__: Union[Build1, Build2] = Field(..., description="Build configuration", title="Build")
+    __root__: Build1 | Build2 = Field(..., description="Build configuration", title="Build")
 
 
 class Hatch1(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    metadata: Optional[Metadata] = None
-    env: Optional[CollectorEnv] = None
-    envs: Optional[Envs] = None
-    build: Optional[Build] = None
-    version: Optional[Any] = None
-    publish: Optional[Publish] = None
+    metadata: Metadata | None = None
+    env: CollectorEnv | None = None
+    envs: Envs | None = None
+    build: Build | None = None
+    version: Any | None = None
+    publish: Publish | None = None
 
 
 class Hatch2(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    metadata: Optional[Metadata] = None
-    env: Optional[CollectorEnv] = None
-    envs: Optional[Envs] = None
-    build: Optional[Build] = None
+    metadata: Metadata | None = None
+    env: CollectorEnv | None = None
+    envs: Envs | None = None
+    build: Build | None = None
     version: Version
-    publish: Optional[Publish] = None
+    publish: Publish | None = None
 
 
 class Hatch(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    __root__: Union[Hatch1, Hatch2] = Field(..., title="Hatch")
+    __root__: Hatch1 | Hatch2 = Field(..., title="Hatch")

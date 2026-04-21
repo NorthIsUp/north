@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional, Union
 
 from pydantic import AnyUrl, BaseModel, Extra, Field, constr
 
@@ -14,8 +13,8 @@ class Plugins(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ignore: Optional[str] = Field(None, description="Flag that prevents the plugin from loading the dotenv file.")
-    location: Optional[str] = Field(
+    ignore: str | None = Field(None, description="Flag that prevents the plugin from loading the dotenv file.")
+    location: str | None = Field(
         None,
         description="Path to the dotenv file. It can be both absolute or relative.",
     )
@@ -48,14 +47,14 @@ class PoetryAuthorPattern(BaseModel):
 
 
 class PoetryAuthors(BaseModel):
-    __root__: List[PoetryAuthorPattern] = Field(
+    __root__: list[PoetryAuthorPattern] = Field(
         ...,
         description="List of authors that contributed to the package. This is typically the main maintainers, not the full list.",
     )
 
 
 class PoetryMaintainers(BaseModel):
-    __root__: List[PoetryAuthorPattern] = Field(
+    __root__: list[PoetryAuthorPattern] = Field(
         ...,
         description="List of maintainers, other than the original author(s), that upkeep the package.",
     )
@@ -71,7 +70,7 @@ class PoetryPackageFormat(Enum):
 
 
 class PoetryPackageFormats(BaseModel):
-    __root__: Union[PoetryPackageFormat, List[PoetryPackageFormat]] = Field(
+    __root__: PoetryPackageFormat | list[PoetryPackageFormat] = Field(
         ..., description="The format(s) for which the package must be included."
     )
 
@@ -92,73 +91,72 @@ class PoetryLongDependency(BaseModel):
         extra = Extra.forbid
 
     version: PoetryPep440Version
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="The python versions for which the dependency should be installed.",
     )
-    platform: Optional[str] = Field(
+    platform: str | None = Field(
         None,
         description="The platform(s) for which the dependency should be installed.",
     )
-    markers: Optional[str] = Field(
+    markers: str | None = Field(
         None,
         description="The PEP 508 compliant environment markers for which the dependency should be installed.",
     )
-    allow_prereleases: Optional[bool] = Field(
+    allow_prereleases: bool | None = Field(
         None,
         alias="allow-prereleases",
         description="Whether the dependency allows prereleases or not.",
     )
-    allows_prereleases: Optional[bool] = Field(
+    allows_prereleases: bool | None = Field(
         None,
         alias="allows-prereleases",
         description="Whether the dependency allows prereleases or not.",
     )
-    optional: Optional[bool] = Field(None, description="Whether the dependency is optional or not.")
-    extras: Optional[List[str]] = Field(None, description="The required extras for this dependency.")
-    source: Optional[str] = Field(None, description="The exclusive source used to search for this dependency.")
+    optional: bool | None = Field(None, description="Whether the dependency is optional or not.")
+    extras: list[str] | None = Field(None, description="The required extras for this dependency.")
+    source: str | None = Field(None, description="The exclusive source used to search for this dependency.")
 
 
 class PoetryGitDependency(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    git: Union[
-        AnyUrl,
-        constr(regex=r"^([A-Za-z0-9\-]+@|https://|http://)[A-Za-z][A-Za-z0-9+.-]*(:|/)[A-Za-z0-9\-\.]+(/[A-Za-z0-9\-_\.]+)+\.git$"),
-    ] = Field(..., description="The url of the git repository.")
-    branch: Optional[str] = Field(None, description="The branch to checkout.")
-    tag: Optional[str] = Field(None, description="The tag to checkout.")
-    rev: Optional[str] = Field(None, description="The revision to checkout.")
-    subdirectory: Optional[str] = Field(
+    git: AnyUrl | constr(
+        regex=r"^([A-Za-z0-9\-]+@|https://|http://)[A-Za-z][A-Za-z0-9+.-]*(:|/)[A-Za-z0-9\-\.]+(/[A-Za-z0-9\-_\.]+)+\.git$"
+    ) = Field(..., description="The url of the git repository.")
+    branch: str | None = Field(None, description="The branch to checkout.")
+    tag: str | None = Field(None, description="The tag to checkout.")
+    rev: str | None = Field(None, description="The revision to checkout.")
+    subdirectory: str | None = Field(
         None,
         description="The relative path to the directory where the package is located.",
     )
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="The python versions for which the dependency should be installed.",
     )
-    platform: Optional[str] = Field(
+    platform: str | None = Field(
         None,
         description="The platform(s) for which the dependency should be installed.",
     )
-    markers: Optional[str] = Field(
+    markers: str | None = Field(
         None,
         description="The PEP 508 compliant environment markers for which the dependency should be installed.",
     )
-    allow_prereleases: Optional[bool] = Field(
+    allow_prereleases: bool | None = Field(
         None,
         alias="allow-prereleases",
         description="Whether the dependency allows prereleases or not.",
     )
-    allows_prereleases: Optional[bool] = Field(
+    allows_prereleases: bool | None = Field(
         None,
         alias="allows-prereleases",
         description="Whether the dependency allows prereleases or not.",
     )
-    optional: Optional[bool] = Field(None, description="Whether the dependency is optional or not.")
-    extras: Optional[List[str]] = Field(None, description="The required extras for this dependency.")
-    develop: Optional[bool] = Field(None, description="Whether to install the dependency in development mode.")
+    optional: bool | None = Field(None, description="Whether the dependency is optional or not.")
+    extras: list[str] | None = Field(None, description="The required extras for this dependency.")
+    develop: bool | None = Field(None, description="Whether to install the dependency in development mode.")
 
 
 class PoetryFileDependency(BaseModel):
@@ -166,20 +164,20 @@ class PoetryFileDependency(BaseModel):
         extra = Extra.forbid
 
     file: str = Field(..., description="The path to the file.")
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="The python versions for which the dependency should be installed.",
     )
-    platform: Optional[str] = Field(
+    platform: str | None = Field(
         None,
         description="The platform(s) for which the dependency should be installed.",
     )
-    markers: Optional[str] = Field(
+    markers: str | None = Field(
         None,
         description="The PEP 508 compliant environment markers for which the dependency should be installed.",
     )
-    optional: Optional[bool] = Field(None, description="Whether the dependency is optional or not.")
-    extras: Optional[List[str]] = Field(None, description="The required extras for this dependency.")
+    optional: bool | None = Field(None, description="Whether the dependency is optional or not.")
+    extras: list[str] | None = Field(None, description="The required extras for this dependency.")
 
 
 class PoetryPathDependency(BaseModel):
@@ -187,21 +185,21 @@ class PoetryPathDependency(BaseModel):
         extra = Extra.forbid
 
     path: str = Field(..., description="The path to the dependency.")
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="The python versions for which the dependency should be installed.",
     )
-    platform: Optional[str] = Field(
+    platform: str | None = Field(
         None,
         description="The platform(s) for which the dependency should be installed.",
     )
-    markers: Optional[str] = Field(
+    markers: str | None = Field(
         None,
         description="The PEP 508 compliant environment markers for which the dependency should be installed.",
     )
-    optional: Optional[bool] = Field(None, description="Whether the dependency is optional or not.")
-    extras: Optional[List[str]] = Field(None, description="The required extras for this dependency.")
-    develop: Optional[bool] = Field(None, description="Whether to install the dependency in development mode.")
+    optional: bool | None = Field(None, description="Whether the dependency is optional or not.")
+    extras: list[str] | None = Field(None, description="The required extras for this dependency.")
+    develop: bool | None = Field(None, description="Whether to install the dependency in development mode.")
 
 
 class PoetryUrlDependency(BaseModel):
@@ -209,32 +207,25 @@ class PoetryUrlDependency(BaseModel):
         extra = Extra.forbid
 
     url: str = Field(..., description="The url to the file.")
-    python: Optional[str] = Field(
+    python: str | None = Field(
         None,
         description="The python versions for which the dependency should be installed.",
     )
-    platform: Optional[str] = Field(
+    platform: str | None = Field(
         None,
         description="The platform(s) for which the dependency should be installed.",
     )
-    markers: Optional[str] = Field(
+    markers: str | None = Field(
         None,
         description="The PEP 508 compliant environment markers for which the dependency should be installed.",
     )
-    optional: Optional[bool] = Field(None, description="Whether the dependency is optional or not.")
-    extras: Optional[List[str]] = Field(None, description="The required extras for this dependency.")
+    optional: bool | None = Field(None, description="Whether the dependency is optional or not.")
+    extras: list[str] | None = Field(None, description="The required extras for this dependency.")
 
 
 class PoetryMultipleConstraintsDependency(BaseModel):
-    __root__: List[
-        Union[
-            PoetryDependency,
-            PoetryLongDependency,
-            PoetryGitDependency,
-            PoetryFileDependency,
-            PoetryPathDependency,
-            PoetryUrlDependency,
-        ]
+    __root__: list[
+        PoetryDependency | PoetryLongDependency | PoetryGitDependency | PoetryFileDependency | PoetryPathDependency | PoetryUrlDependency
     ] = Field(..., min_items=1)
 
 
@@ -256,7 +247,7 @@ class PoetryExtraScripts(BaseModel):
         description="If type is file this is the relative path of the script file, if console it is the module name.",
     )
     type: Type = Field(..., description="Value can be either file or console.")
-    extras: Optional[List[str]] = Field(
+    extras: list[str] | None = Field(
         None,
         description="The required extras for this script. Only applicable if type is console.",
     )
@@ -266,11 +257,11 @@ class PoetryExtraScriptLegacy(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    callable: Optional[PoetryScriptLegacy] = Field(
+    callable: PoetryScriptLegacy | None = Field(
         None,
         description="The entry point of the script. Deprecated in favour of reference.",
     )
-    extras: Optional[List[str]] = Field(None, description="The required extras for this script.")
+    extras: list[str] | None = Field(None, description="The required extras for this script.")
 
 
 class PoetryBuildScript(BaseModel):
@@ -281,16 +272,16 @@ class PoetryBuildConfig(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    generate_setup_file: Optional[bool] = Field(
+    generate_setup_file: bool | None = Field(
         True,
         alias="generate-setup-file",
         description="Generate and include a setup.py file in sdist.",
     )
-    script: Optional[PoetryBuildScript] = None
+    script: PoetryBuildScript | None = None
 
 
 class PoetryBuildSection(BaseModel):
-    __root__: Union[PoetryBuildScript, PoetryBuildConfig]
+    __root__: PoetryBuildScript | PoetryBuildConfig
 
 
 class PoetryPriority(Enum):
@@ -306,13 +297,13 @@ class Package(BaseModel):
         extra = Extra.forbid
 
     include: PoetryIncludePath
-    from_: Optional[str] = Field(
+    from_: str | None = Field(
         None,
         alias="from",
         description="Where the source directory of the package resides.",
     )
-    format: Optional[PoetryPackageFormats] = None
-    to: Optional[str] = Field(
+    format: PoetryPackageFormats | None = None
+    to: str | None = Field(
         None,
         description="Where the package should be installed in the final distribution.",
     )
@@ -323,11 +314,11 @@ class Include(BaseModel):
         extra = Extra.forbid
 
     path: PoetryIncludePath
-    format: Optional[PoetryPackageFormats] = None
+    format: PoetryPackageFormats | None = None
 
 
 class Dependencies(BaseModel):
-    python: Optional[PoetryDependency] = Field(None, description="The Python versions the package is compatible with.")
+    python: PoetryDependency | None = Field(None, description="The Python versions the package is compatible with.")
 
 
 class Source(BaseModel):
@@ -335,7 +326,7 @@ class Source(BaseModel):
         extra = Extra.forbid
 
     name: str = Field("pypi", const=True, description="The name of the source.")
-    priority: Optional[PoetryPriority] = Field(None, description="The priority of the source.")
+    priority: PoetryPriority | None = Field(None, description="The priority of the source.")
 
 
 class Source1(BaseModel):
@@ -344,31 +335,31 @@ class Source1(BaseModel):
 
     name: Name = Field(..., description="The name of the source.")
     url: AnyUrl = Field(..., description="The url of the source.")
-    priority: Optional[PoetryPriority] = Field(None, description="The priority of the source.")
+    priority: PoetryPriority | None = Field(None, description="The priority of the source.")
 
 
 class PoetryDependencyAny(BaseModel):
-    __root__: Union[
-        PoetryDependency,
-        PoetryLongDependency,
-        PoetryGitDependency,
-        PoetryFileDependency,
-        PoetryPathDependency,
-        PoetryUrlDependency,
-        PoetryMultipleConstraintsDependency,
-    ]
+    __root__: (
+        PoetryDependency
+        | PoetryLongDependency
+        | PoetryGitDependency
+        | PoetryFileDependency
+        | PoetryPathDependency
+        | PoetryUrlDependency
+        | PoetryMultipleConstraintsDependency
+    )
 
 
 class PoetryScriptTable(BaseModel):
-    __root__: Union[PoetryExtraScriptLegacy, PoetryExtraScripts]
+    __root__: PoetryExtraScriptLegacy | PoetryExtraScripts
 
 
 class Group(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    optional: Optional[bool] = Field(None, description="Whether the dependency group is optional or not")
-    dependencies: Dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), PoetryDependencyAny] = Field(
+    optional: bool | None = Field(None, description="Whether the dependency group is optional or not")
+    dependencies: dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), PoetryDependencyAny] = Field(
         ..., description="The dependencies of this dependency group"
     )
 
@@ -377,55 +368,48 @@ class PartialPoetry(BaseModel):
     class Config:
         extra = Extra.allow
 
-    package_mode: Optional[bool] = Field(
+    package_mode: bool | None = Field(
         True,
         alias="package-mode",
         description="Whether Poetry operates in package mode or not.",
     )
-    name: Optional[PoetryName] = None
-    version: Optional[PoetryVersion] = None
-    description: Optional[PoetryDescription] = None
-    keywords: Optional[List[str]] = None
-    homepage: Optional[AnyUrl] = Field(None, description="Homepage URL for the project.")
-    repository: Optional[AnyUrl] = Field(None, description="Repository URL for the project.")
-    documentation: Optional[AnyUrl] = Field(None, description="Documentation URL for the project.")
-    license: Optional[str] = Field(None, description="License name.")
-    authors: Optional[PoetryAuthors] = None
-    maintainers: Optional[PoetryMaintainers] = None
-    readme: Optional[Union[str, List[str]]] = None
-    classifiers: Optional[List[str]] = Field(None, description="A list of trove classifiers.")
-    packages: Optional[List[Package]] = Field(None, description="A list of packages to include in the final distribution.")
-    include: Optional[List[Union[PoetryIncludePath, Include]]] = Field(None, description="A list of files and folders to include.")
-    exclude: Optional[List[str]] = Field(None, description="A list of files and folders to exclude.")
-    dependencies: Optional[Dependencies] = Field(
+    name: PoetryName | None = None
+    version: PoetryVersion | None = None
+    description: PoetryDescription | None = None
+    keywords: list[str] | None = None
+    homepage: AnyUrl | None = Field(None, description="Homepage URL for the project.")
+    repository: AnyUrl | None = Field(None, description="Repository URL for the project.")
+    documentation: AnyUrl | None = Field(None, description="Documentation URL for the project.")
+    license: str | None = Field(None, description="License name.")
+    authors: PoetryAuthors | None = None
+    maintainers: PoetryMaintainers | None = None
+    readme: str | list[str] | None = None
+    classifiers: list[str] | None = Field(None, description="A list of trove classifiers.")
+    packages: list[Package] | None = Field(None, description="A list of packages to include in the final distribution.")
+    include: list[PoetryIncludePath | Include] | None = Field(None, description="A list of files and folders to include.")
+    exclude: list[str] | None = Field(None, description="A list of files and folders to exclude.")
+    dependencies: Dependencies | None = Field(
         None,
         description="This is a hash of package name (keys) and version constraints (values) that are required to run this package.",
     )
-    dev_dependencies: Optional[Dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), PoetryDependencyAny]] = Field(
+    dev_dependencies: dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), PoetryDependencyAny] | None = Field(
         None,
         alias="dev-dependencies",
         description="This is a hash of package name (keys) and version constraints (values) that this package requires for developing it (testing tools and such).",
     )
-    extras: Optional[Dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), List[str]]] = None
-    group: Optional[Dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), Group]] = Field(None, description="This represents groups of dependencies")
-    build: Optional[PoetryBuildSection] = None
-    scripts: Optional[
-        Dict[
-            constr(regex=r"^[a-zA-Z-_.0-9]+$"),
-            Union[PoetryScriptLegacy, PoetryScriptTable],
-        ]
-    ] = Field(None, description="A hash of scripts to be installed.")
-    plugins: Optional[
-        Union[
-            Dict[constr(regex=r"^dotenv$"), Plugins],
-            Dict[
-                constr(regex=r"^[a-zA-Z-_.0-9]+$"),
-                Dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), str],
-            ],
-        ]
-    ] = Field(None, description="A hash of hashes representing plugins")
-    urls: Optional[Dict[constr(regex=r"^.+$"), str]] = None
-    source: Optional[List[Union[Source, Source1]]] = None
+    extras: dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), list[str]] | None = None
+    group: dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), Group] | None = Field(None, description="This represents groups of dependencies")
+    build: PoetryBuildSection | None = None
+    scripts: dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), PoetryScriptLegacy | PoetryScriptTable] | None = Field(
+        None, description="A hash of scripts to be installed."
+    )
+    plugins: (
+        dict[constr(regex=r"^dotenv$"), Plugins]
+        | dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), dict[constr(regex=r"^[a-zA-Z-_.0-9]+$"), str]]
+        | None
+    ) = Field(None, description="A hash of hashes representing plugins")
+    urls: dict[constr(regex=r"^.+$"), str] | None = None
+    source: list[Source | Source1] | None = None
 
 
 class Model(BaseModel):

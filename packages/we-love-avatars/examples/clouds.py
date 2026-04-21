@@ -19,16 +19,16 @@ def example_cosmic_clouds() -> None:
         duration=30.0,
         gradient_config=GradientConfig(
             colors=[
-                (30, 95, 95),    # Teal (start)
+                (30, 95, 95),  # Teal (start)
                 (40, 105, 120),  # Teal-cyan
                 (50, 112, 145),  # Cyan-blue
                 (60, 113, 168),  # Sky blue (peak)
                 (50, 112, 145),  # Cyan-blue (mirror)
                 (40, 105, 120),  # Teal-cyan (mirror)
-                (30, 95, 95),    # Teal (end = start)
+                (30, 95, 95),  # Teal (end = start)
             ],
             gradient_type=GradientType.CLOUDS,
-            cloud_scale=1.5,   # Large, gentle clouds
+            cloud_scale=1.5,  # Large, gentle clouds
             cloud_drift=0.008,  # Slow, gentle drift
         ),
         loop_configs=[
@@ -67,7 +67,7 @@ def example_ethereal_mist() -> None:
                 (118, 68, 178),  # Purple (end = start)
             ],
             gradient_type=GradientType.CLOUDS,
-            cloud_scale=1.2,   # Very large, soft clouds
+            cloud_scale=1.2,  # Very large, soft clouds
             cloud_drift=0.006,  # Very gentle drift
         ),
         loop_configs=[
@@ -106,8 +106,8 @@ def example_ocean_fog() -> None:
                 (58, 125, 180),  # Deep blue (end = start)
             ],
             gradient_type=GradientType.CLOUDS,
-            cloud_scale=1.8,   # Large, billowing features
-            cloud_drift=0.01,   # Slow, meditative drift
+            cloud_scale=1.8,  # Large, billowing features
+            cloud_drift=0.01,  # Slow, meditative drift
         ),
         loop_configs=[
             LoopConfig(
@@ -132,13 +132,13 @@ if __name__ == "__main__":
     print("Inspired by Inigo Quilez's techniques")
     print("=" * 60)
     print()
-    
+
     example_cosmic_clouds()
     print()
     example_ethereal_mist()
     print()
     example_ocean_fog()
-    
+
     print()
     print("=" * 60)
     print("✨ Cloud gradients generated!")

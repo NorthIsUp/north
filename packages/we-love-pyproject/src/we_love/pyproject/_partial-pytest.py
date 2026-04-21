@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional, Union
 
 from pydantic import BaseModel, Extra, Field, conint
 
@@ -84,133 +83,129 @@ class LogLevel2(Enum):
 
 
 class LogLevel(BaseModel):
-    __root__: Union[conint(ge=0), LogLevel1, LogLevel2] = Field(..., description="A minimum log level. Can be level name or integer value.")
+    __root__: conint(ge=0) | LogLevel1 | LogLevel2 = Field(..., description="A minimum log level. Can be level name or integer value.")
 
 
 class IniOptions(BaseModel):
     class Config:
         extra = Extra.allow
 
-    addopts: Optional[Union[List[str], str]] = Field(None, description="Extra command line options to be added by default.")
-    cache_dir: Optional[str] = Field(
+    addopts: list[str] | str | None = Field(None, description="Extra command line options to be added by default.")
+    cache_dir: str | None = Field(
         ".pytest_cache",
         description="Sets directory for cache plugin. Can include environment variables.",
     )
-    consider_namespace_packages: Optional[bool] = Field(
+    consider_namespace_packages: bool | None = Field(
         False,
         description="Controls whether pytest attempts to identify namespace packages.",
     )
-    console_output_style: Optional[ConsoleOutputStyle] = Field("progress", description="Sets console output style during test execution.")
-    doctest_encoding: Optional[str] = Field(None, description="Sets default encoding for doctest files.")
-    doctest_optionflags: Optional[Union[List[str], str]] = Field(
-        None, description="Specifies doctest flag names from the `doctest` module."
-    )
-    empty_parameter_set_mark: Optional[EmptyParameterSetMark] = Field(
+    console_output_style: ConsoleOutputStyle | None = Field("progress", description="Sets console output style during test execution.")
+    doctest_encoding: str | None = Field(None, description="Sets default encoding for doctest files.")
+    doctest_optionflags: list[str] | str | None = Field(None, description="Specifies doctest flag names from the `doctest` module.")
+    empty_parameter_set_mark: EmptyParameterSetMark | None = Field(
         "skip",
         description="Defines behavior for empty parameter sets in parameterization.",
     )
-    faulthandler_timeout: Optional[int] = Field(
+    faulthandler_timeout: int | None = Field(
         None,
         description="Sets timeout in seconds for dumping the traceback of all threads if a test takes too long.",
     )
-    filterwarnings: Optional[Union[List[str], str]] = Field(
+    filterwarnings: list[str] | str | None = Field(
         None,
         description="Sets action to take for matching warnings. Each item is a warning specification string.",
     )
-    junit_duration_report: Optional[JunitDurationReport] = Field(
-        "total", description="Sets how to record test durations in JUnit XML report."
-    )
-    junit_family: Optional[JunitFamily] = Field("xunit2", description="Sets format of generated JUnit XML files.")
-    junit_logging: Optional[JunitLogging] = Field(
+    junit_duration_report: JunitDurationReport | None = Field("total", description="Sets how to record test durations in JUnit XML report.")
+    junit_family: JunitFamily | None = Field("xunit2", description="Sets format of generated JUnit XML files.")
+    junit_logging: JunitLogging | None = Field(
         "no",
         description="Controls whether captured output is written to JUnit XML file.",
     )
-    junit_log_passing_tests: Optional[bool] = Field(
+    junit_log_passing_tests: bool | None = Field(
         True,
         description="If `junit_logging` is not 'no', controls whether to include output of passing tests.",
     )
-    junit_suite_name: Optional[str] = Field(None, description="Sets name of root test suite in JUnit XML report.")
-    log_auto_indent: Optional[Union[bool, conint(ge=0), LogAutoIndent]] = Field(
+    junit_suite_name: str | None = Field(None, description="Sets name of root test suite in JUnit XML report.")
+    log_auto_indent: bool | conint(ge=0) | LogAutoIndent | None = Field(
         None,
         description="Allows selective auto-indentation of multiline log messages. Can be true, false, positive integer, 'On', or 'Off'.",
     )
-    log_cli: Optional[bool] = Field(False, description="Enables log display during test run (live logging).")
-    log_cli_date_format: Optional[str] = Field(
+    log_cli: bool | None = Field(False, description="Enables log display during test run (live logging).")
+    log_cli_date_format: str | None = Field(
         None,
         description="Sets date format for live logging using `time.strftime()` format.",
     )
-    log_cli_format: Optional[str] = Field(None, description="Sets message format for live logging using `logging` format.")
-    log_cli_level: Optional[LogLevel] = Field(
+    log_cli_format: str | None = Field(None, description="Sets message format for live logging using `logging` format.")
+    log_cli_level: LogLevel | None = Field(
         None,
         description="Sets minimum log level for live logging. Can be level name or integer value.",
     )
-    log_date_format: Optional[str] = Field(
+    log_date_format: str | None = Field(
         None,
         description="Sets date format for captured logging using `time.strftime()` format.",
     )
-    log_file: Optional[str] = Field(None, description="Sets file path to write log messages to.")
-    log_file_date_format: Optional[str] = Field(
+    log_file: str | None = Field(None, description="Sets file path to write log messages to.")
+    log_file_date_format: str | None = Field(
         None,
         description="Sets date format for log file using `time.strftime()` format.",
     )
-    log_file_format: Optional[str] = Field(None, description="Sets message format for log file using `logging` format.")
-    log_file_level: Optional[LogLevel] = Field(
+    log_file_format: str | None = Field(None, description="Sets message format for log file using `logging` format.")
+    log_file_level: LogLevel | None = Field(
         None,
         description="Sets minimum log level for log file. Can be level name or integer value.",
     )
-    log_format: Optional[str] = Field(
+    log_format: str | None = Field(
         None,
         description="Sets message format for captured logging using `logging` format.",
     )
-    log_level: Optional[LogLevel] = Field(
+    log_level: LogLevel | None = Field(
         None,
         description="Sets minimum log level for captured logging. Can be level name or integer value.",
     )
-    markers: Optional[Union[List[str], str]] = Field(None, description="Allows registering additional markers for test functions.")
-    minversion: Optional[str] = Field(None, description="Specifies minimum required pytest version.")
-    norecursedirs: Optional[Union[List[str], str]] = Field(
+    markers: list[str] | str | None = Field(None, description="Allows registering additional markers for test functions.")
+    minversion: str | None = Field(None, description="Specifies minimum required pytest version.")
+    norecursedirs: list[str] | str | None = Field(
         None,
         description="Sets base name patterns for directories to be skipped during test discovery. Uses fnmatch-style matching. Replaces default patterns.",
     )
-    python_classes: Optional[Union[List[str], str]] = Field(
+    python_classes: list[str] | str | None = Field(
         None,
         description="Specifies name prefixes or glob patterns for identifying test classes.",
     )
-    python_files: Optional[Union[List[str], str]] = Field(
+    python_files: list[str] | str | None = Field(
         ["test_*.py", "*_test.py"],
         description="Specifies glob patterns for identifying Python test module files.",
     )
-    python_functions: Optional[Union[List[str], str]] = Field(
+    python_functions: list[str] | str | None = Field(
         ["test_*"],
         description="Specifies name prefixes or glob patterns for identifying test functions and methods.",
     )
-    pythonpath: Optional[Union[List[str], str]] = Field(
+    pythonpath: list[str] | str | None = Field(
         None,
         description="Sets list of directories to be added to the Python search path. Paths are relative to root directory.",
     )
-    required_plugins: Optional[Union[List[str], str]] = Field(
+    required_plugins: list[str] | str | None = Field(
         None,
         description="Space-separated list of plugins required to run pytest. Can include version specifiers.",
     )
-    testpaths: Optional[Union[List[str], str]] = Field(
+    testpaths: list[str] | str | None = Field(
         None,
         description="Sets directories to search for tests when no specific paths are given on the command line. Paths are relative to root directory. Shell-style wildcards can be used.",
     )
-    tmp_path_retention_count: Optional[int] = Field(3, description="Number of sessions to retain `tmp_path` directories for.")
-    tmp_path_retention_policy: Optional[TmpPathRetentionPolicy] = Field(
+    tmp_path_retention_count: int | None = Field(3, description="Number of sessions to retain `tmp_path` directories for.")
+    tmp_path_retention_policy: TmpPathRetentionPolicy | None = Field(
         "all",
         description="Controls which `tmp_path` directories to retain based on test outcome.",
     )
-    usefixtures: Optional[Union[List[str], str]] = Field(None, description="List of fixtures that will be applied to all test functions.")
-    verbosity_assertions: Optional[Union[conint(ge=0), VerbosityAssertions]] = Field(
+    usefixtures: list[str] | str | None = Field(None, description="List of fixtures that will be applied to all test functions.")
+    verbosity_assertions: conint(ge=0) | VerbosityAssertions | None = Field(
         None,
         description="Sets verbosity specific to assertion-related output. Can be integer or 'auto'.",
     )
-    verbosity_test_cases: Optional[Union[conint(ge=0), VerbosityTestCases]] = Field(
+    verbosity_test_cases: conint(ge=0) | VerbosityTestCases | None = Field(
         None,
         description="Sets verbosity specific to test case execution output. Can be integer or 'auto'.",
     )
-    xfail_strict: Optional[bool] = Field(
+    xfail_strict: bool | None = Field(
         False,
         description="If true, test suite will fail if a test marked with `@pytest.mark.xfail` unexpectedly passes.",
     )
@@ -220,15 +215,15 @@ class IniOptionsAsyncio(BaseModel):
     class Config:
         extra = Extra.allow
 
-    asyncio_default_fixture_loop_scope: Optional[AsyncioScope] = Field(
+    asyncio_default_fixture_loop_scope: AsyncioScope | None = Field(
         None,
         description="Default event loop scope of asynchronous fixtures. When this configuration option is unset, it defaults to the fixture scope. In future versions of pytest-asyncio, the value will default to function when unset",
     )
-    asyncio_default_test_loop_scope: Optional[AsyncioScope] = Field(
+    asyncio_default_test_loop_scope: AsyncioScope | None = Field(
         "function",
         description="Default event loop scope of asynchronous tests. When this configuration option is unset, it default to function scope",
     )
-    asyncio_mode: Optional[str] = Field("strict", description="Sets the asyncio mode for pytest-asyncio.")
+    asyncio_mode: str | None = Field("strict", description="Sets the asyncio mode for pytest-asyncio.")
 
 
 class IniOptionsModel(IniOptions, IniOptionsAsyncio):
@@ -239,7 +234,7 @@ class Model(BaseModel):
     class Config:
         extra = Extra.forbid
 
-    ini_options: Optional[IniOptionsModel] = Field(
+    ini_options: IniOptionsModel | None = Field(
         None,
         description="The `ini_options` table is used as a bridge between the existing `pytest.ini` configuration system and future configuration formats. `pytest.ini` takes precedence over `[tool.pytest.ini_options]` in `pyproject.toml`.",
         title="Bridge Configuration Options for `pytest.ini` File",

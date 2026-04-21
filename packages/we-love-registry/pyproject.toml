@@ -24,3 +24,6 @@ module-name = "we_love"
 [tool.pyright]
 venv     = ".venv"
 venvPath = "."
+
+[dependency-groups]
+dev = ["pytest>=9"]

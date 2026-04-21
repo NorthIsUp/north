@@ -19,10 +19,10 @@ def example_zoomed_epitrochoid() -> None:
         duration=4.0,
         gradient_config=GradientConfig(
             colors=[
-                (20, 20, 40),   # Deep blue-black
+                (20, 20, 40),  # Deep blue-black
                 (80, 40, 120),  # Purple
-                (120, 80, 160), # Lighter purple
-                (60, 100, 180), # Blue
+                (120, 80, 160),  # Lighter purple
+                (60, 100, 180),  # Blue
                 (40, 60, 100),  # Deep blue
             ],
             gradient_type=GradientType.WAVE,
@@ -47,8 +47,8 @@ def example_zoomed_epitrochoid() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/enhanced_epitrochoid.gif')
-    print('Created: output/enhanced_epitrochoid.gif')
+    avatar.save_gif("output/enhanced_epitrochoid.gif")
+    print("Created: output/enhanced_epitrochoid.gif")
 
 
 def example_smooth_radial() -> None:
@@ -85,8 +85,8 @@ def example_smooth_radial() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/smooth_radial.gif')
-    print('Created: output/smooth_radial.gif')
+    avatar.save_gif("output/smooth_radial.gif")
+    print("Created: output/smooth_radial.gif")
 
 
 def example_double_epitrochoid() -> None:
@@ -135,8 +135,8 @@ def example_double_epitrochoid() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/double_epitrochoid.gif')
-    print('Created: output/double_epitrochoid.gif')
+    avatar.save_gif("output/double_epitrochoid.gif")
+    print("Created: output/double_epitrochoid.gif")
 
 
 def example_lissajous_wave() -> None:
@@ -175,14 +175,14 @@ def example_lissajous_wave() -> None:
         ],
     )
     avatar = Avatar(config)
-    avatar.save_gif('output/lissajous_wave.gif')
-    print('Created: output/lissajous_wave.gif')
+    avatar.save_gif("output/lissajous_wave.gif")
+    print("Created: output/lissajous_wave.gif")
 
 
-if __name__ == '__main__':
-    print('Generating enhanced examples...\n')
+if __name__ == "__main__":
+    print("Generating enhanced examples...\n")
     example_zoomed_epitrochoid()
     example_smooth_radial()
     example_double_epitrochoid()
     example_lissajous_wave()
-    print('\n✨ All enhanced examples generated successfully!')
+    print("\n✨ All enhanced examples generated successfully!")

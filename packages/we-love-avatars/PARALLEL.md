@@ -11,11 +11,11 @@ By default, frames render sequentially (one at a time). With `parallel=True`, fr
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('parallel-demo')
+config = avatar("parallel-demo")
 av = Avatar(config)
 
 # Enable parallel rendering
-av.save_gif('avatar.gif', parallel=True, progress=True, optimize=False)
+av.save_gif("avatar.gif", parallel=True, progress=True, optimize=False)
 ```
 
 **Output:**
@@ -75,7 +75,7 @@ Expected speedups for 900-frame renders:
 - Want maximum speed
 
 ```python
-av.save_gif('avatar.gif', parallel=True, optimize=False, progress=True)
+av.save_gif("avatar.gif", parallel=True, optimize=False, progress=True)
 # Fastest possible: ~13s for 900 frames
 ```
 
@@ -91,10 +91,10 @@ Control how many cores to use:
 
 ```python
 # Use specific number of workers
-av.save_gif('avatar.gif', parallel=True, workers=8)
+av.save_gif("avatar.gif", parallel=True, workers=8)
 
 # Use all available cores (default)
-av.save_gif('avatar.gif', parallel=True)  # Auto-detects
+av.save_gif("avatar.gif", parallel=True)  # Auto-detects
 ```
 
 ## Complete Speed Optimization
@@ -105,19 +105,19 @@ Combine all optimization tricks:
 from we_love.avatars import Avatar, AvatarGeneratorConfig, avatar
 
 gen_config = AvatarGeneratorConfig(
-    fps=20,          # Lower FPS (still smooth)
-    duration=10.0,   # Shorter for dev
+    fps=20,  # Lower FPS (still smooth)
+    duration=10.0,  # Shorter for dev
 )
 
-config = avatar('fast', gen_config)
+config = avatar("fast", gen_config)
 av = Avatar(config)
 
 # Parallel + fast encoding + progress
 av.save_gif(
-    'fast.gif',
-    parallel=True,    # ⚡ Multi-core rendering
-    optimize=False,   # ⚡ Fast encoding
-    progress=True,    # See what's happening
+    "fast.gif",
+    parallel=True,  # ⚡ Multi-core rendering
+    optimize=False,  # ⚡ Fast encoding
+    progress=True,  # See what's happening
 )
 
 # Result: 200 frames in ~2 seconds! 🚀
@@ -151,7 +151,7 @@ for i in range(900):
     frames[i] = render_frame(i)
 # Uses 1 core, one at a time
 
-# Parallel  
+# Parallel
 with Pool(16) as pool:
     frames = pool.map(render_frame, range(900))
 # Uses 16 cores, renders 16 frames simultaneously!
@@ -188,8 +188,8 @@ You'll hear your fans spin up - that's the sound of speed! 🔥
 from we_love.avatars import AvatarGeneratorConfig, avatar, Avatar
 
 gen_config = AvatarGeneratorConfig(fps=15, duration=5.0)
-Avatar(avatar('dev', gen_config)).save_gif(
-    'dev.gif',
+Avatar(avatar("dev", gen_config)).save_gif(
+    "dev.gif",
     parallel=True,
     optimize=False,
     progress=True,
@@ -200,10 +200,10 @@ Avatar(avatar('dev', gen_config)).save_gif(
 ### Production (quality + speed)
 ```python
 gen_config = AvatarGeneratorConfig(fps=30, duration=30.0)
-Avatar(avatar('prod', gen_config)).save_gif(
-    'prod.gif',
-    parallel=True,     # ⚡ Fast rendering
-    optimize=True,     # 📦 Small file
+Avatar(avatar("prod", gen_config)).save_gif(
+    "prod.gif",
+    parallel=True,  # ⚡ Fast rendering
+    optimize=True,  # 📦 Small file
     progress=True,
 )
 # 900 frames in ~16s (vs 26s sequential)
@@ -214,15 +214,17 @@ Avatar(avatar('prod', gen_config)).save_gif(
 # Generate 10 avatars in parallel
 import concurrent.futures
 
+
 def generate_avatar(seed):
     config = avatar(seed)
-    Avatar(config).save_gif(f'{seed}.gif', parallel=True, optimize=False)
+    Avatar(config).save_gif(f"{seed}.gif", parallel=True, optimize=False)
 
-seeds = [f'user{i}' for i in range(10)]
+
+seeds = [f"user{i}" for i in range(10)]
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
     executor.map(generate_avatar, seeds)
-    
+
 # 10 avatars, each using 16 cores!
 # Note: May be memory intensive
 ```

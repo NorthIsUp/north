@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from .guards import is_tuple_of, match_type
@@ -75,7 +77,7 @@ class TestMatchType:
         """Test matching simple types."""
         assert match_type("hello", str)
         assert match_type(42, int)
-        assert match_type(3.14, float)
+        assert match_type(math.pi, float)
         assert match_type(True, bool)
 
     def test_simple_type_mismatch(self) -> None:

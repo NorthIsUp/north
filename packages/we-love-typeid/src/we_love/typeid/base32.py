@@ -1,5 +1,3 @@
-from typing import List
-
 SUFFIX_LEN = 26
 
 
@@ -266,7 +264,7 @@ TABLE = [
 ]
 
 
-def encode(src: List[int]) -> str:
+def encode(src: list[int]) -> str:
     dst = [""] * SUFFIX_LEN
 
     if len(src) != 16:
@@ -305,7 +303,7 @@ def encode(src: List[int]) -> str:
     return "".join(dst)
 
 
-def decode(s: str) -> List[int]:
+def decode(s: str) -> list[int]:
     v = bytes(s, encoding="utf-8")
 
     if (

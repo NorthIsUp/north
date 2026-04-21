@@ -32,16 +32,16 @@ from we_love.avatars import Avatar, AvatarConfig, GradientConfig, GradientType, 
 config = AvatarConfig(
     gradient_config=GradientConfig(
         colors=[
-            (30, 95, 95),    # Teal
+            (30, 95, 95),  # Teal
             (40, 105, 120),  # Cyan
             (50, 112, 145),  # Blue
             (60, 113, 168),  # Sky blue
             (50, 112, 145),  # Blue
             (40, 105, 120),  # Cyan
-            (30, 95, 95),    # Teal (circular!)
+            (30, 95, 95),  # Teal (circular!)
         ],
         gradient_type=GradientType.CLOUDS,
-        cloud_scale=1.5,    # Large, gentle clouds (lower = larger!)
+        cloud_scale=1.5,  # Large, gentle clouds (lower = larger!)
         cloud_drift=0.008,  # Gentle drift
     ),
     loop_configs=[
@@ -54,7 +54,7 @@ config = AvatarConfig(
     ],
 )
 
-Avatar(config).save_gif('clouds.gif', parallel=True, optimize=False, progress=True)
+Avatar(config).save_gif("clouds.gif", parallel=True, optimize=False, progress=True)
 ```
 
 ## Parameters
@@ -85,14 +85,14 @@ Creates the base turbulence pattern.
 
 ### Layer 2: Warped Noise (r)
 ```python
-r_x = fbm(x + 4*q_x + drift*0.8, y + 4*q_y + drift*0.8, time)
-r_y = fbm(x + 4*q_x + offset + drift*0.8, y + 4*q_y + offset + drift*0.8, time)
+r_x = fbm(x + 4 * q_x + drift * 0.8, y + 4 * q_y + drift * 0.8, time)
+r_y = fbm(x + 4 * q_x + offset + drift * 0.8, y + 4 * q_y + offset + drift * 0.8, time)
 ```
 Samples noise at warped coordinates for organic flow.
 
 ### Layer 3: Final Pattern
 ```python
-density = fbm((x + warp_strength*r_x)*cloud_scale, (y + warp_strength*r_y)*cloud_scale, time)
+density = fbm((x + warp_strength * r_x) * cloud_scale, (y + warp_strength * r_y) * cloud_scale, time)
 ```
 The final cloud density, sampled at double-warped coordinates!
 
@@ -144,7 +144,7 @@ Generates:
 from we_love.avatars import Avatar, AvatarGeneratorConfig, avatar, GradientConfig, GradientType
 
 # Get organic gradient from seed
-config = avatar('my-seed')
+config = avatar("my-seed")
 
 # Force cloud gradient
 config.gradient_config.gradient_type = GradientType.CLOUDS
@@ -155,10 +155,10 @@ config.gradient_config.cloud_drift = 0.015
 gen_config = AvatarGeneratorConfig(random_loop=True)
 
 for i in range(10):
-    config_variant = avatar('my-seed', gen_config)
+    config_variant = avatar("my-seed", gen_config)
     config_variant.gradient_config = config.gradient_config  # Keep cloud gradient
-    
-    Avatar(config_variant).save_gif(f'cloud_variant_{i}.gif', parallel=True, optimize=False)
+
+    Avatar(config_variant).save_gif(f"cloud_variant_{i}.gif", parallel=True, optimize=False)
 ```
 
 ## Technical Details

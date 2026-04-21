@@ -51,8 +51,8 @@ class Editors:
 
         return sorted(cls._registry.values(), key=lambda x: priority.index(x.short_name), reverse=True)[:num]
 
-    @a.cache
     @classmethod
+    @a.cache
     async def discover_editors(cls) -> None:
         async with cls._discovery_lock:
             if cls._discovery_has_run:

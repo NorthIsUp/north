@@ -36,7 +36,7 @@ Generate unique avatars from any string (email, username, etc.):
 from we_love.avatars import avatar, Avatar
 
 # One line to generate a unique avatar from any string!
-Avatar(avatar('alice@example.com')).save_gif('alice.gif')
+Avatar(avatar("alice@example.com")).save_gif("alice.gif")
 ```
 
 That's it! Same seed = same avatar (deterministic). Different seeds = different avatars.
@@ -53,7 +53,7 @@ gen_config = AvatarGeneratorConfig(random_loop=True)
 
 # Generate 5 variations
 for i in range(5):
-    Avatar(avatar('my-seed', gen_config)).save_gif(f'variation_{i}.gif')
+    Avatar(avatar("my-seed", gen_config)).save_gif(f"variation_{i}.gif")
     # Each has a different squiggle! 🎲
 ```
 
@@ -71,9 +71,9 @@ config = AvatarConfig(
     duration=3.0,
     gradient_config=GradientConfig(
         colors=[
-            (255, 0, 128),    # Pink
-            (128, 0, 255),    # Purple
-            (0, 128, 255),    # Blue
+            (255, 0, 128),  # Pink
+            (128, 0, 255),  # Purple
+            (0, 128, 255),  # Blue
         ],
         gradient_type=GradientType.RADIAL,
         animate_shift=True,
@@ -91,7 +91,7 @@ config = AvatarConfig(
 )
 
 avatar = Avatar(config)
-avatar.save_gif('custom_avatar.gif')
+avatar.save_gif("custom_avatar.gif")
 ```
 
 ## Loop Types
@@ -102,33 +102,39 @@ Beautiful parametric curves created by combining sine waves:
 ```python
 from we_love.avatars import Loop, LoopConfig, LoopType
 
-loop = Loop(LoopConfig(
-    loop_type=LoopType.LISSAJOUS,
-    freq_x=3.0,  # X frequency
-    freq_y=4.0,  # Y frequency
-    phase=0.5,   # Phase offset
-))
+loop = Loop(
+    LoopConfig(
+        loop_type=LoopType.LISSAJOUS,
+        freq_x=3.0,  # X frequency
+        freq_y=4.0,  # Y frequency
+        phase=0.5,  # Phase offset
+    )
+)
 ```
 
 ### Rose Curves
 Flower-like patterns with configurable petals:
 
 ```python
-loop = Loop(LoopConfig(
-    loop_type=LoopType.ROSE,
-    petals=5,  # Number of petals
-))
+loop = Loop(
+    LoopConfig(
+        loop_type=LoopType.ROSE,
+        petals=5,  # Number of petals
+    )
+)
 ```
 
 ### Epitrochoid
 Spirograph-like curves:
 
 ```python
-loop = Loop(LoopConfig(
-    loop_type=LoopType.EPITROCHOID,
-    r_major=0.3,
-    r_minor=0.1,
-))
+loop = Loop(
+    LoopConfig(
+        loop_type=LoopType.EPITROCHOID,
+        r_major=0.3,
+        r_minor=0.1,
+    )
+)
 ```
 
 ### Circle & Spiral
@@ -148,23 +154,29 @@ loop = Loop(LoopConfig(loop_type=LoopType.SPIRAL))
 from we_love.avatars import Gradient, GradientConfig, GradientType
 
 # Aurora borealis (multi-dimensional flowing waves)
-gradient = Gradient(GradientConfig(
-    gradient_type=GradientType.AURORA,
-    colors=[(10, 80, 60), (40, 120, 180), (80, 60, 180)],
-))
+gradient = Gradient(
+    GradientConfig(
+        gradient_type=GradientType.AURORA,
+        colors=[(10, 80, 60), (40, 120, 180), (80, 60, 180)],
+    )
+)
 
 # Plasma (chaotic multi-frequency waves)
-gradient = Gradient(GradientConfig(
-    gradient_type=GradientType.PLASMA,
-    colors=[(255, 60, 120), (200, 100, 255), (100, 150, 255)],
-))
+gradient = Gradient(
+    GradientConfig(
+        gradient_type=GradientType.PLASMA,
+        colors=[(255, 60, 120), (200, 100, 255), (100, 150, 255)],
+    )
+)
 
 # Wave (asymmetric flowing gradient)
-gradient = Gradient(GradientConfig(
-    gradient_type=GradientType.WAVE,
-    wave_frequency=2.5,
-    wave_amplitude=0.4,
-))
+gradient = Gradient(
+    GradientConfig(
+        gradient_type=GradientType.WAVE,
+        wave_frequency=2.5,
+        wave_amplitude=0.4,
+    )
+)
 
 # Classic gradients
 gradient = Gradient(GradientConfig(gradient_type=GradientType.LINEAR))
@@ -209,7 +221,7 @@ frame = avatar.render_frame(15)
 frames = avatar.render_all_frames(progress=True)
 
 # Save a single frame
-avatar.save_png('frame.png', frame=0)
+avatar.save_png("frame.png", frame=0)
 ```
 
 ### Parallel Rendering & Fast Encoding
@@ -219,11 +231,11 @@ Use all your CPU cores for maximum speed:
 ```python
 from we_love.avatars import avatar, Avatar
 
-config = avatar('user@example.com')
+config = avatar("user@example.com")
 av = Avatar(config)
 
 # Parallel rendering + fast encoding = FASTEST!
-av.save_gif('avatar.gif', parallel=True, optimize=False, progress=True)
+av.save_gif("avatar.gif", parallel=True, optimize=False, progress=True)
 
 # Output:
 # Rendering frames (16 cores): 100%|████| 900/900 [00:02<00:00, 392fps]
@@ -246,12 +258,12 @@ from we_love.avatars import Gradient
 # Create gradient from custom colors
 gradient = Gradient.from_colors(
     colors=[
-        (255, 0, 0),    # Red
+        (255, 0, 0),  # Red
         (255, 165, 0),  # Orange
         (255, 255, 0),  # Yellow
-        (0, 255, 0),    # Green
-        (0, 0, 255),    # Blue
-        (238, 130, 238),# Violet
+        (0, 255, 0),  # Green
+        (0, 0, 255),  # Blue
+        (238, 130, 238),  # Violet
     ],
     gradient_type=GradientType.LINEAR,
 )

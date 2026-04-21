@@ -6,7 +6,6 @@ import hashlib
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
-
 from we_love.avatars.avatar import AvatarConfig
 from we_love.avatars.constants import (
     BASE_COLOR_PAIRS,
@@ -44,18 +43,16 @@ if TYPE_CHECKING:
 class AvatarGeneratorConfig(BaseModel):
     """Configuration for avatar generation from seeds."""
 
-    width: int = Field(default=512, description='Avatar width')
-    height: int = Field(default=512, description='Avatar height')
-    fps: int = Field(default=30, description='Frames per second')
-    duration: float = Field(default=30.0, description='Animation duration in seconds')
-    enable_zoom: bool = Field(default=True, description='Enable zoom and offset')
-    enable_wave_gradients: bool = Field(
-        default=True, description='Enable wave gradients'
-    )
-    max_loops: int = Field(default=1, description='Maximum number of loops')
+    width: int = Field(default=512, description="Avatar width")
+    height: int = Field(default=512, description="Avatar height")
+    fps: int = Field(default=30, description="Frames per second")
+    duration: float = Field(default=30.0, description="Animation duration in seconds")
+    enable_zoom: bool = Field(default=True, description="Enable zoom and offset")
+    enable_wave_gradients: bool = Field(default=True, description="Enable wave gradients")
+    max_loops: int = Field(default=1, description="Maximum number of loops")
     random_loop: bool = Field(
         default=False,
-        description='Use random loop parameters instead of deterministic (changes each generation)',
+        description="Use random loop parameters instead of deterministic (changes each generation)",
     )
 
 
@@ -74,9 +71,7 @@ class AvatarGenerator:
         """Generate hash from seed string."""
         return hashlib.sha256(seed.encode()).digest()
 
-    def _get_deterministic_value(
-        self, hash_bytes: bytes, offset: int, max_value: int
-    ) -> int:
+    def _get_deterministic_value(self, hash_bytes: bytes, offset: int, max_value: int) -> int:
         """Get a deterministic value from hash bytes.
 
         Args:
@@ -90,9 +85,7 @@ class AvatarGenerator:
         byte_val = hash_bytes[offset % len(hash_bytes)]
         return byte_val % max_value
 
-    def _get_deterministic_float(
-        self, hash_bytes: bytes, offset: int, min_val: float, max_val: float
-    ) -> float:
+    def _get_deterministic_float(self, hash_bytes: bytes, offset: int, min_val: float, max_val: float) -> float:
         """Get a deterministic float from hash bytes.
 
         Args:
@@ -129,32 +122,32 @@ class AvatarGenerator:
             List of RGB colors forming smooth path
         """
         path = [start_color]
-        
+
         for i in range(1, num_steps):
             # Linear interpolation as base
             t = i / num_steps
             base_r = int(start_color[0] + (peak_color[0] - start_color[0]) * t)
             base_g = int(start_color[1] + (peak_color[1] - start_color[1]) * t)
             base_b = int(start_color[2] + (peak_color[2] - start_color[2]) * t)
-            
+
             # Add organic variation (±PALETTE_VARIATION units)
             var_range = PALETTE_VARIATION * 2 + 1
             var_r = self._get_deterministic_value(hash_bytes, base_offset + i * 3, var_range) - PALETTE_VARIATION
             var_g = self._get_deterministic_value(hash_bytes, base_offset + i * 3 + 1, var_range) - PALETTE_VARIATION
             var_b = self._get_deterministic_value(hash_bytes, base_offset + i * 3 + 2, var_range) - PALETTE_VARIATION
-            
+
             # Apply variation with clamping
             r = max(0, min(255, base_r + var_r))
             g = max(0, min(255, base_g + var_g))
             b = max(0, min(255, base_b + var_b))
-            
+
             path.append((r, g, b))
-        
+
         return path
 
     def _generate_color_palette(self, hash_bytes: bytes, offset: int) -> list[tuple[int, int, int]]:
         """Generate a harmonious color palette from hash.
-        
+
         Creates an organic circular path: start → peak → back to start
         Uses different paths for outbound and return for natural look.
 
@@ -168,25 +161,21 @@ class AvatarGenerator:
         # Select base hue
         hue_sector = self._get_deterministic_value(hash_bytes, offset, len(BASE_COLOR_PAIRS))
         start_color, peak_color = BASE_COLOR_PAIRS[hue_sector]
-        
+
         # Generate organic circular path: start → peak → back to start
         # Use different hash offsets for outbound vs return for variation
-        
+
         # Outbound: start → peak (4 colors including endpoints)
-        outbound = self._generate_smooth_path(
-            start_color, peak_color, 4, hash_bytes, offset + 100
-        )
-        
+        outbound = self._generate_smooth_path(start_color, peak_color, 4, hash_bytes, offset + 100)
+
         # Return: peak → start (4 colors including endpoints)
         # Different hash offset creates different path back!
-        return_path = self._generate_smooth_path(
-            peak_color, start_color, 4, hash_bytes, offset + 200
-        )
-        
+        return_path = self._generate_smooth_path(peak_color, start_color, 4, hash_bytes, offset + 200)
+
         # Combine: outbound[0,1,2,3=peak] + return[1,2,3=start]
         # Total: 7 colors with start appearing twice (start and end)
         palette = outbound + return_path[1:]
-        
+
         return palette
 
     def _generate_loop_color(self, hash_bytes: bytes, offset: int) -> tuple[int, int, int]:
@@ -233,9 +222,7 @@ class AvatarGenerator:
                 GradientType.DIAGONAL,
             ]
 
-        gradient_type = gradient_types[
-            self._get_deterministic_value(hash_bytes, 4, len(gradient_types))
-        ]
+        gradient_type = gradient_types[self._get_deterministic_value(hash_bytes, 4, len(gradient_types))]
 
         gradient_config = GradientConfig(
             colors=colors,
@@ -251,13 +238,11 @@ class AvatarGenerator:
         if self.config.random_loop:
             # Use true randomness for loop parameters
             import random
-            
+
             num_loops = self.config.max_loops
         else:
             # Deterministic from seed
-            num_loops = self._get_deterministic_value(
-                hash_bytes, 8, self.config.max_loops
-            ) + 1
+            num_loops = self._get_deterministic_value(hash_bytes, 8, self.config.max_loops) + 1
 
         loop_configs = []
         for i in range(num_loops):
@@ -265,18 +250,18 @@ class AvatarGenerator:
 
             if self.config.random_loop:
                 import random
-                
+
                 # Random loop type
                 loop_types = [LoopType[t.upper()] for t in PREFERRED_LOOP_TYPES]
                 loop_type = random.choice(loop_types)
-                
+
                 # Random parameters
                 width_pct = random.uniform(LINE_WIDTH_MIN_PCT, LINE_WIDTH_MAX_PCT)
                 line_width = int(self.config.width * width_pct)
-                
+
                 size_min = SIZE_MIN_ZOOMED if self.config.enable_zoom else SIZE_MIN_NORMAL
                 size_max = SIZE_MAX_ZOOMED if self.config.enable_zoom else SIZE_MAX_NORMAL
-                
+
                 loop_config = LoopConfig(
                     loop_type=loop_type,
                     color=random.choice(LOOP_COLORS),
@@ -284,7 +269,7 @@ class AvatarGenerator:
                     size=random.uniform(size_min, size_max),
                     speed=random.uniform(SPEED_MIN, SPEED_MAX),
                 )
-                
+
                 # Random type-specific parameters
                 if loop_type == LoopType.LISSAJOUS:
                     loop_config.freq_x = random.uniform(LISSAJOUS_FREQ_MIN, LISSAJOUS_FREQ_MAX)
@@ -295,7 +280,7 @@ class AvatarGenerator:
                 elif loop_type == LoopType.EPITROCHOID:
                     loop_config.r_major = random.uniform(EPITROCHOID_R_MAJOR_MIN, EPITROCHOID_R_MAJOR_MAX)
                     loop_config.r_minor = random.uniform(EPITROCHOID_R_MINOR_MIN, EPITROCHOID_R_MINOR_MAX)
-                
+
                 # Random offset if zoom enabled
                 if self.config.enable_zoom:
                     loop_config.offset_x = random.uniform(OFFSET_MIN, OFFSET_MAX)
@@ -303,19 +288,15 @@ class AvatarGenerator:
             else:
                 # Deterministic from seed (original behavior)
                 loop_types = [LoopType[t.upper()] for t in PREFERRED_LOOP_TYPES]
-                loop_type = loop_types[
-                    self._get_deterministic_value(hash_bytes, base_offset, len(loop_types))
-                ]
+                loop_type = loop_types[self._get_deterministic_value(hash_bytes, base_offset, len(loop_types))]
 
                 # Generate loop parameters using constants
-                width_pct = self._get_deterministic_float(
-                    hash_bytes, base_offset + 2, LINE_WIDTH_MIN_PCT, LINE_WIDTH_MAX_PCT
-                )
+                width_pct = self._get_deterministic_float(hash_bytes, base_offset + 2, LINE_WIDTH_MIN_PCT, LINE_WIDTH_MAX_PCT)
                 line_width = int(self.config.width * width_pct)
-                
+
                 size_min = SIZE_MIN_ZOOMED if self.config.enable_zoom else SIZE_MIN_NORMAL
                 size_max = SIZE_MAX_ZOOMED if self.config.enable_zoom else SIZE_MAX_NORMAL
-                
+
                 loop_config = LoopConfig(
                     loop_type=loop_type,
                     color=self._generate_loop_color(hash_bytes, base_offset + 1),
@@ -326,20 +307,12 @@ class AvatarGenerator:
 
                 # Add type-specific parameters using constants
                 if loop_type == LoopType.LISSAJOUS:
-                    loop_config.freq_x = self._get_deterministic_float(
-                        hash_bytes, base_offset + 5, LISSAJOUS_FREQ_MIN, LISSAJOUS_FREQ_MAX
-                    )
-                    loop_config.freq_y = self._get_deterministic_float(
-                        hash_bytes, base_offset + 6, LISSAJOUS_FREQ_MIN, LISSAJOUS_FREQ_MAX
-                    )
-                    loop_config.phase = self._get_deterministic_float(
-                        hash_bytes, base_offset + 7, LISSAJOUS_PHASE_MIN, LISSAJOUS_PHASE_MAX
-                    )
+                    loop_config.freq_x = self._get_deterministic_float(hash_bytes, base_offset + 5, LISSAJOUS_FREQ_MIN, LISSAJOUS_FREQ_MAX)
+                    loop_config.freq_y = self._get_deterministic_float(hash_bytes, base_offset + 6, LISSAJOUS_FREQ_MIN, LISSAJOUS_FREQ_MAX)
+                    loop_config.phase = self._get_deterministic_float(hash_bytes, base_offset + 7, LISSAJOUS_PHASE_MIN, LISSAJOUS_PHASE_MAX)
                 elif loop_type == LoopType.ROSE:
                     petal_range = ROSE_PETALS_MAX - ROSE_PETALS_MIN + 1
-                    loop_config.petals = (
-                        self._get_deterministic_value(hash_bytes, base_offset + 5, petal_range) + ROSE_PETALS_MIN
-                    )
+                    loop_config.petals = self._get_deterministic_value(hash_bytes, base_offset + 5, petal_range) + ROSE_PETALS_MIN
                 elif loop_type == LoopType.EPITROCHOID:
                     loop_config.r_major = self._get_deterministic_float(
                         hash_bytes, base_offset + 5, EPITROCHOID_R_MAJOR_MIN, EPITROCHOID_R_MAJOR_MAX
@@ -350,12 +323,8 @@ class AvatarGenerator:
 
                 # Add offset if zoom enabled
                 if self.config.enable_zoom:
-                    loop_config.offset_x = self._get_deterministic_float(
-                        hash_bytes, base_offset + 8, OFFSET_MIN, OFFSET_MAX
-                    )
-                    loop_config.offset_y = self._get_deterministic_float(
-                        hash_bytes, base_offset + 9, OFFSET_MIN, OFFSET_MAX
-                    )
+                    loop_config.offset_x = self._get_deterministic_float(hash_bytes, base_offset + 8, OFFSET_MIN, OFFSET_MAX)
+                    loop_config.offset_y = self._get_deterministic_float(hash_bytes, base_offset + 9, OFFSET_MIN, OFFSET_MAX)
 
             loop_configs.append(loop_config)
 
