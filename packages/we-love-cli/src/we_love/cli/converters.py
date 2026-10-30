@@ -3,26 +3,45 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Protocol, override
 
 if TYPE_CHECKING:
     from typing import ClassVar
 
 
 class ConversionError(ValueError):
-    def __init__(self, message: str, value: Any) -> None:
+    def __init__(self, message: str, value: object) -> None:
         self.message = message
         self.value = value
 
 
-CONVERTER_REGISTRY: dict[type[object], list[BaseConverter[object]]] = defaultdict(list)
+class RegisteredConverter(Protocol):
+    def encode(self, value: object) -> str: ...
+    def decode(self, value: str) -> object: ...
+
+
+class ConverterAdapter[T]:
+    def __init__(self, converter: BaseConverter[T]) -> None:
+        self.converter = converter
+
+    def encode(self, value: object) -> str:
+        if not isinstance(value, self.converter.handled_type):
+            raise ConversionError("Incorrect value type", value)
+        return self.converter.encode(value)
+
+    def decode(self, value: str) -> object:
+        return self.converter.decode(value)
+
+
+CONVERTER_REGISTRY: dict[type[object], list[RegisteredConverter]] = defaultdict(list)
 
 
 class BaseConverter[T]:
     handled_type: type[T]
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        CONVERTER_REGISTRY[cls.handled_type].append(cls())  # type: ignore[arg-type]
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        if "handled_type" in cls.__dict__:
+            CONVERTER_REGISTRY[cls.handled_type].append(ConverterAdapter(cls()))
 
     def encode(self, s: T) -> str:
         for converter in CONVERTER_REGISTRY[self.handled_type]:
@@ -32,15 +51,18 @@ class BaseConverter[T]:
                 continue
         raise ConversionError(f"No converter found for type: {self.handled_type}", s)
 
-    def decode(self, s: str) -> T: ...
+    def decode(self, s: str) -> T:
+        raise NotImplementedError
 
 
 class StringConverter(BaseConverter[str]):
     handled_type: type[str] = str
 
+    @override
     def encode(self, s: str) -> str:
         return s
 
+    @override
     def decode(self, s: str) -> str:
         return s
 
@@ -48,27 +70,29 @@ class StringConverter(BaseConverter[str]):
 class IntConverter(BaseConverter[int]):
     handled_type: type[int] = int
 
+    @override
     def encode(self, s: int) -> str:
         return str(s)
 
+    @override
     def decode(self, s: str) -> int:
         if s.isdigit():
             return int(s)
-        else:
-            raise ConversionError(f"Invalid int: '{s}'", s)
+        raise ConversionError(f"Invalid int: '{s}'", s)
 
 
 class FloatConverter(BaseConverter[float]):
     handled_type: type[float] = float
 
+    @override
     def encode(self, s: float) -> str:
         return str(s)
 
+    @override
     def decode(self, s: str) -> float:
         if s.replace(".", "", 1).isdigit():
             return float(s)
-        else:
-            raise ConversionError(f"Invalid float: '{s}'", s)
+        raise ConversionError(f"Invalid float: '{s}'", s)
 
 
 class BoolConverter(BaseConverter[bool]):
@@ -77,45 +101,47 @@ class BoolConverter(BaseConverter[bool]):
     _true_values: ClassVar[frozenset[str]] = frozenset(["true", "t", "yes", "y", "1", "on"])
     _false_values: ClassVar[frozenset[str]] = frozenset(["false", "f", "no", "n", "0", "off"])
 
+    @override
     def encode(self, s: bool) -> str:
         return str(s)
 
+    @override
     def decode(self, s: str, strict: bool = True) -> bool:
         s = s.lower()
         if strict:
             if s in self._true_values:
                 return True
-            elif s in self._false_values:
+            if s in self._false_values:
                 return False
-            else:
-                raise ConversionError(f"Invalid bool: '{s}'", s)
-        else:
-            return s not in self._false_values
+            raise ConversionError(f"Invalid bool: '{s}'", s)
+        return s not in self._false_values
 
 
 class PathConverter(BaseConverter[Path]):
     handled_type: type[Path] = Path
 
+    @override
     def encode(self, s: Path) -> str:
         return str(s.expanduser().resolve())
 
+    @override
     def decode(self, s: str, strict: bool = True) -> Path:
         path = Path(s).expanduser().resolve()
         if strict:
             if path.exists():
                 return path
-            else:
-                raise ConversionError(f"Path does not exist: '{s}'", s)
-        else:
-            return path
+            raise ConversionError(f"Path does not exist: '{s}'", s)
+        return path
 
 
 class DateTimeConverter(BaseConverter[datetime]):
     handled_type: type[datetime] = datetime
 
+    @override
     def encode(self, s: datetime) -> str:
         return s.isoformat()
 
+    @override
     def decode(self, s: str) -> datetime:
         return datetime.fromisoformat(s)
 
@@ -123,9 +149,11 @@ class DateTimeConverter(BaseConverter[datetime]):
 class DateConverter(BaseConverter[date]):
     handled_type: type[date] = date
 
+    @override
     def encode(self, s: date) -> str:
         return s.isoformat()
 
+    @override
     def decode(self, s: str) -> date:
         return date.fromisoformat(s)
 
@@ -133,18 +161,24 @@ class DateConverter(BaseConverter[date]):
 class TimeConverter(BaseConverter[time]):
     handled_type: type[time] = time
 
+    @override
     def encode(self, s: time) -> str:
         return s.isoformat()
 
+    @override
     def decode(self, s: str) -> time:
         return time.fromisoformat(s)
 
 
 class ListConverter[T](BaseConverter[list[T]]):
-    handled_type: type[list[T]] = list[T]
+    def __init__(self, converter: BaseConverter[T]) -> None:
+        self.converter = converter
+        self.handled_type = list
 
+    @override
     def encode(self, s: list[T]) -> str:
-        return ", ".join(CONVERTER_REGISTRY[T].encode(item) for item in s)
+        return ", ".join(self.converter.encode(item) for item in s)
 
+    @override
     def decode(self, s: str) -> list[T]:
-        return [self.converter.decode(item) for item in s.split(",")]
+        return [self.converter.decode(item.strip()) for item in s.split(",")]

@@ -2,6 +2,7 @@
 
 from we_love.avatars.avatar import Avatar, AvatarConfig
 from we_love.avatars.generator import AvatarGenerator, AvatarGeneratorConfig, avatar
+from we_love.avatars.gradient import GradientType
 
 
 def test_avatar_function() -> None:
@@ -100,7 +101,6 @@ def test_wave_gradients_disabled() -> None:
     config = avatar("test", gen_config)
 
     # Should not use WAVE gradient type
-    from we_love.avatars.gradient import GradientType
 
     assert config.gradient_config.gradient_type != GradientType.WAVE
 

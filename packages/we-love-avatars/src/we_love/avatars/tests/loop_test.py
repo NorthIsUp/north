@@ -84,7 +84,7 @@ def test_loop_animation(base_image: Image.Image) -> None:
     frame2 = loop.render(base_image, frame=5, total_frames=10)
 
     # Frames should be different when animating
-    assert list(frame1.getdata()) != list(frame2.getdata())
+    assert list(frame1.get_flattened_data()) != list(frame2.get_flattened_data())
 
 
 def test_loop_color(base_image: Image.Image) -> None:
@@ -97,8 +97,8 @@ def test_loop_color(base_image: Image.Image) -> None:
     img = loop.render(base_image)
 
     # Check that red pixels exist in the image
-    pixels = list(img.getdata())
-    assert any(r > 200 for r, _g, _b in pixels)
+    pixels = list(img.get_flattened_data())
+    assert any(isinstance(pixel, tuple) and pixel[0] > 200 for pixel in pixels)
 
 
 def test_loop_size(base_image: Image.Image) -> None:

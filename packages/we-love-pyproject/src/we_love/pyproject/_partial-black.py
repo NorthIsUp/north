@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TargetVersionEnum(Enum):
@@ -24,10 +24,9 @@ class TargetVersionEnum(Enum):
 
 
 class Model(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    code: str | None = Field(None, description="Format the code passed in as a string.")
+    code: str | None = Field(default=None, description="Format the code passed in as a string.")
     line_length: int | None = Field(88, alias="line-length", description="How many characters per line to allow.")
     target_version: list[TargetVersionEnum] | None = Field(
         None,

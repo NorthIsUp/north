@@ -5,24 +5,23 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Annotated
 
-from pydantic import BaseModel, Extra, Field, conint, constr
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
-class Alias(BaseModel):
-    __root__: str
+class Alias(RootModel[str]):
+    root: str
 
 
 class ApiBan(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     msg: str = Field(..., description="The message to display when the API is used.")
 
 
-class BannedAliases(BaseModel):
-    __root__: list[str]
+class BannedAliases(RootModel[list[str]]):
+    root: list[str]
 
 
 class ConstantType(Enum):
@@ -45,8 +44,8 @@ class Convention3(Enum):
     pep257 = "pep257"
 
 
-class Convention(BaseModel):
-    __root__: Convention1 | Convention2 | Convention3
+class Convention(RootModel[Convention1 | Convention2 | Convention3]):
+    root: Convention1 | Convention2 | Convention3
 
 
 class Direction1(Enum):
@@ -57,13 +56,12 @@ class Direction2(Enum):
     dependents = "dependents"
 
 
-class Direction(BaseModel):
-    __root__: Direction1 | Direction2
+class Direction(RootModel[Direction1 | Direction2]):
+    root: Direction1 | Direction2
 
 
 class Flake8AnnotationsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allow_star_arg_any: bool | None = Field(
         None,
@@ -93,8 +91,7 @@ class Flake8AnnotationsOptions(BaseModel):
 
 
 class Flake8BanditOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allowed_markup_calls: list[str] | None = Field(
         None,
@@ -124,8 +121,7 @@ class Flake8BanditOptions(BaseModel):
 
 
 class Flake8BooleanTrapOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     extend_allowed_calls: list[str] | None = Field(
         None,
@@ -135,8 +131,7 @@ class Flake8BooleanTrapOptions(BaseModel):
 
 
 class Flake8BugbearOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     extend_immutable_calls: list[str] | None = Field(
         None,
@@ -146,8 +141,7 @@ class Flake8BugbearOptions(BaseModel):
 
 
 class Flake8BuiltinsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allowed_modules: list[str] | None = Field(
         None,
@@ -169,7 +163,7 @@ class Flake8BuiltinsOptions(BaseModel):
         alias="builtins-strict-checking",
         description="DEPRECATED: This option has been renamed to `strict-checking`. Use `strict-checking` instead.\n\nCompare module names instead of full module paths.\n\nThis option is ignored if both `strict-checking` and `builtins-strict-checking` are set.",
     )
-    ignorelist: list[str] | None = Field(None, description="Ignore list of builtins.")
+    ignorelist: list[str] | None = Field(default=None, description="Ignore list of builtins.")
     strict_checking: bool | None = Field(
         None,
         alias="strict-checking",
@@ -178,8 +172,7 @@ class Flake8BuiltinsOptions(BaseModel):
 
 
 class Flake8ComprehensionsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allow_dict_calls_with_keyword_arguments: bool | None = Field(
         None,
@@ -189,14 +182,13 @@ class Flake8ComprehensionsOptions(BaseModel):
 
 
 class Flake8CopyrightOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     author: str | None = Field(
         None,
         description="Author to enforce within the copyright notice. If provided, the author must be present immediately following the copyright notice.",
     )
-    min_file_size: conint(ge=0) | None = Field(
+    min_file_size: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="min-file-size",
         description="A minimum file size (in bytes) required for a copyright notice to be enforced. By default, all files are validated.",
@@ -209,10 +201,9 @@ class Flake8CopyrightOptions(BaseModel):
 
 
 class Flake8ErrMsgOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    max_string_length: conint(ge=0) | None = Field(
+    max_string_length: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-string-length",
         description="Maximum string length for string literals in exception messages.",
@@ -220,8 +211,7 @@ class Flake8ErrMsgOptions(BaseModel):
 
 
 class Flake8GetTextOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     extend_function_names: list[str] | None = Field(
         None,
@@ -236,8 +226,7 @@ class Flake8GetTextOptions(BaseModel):
 
 
 class Flake8ImplicitStrConcatOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allow_multiline: bool | None = Field(
         None,
@@ -247,14 +236,13 @@ class Flake8ImplicitStrConcatOptions(BaseModel):
 
 
 class Flake8ImportConventionsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    aliases: dict[str, Any] | None = Field(
+    aliases: dict[str, object] | None = Field(
         None,
         description="The conventional aliases for imports. These aliases can be extended by the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.",
     )
-    banned_aliases: dict[str, Any] | None = Field(
+    banned_aliases: dict[str, object] | None = Field(
         None,
         alias="banned-aliases",
         description="A mapping from module to its banned import aliases.",
@@ -263,9 +251,8 @@ class Flake8ImportConventionsOptions(BaseModel):
         None,
         alias="banned-from",
         description='A list of modules that should not be imported from using the `from ... import ...` syntax.\n\nFor example, given `banned-from = ["pandas"]`, `from pandas import DataFrame` would be disallowed, while `import pandas` would be allowed.',
-        unique_items=True,
     )
-    extend_aliases: dict[str, Any] | None = Field(
+    extend_aliases: dict[str, object] | None = Field(
         None,
         alias="extend-aliases",
         description="A mapping from module to conventional import alias. These aliases will be added to the [`aliases`](#lint_flake8-import-conventions_aliases) mapping.",
@@ -273,8 +260,7 @@ class Flake8ImportConventionsOptions(BaseModel):
 
 
 class Flake8SelfOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     extend_ignore_names: list[str] | None = Field(
         None,
@@ -289,8 +275,7 @@ class Flake8SelfOptions(BaseModel):
 
 
 class Flake8TypeCheckingOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     exempt_modules: list[str] | None = Field(
         None,
@@ -319,8 +304,7 @@ class Flake8TypeCheckingOptions(BaseModel):
 
 
 class Flake8UnusedArgumentsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     ignore_variadic_names: bool | None = Field(
         None,
@@ -345,12 +329,12 @@ class IndentStyle2(Enum):
     space = "space"
 
 
-class IndentStyle(BaseModel):
-    __root__: IndentStyle1 | IndentStyle2
+class IndentStyle(RootModel[IndentStyle1 | IndentStyle2]):
+    root: IndentStyle1 | IndentStyle2
 
 
-class IndentWidth(BaseModel):
-    __root__: conint(ge=1) = Field(..., description="The size of a tab.")
+class IndentWidth(RootModel[Annotated[int, Field(ge=1)]]):
+    root: Annotated[int, Field(ge=1)] = Field(..., description="The size of a tab.")
 
 
 class LineEnding1(Enum):
@@ -369,37 +353,36 @@ class LineEnding4(Enum):
     native = "native"
 
 
-class LineEnding(BaseModel):
-    __root__: LineEnding1 | LineEnding2 | LineEnding3 | LineEnding4
+class LineEnding(RootModel[LineEnding1 | LineEnding2 | LineEnding3 | LineEnding4]):
+    root: LineEnding1 | LineEnding2 | LineEnding3 | LineEnding4
 
 
-class LineLength(BaseModel):
-    __root__: conint(ge=1, le=320) = Field(
+class LineLength(RootModel[Annotated[int, Field(ge=1, le=320)]]):
+    root: Annotated[int, Field(ge=1, le=320)] = Field(
         ...,
         description="The length of a line of text that is considered too long.\n\nThe allowed range of values is 1..=320",
     )
 
 
-class LineWidth(BaseModel):
-    __root__: conint(ge=1) = Field(
+class LineWidth(RootModel[Annotated[int, Field(ge=1)]]):
+    root: Annotated[int, Field(ge=1)] = Field(
         ...,
         description="The maximum visual width to which the formatter should try to limit a line.",
     )
 
 
 class McCabeOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    max_complexity: conint(ge=0) | None = Field(
+    max_complexity: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-complexity",
         description="The maximum McCabe complexity to allow before triggering `C901` errors.",
     )
 
 
-class NameImports(BaseModel):
-    __root__: str
+class NameImports(RootModel[str]):
+    root: str
 
 
 class OutputFormat(Enum):
@@ -434,8 +417,7 @@ class ParametrizeValuesType(Enum):
 
 
 class Pep8NamingOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     classmethod_decorators: list[str] | None = Field(
         None,
@@ -460,8 +442,7 @@ class Pep8NamingOptions(BaseModel):
 
 
 class PyUpgradeOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     keep_runtime_typing: bool | None = Field(
         None,
@@ -471,8 +452,7 @@ class PyUpgradeOptions(BaseModel):
 
 
 class PycodestyleOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     ignore_overlong_task_comments: bool | None = Field(
         None,
@@ -492,8 +472,7 @@ class PycodestyleOptions(BaseModel):
 
 
 class PydoclintOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     ignore_one_line_docstrings: bool | None = Field(
         None,
@@ -503,8 +482,7 @@ class PydoclintOptions(BaseModel):
 
 
 class PydocstyleOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     convention: Convention | None = Field(
         None,
@@ -528,8 +506,7 @@ class PydocstyleOptions(BaseModel):
 
 
 class PyflakesOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allowed_unused_imports: list[str] | None = Field(
         None,
@@ -544,61 +521,59 @@ class PyflakesOptions(BaseModel):
 
 
 class PylintOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allow_dunder_method_names: list[str] | None = Field(
         None,
         alias="allow-dunder-method-names",
         description="Dunder methods name to allow, in addition to the default set from the Python standard library (see `PLW3201`).",
-        unique_items=True,
     )
     allow_magic_value_types: list[ConstantType] | None = Field(
         None,
         alias="allow-magic-value-types",
         description='Constant types to ignore when used as "magic values" (see `PLR2004`).',
     )
-    max_args: conint(ge=0) | None = Field(
+    max_args: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-args",
         description="Maximum number of arguments allowed for a function or method definition (see `PLR0913`).",
     )
-    max_bool_expr: conint(ge=0) | None = Field(
+    max_bool_expr: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-bool-expr",
         description="Maximum number of Boolean expressions allowed within a single `if` statement (see `PLR0916`).",
     )
-    max_branches: conint(ge=0) | None = Field(
+    max_branches: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-branches",
         description="Maximum number of branches allowed for a function or method body (see `PLR0912`).",
     )
-    max_locals: conint(ge=0) | None = Field(
+    max_locals: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-locals",
         description="Maximum number of local variables allowed for a function or method body (see `PLR0914`).",
     )
-    max_nested_blocks: conint(ge=0) | None = Field(
+    max_nested_blocks: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-nested-blocks",
         description="Maximum number of nested blocks allowed within a function or method body (see `PLR1702`).",
     )
-    max_positional_args: conint(ge=0) | None = Field(
+    max_positional_args: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-positional-args",
         description="Maximum number of positional arguments allowed for a function or method definition (see `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
     )
-    max_public_methods: conint(ge=0) | None = Field(
+    max_public_methods: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-public-methods",
         description="Maximum number of public methods allowed for a class (see `PLR0904`).",
     )
-    max_returns: conint(ge=0) | None = Field(
+    max_returns: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-returns",
         description="Maximum number of return statements allowed for a function or method body (see `PLR0911`)",
     )
-    max_statements: conint(ge=0) | None = Field(
+    max_statements: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="max-statements",
         description="Maximum number of statements allowed for a function or method body (see `PLR0915`).",
@@ -624,8 +599,8 @@ class Quote2(Enum):
     single = "single"
 
 
-class Quote(BaseModel):
-    __root__: Quote1 | Quote2
+class Quote(RootModel[Quote1 | Quote2]):
+    root: Quote1 | Quote2
 
 
 class QuoteStyle(Enum):
@@ -642,17 +617,16 @@ class RelativeImportsOrder2(Enum):
     furthest_to_closest = "furthest-to-closest"
 
 
-class RelativeImportsOrder(BaseModel):
-    __root__: RelativeImportsOrder1 | RelativeImportsOrder2
+class RelativeImportsOrder(RootModel[RelativeImportsOrder1 | RelativeImportsOrder2]):
+    root: RelativeImportsOrder1 | RelativeImportsOrder2
 
 
-class RequiredVersion(BaseModel):
-    __root__: str
+class RequiredVersion(RootModel[str]):
+    root: str
 
 
 class RuffOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     allowed_markup_calls: list[str] | None = Field(
         None,
@@ -2086,13 +2060,12 @@ class Strictness2(Enum):
     all = "all"
 
 
-class Strictness(BaseModel):
-    __root__: Strictness1 | Strictness2
+class Strictness(RootModel[Strictness1 | Strictness2]):
+    root: Strictness1 | Strictness2
 
 
 class AnalyzeOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     detect_string_imports: bool | None = Field(
         None,
@@ -2107,7 +2080,7 @@ class AnalyzeOptions(BaseModel):
         None,
         description="A list of file patterns to exclude from analysis in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    include_dependencies: dict[str, Any] | None = Field(
+    include_dependencies: dict[str, object] | None = Field(
         None,
         alias="include-dependencies",
         description="A map from file path to the list of Python or non-Python file paths or globs that should be considered dependencies of that file, regardless of whether relevant imports are detected.",
@@ -2116,20 +2089,19 @@ class AnalyzeOptions(BaseModel):
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will expose unstable commands.",
     )
-    string_imports_min_dots: conint(ge=0) | None = Field(
+    string_imports_min_dots: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="string-imports-min-dots",
         description='The minimum number of dots in a string to consider it a valid import.\n\nThis setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled. For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`) would be considered valid imports.',
     )
 
 
-class DocstringCodeLineWidth(BaseModel):
-    __root__: LineWidth | str
+class DocstringCodeLineWidth(RootModel[LineWidth | str]):
+    root: LineWidth | str
 
 
 class Flake8PytestStyleOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     fixture_parentheses: bool | None = Field(
         None,
@@ -2179,8 +2151,7 @@ class Flake8PytestStyleOptions(BaseModel):
 
 
 class Flake8QuotesOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     avoid_escape: bool | None = Field(
         None,
@@ -2205,15 +2176,14 @@ class Flake8QuotesOptions(BaseModel):
 
 
 class Flake8TidyImportsOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     ban_relative_imports: Strictness | None = Field(
         None,
         alias="ban-relative-imports",
         description='Whether to ban all relative imports (`"all"`), or only those imports that extend into the parent module or beyond (`"parents"`).',
     )
-    banned_api: dict[str, Any] | None = Field(
+    banned_api: dict[str, object] | None = Field(
         None,
         alias="banned-api",
         description="Specific modules or module members that may not be imported or accessed. Note that this rule is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
@@ -2226,8 +2196,7 @@ class Flake8TidyImportsOptions(BaseModel):
 
 
 class FormatOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     docstring_code_format: bool | None = Field(
         None,
@@ -2253,7 +2222,7 @@ class FormatOptions(BaseModel):
         alias="line-ending",
         description="The character Ruff uses at the end of a line.\n\n* `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\\n` for files that contain no line endings. * `lf`: Line endings will be converted to `\\n`. The default line ending on Unix. * `cr-lf`: Line endings will be converted to `\\r\\n`. The default line ending on Windows. * `native`: Line endings will be converted to `\\n` on Unix and `\\r\\n` on Windows.",
     )
-    preview: bool | None = Field(None, description="Whether to enable the unstable preview style formatting.")
+    preview: bool | None = Field(default=None, description="Whether to enable the unstable preview style formatting.")
     quote_style: QuoteStyle | None = Field(
         None,
         alias="quote-style",
@@ -2266,13 +2235,12 @@ class FormatOptions(BaseModel):
     )
 
 
-class ImportSection(BaseModel):
-    __root__: ImportType | str
+class ImportSection(RootModel[ImportType | str]):
+    root: ImportType | str
 
 
 class IsortOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     case_sensitive: bool | None = Field(
         None,
@@ -2367,7 +2335,7 @@ class IsortOptions(BaseModel):
         alias="lines-after-imports",
         description="The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nRuff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to the typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
     )
-    lines_between_types: conint(ge=0) | None = Field(
+    lines_between_types: Annotated[int, Field(ge=0)] | None = Field(
         None,
         alias="lines-between-types",
         description='The number of lines to place between "direct" and `import from` imports.\n\nWhen using the formatter, only the values `0` and `1` are compatible because it preserves up to one empty line after imports in nested blocks.',
@@ -2402,7 +2370,7 @@ class IsortOptions(BaseModel):
         alias="section-order",
         description="Override in which order the sections should be output. Can be used to move custom sections.",
     )
-    sections: dict[str, Any] | None = Field(
+    sections: dict[str, object] | None = Field(
         None,
         description='A list of mappings from section names to modules.\n\nBy default, imports are categorized according to their type (e.g., `future`, `third-party`, and so on). This setting allows you to group modules into custom sections, to augment or override the built-in sections.\n\nFor example, to group all testing utilities, you could create a `testing` section: ```toml testing = ["pytest", "hypothesis"] ```\n\nThe values in the list are treated as glob patterns. For example, to match all packages in the LangChain ecosystem (`langchain-core`, `langchain-openai`, etc.): ```toml langchain = ["langchain-*"] ```\n\nCustom sections should typically be inserted into the [`section-order`](#lint_isort_section-order) list to ensure that they\'re displayed as a standalone group and in the intended order, as in: ```toml section-order = [ "future", "standard-library", "third-party", "first-party", "local-folder", "testing" ] ```\n\nIf a custom section is omitted from [`section-order`](#lint_isort_section-order), imports in that section will be assigned to the [`default-section`](#lint_isort_default-section) (which defaults to `third-party`).',
     )
@@ -2423,10 +2391,9 @@ class IsortOptions(BaseModel):
 
 
 class LintOptions(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    allowed_confusables: list[constr(min_length=1, max_length=1)] | None = Field(
+    allowed_confusables: list[Annotated[str, Field(min_length=1, max_length=1)]] | None = Field(
         None,
         alias="allowed-confusables",
         description='A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.',
@@ -2455,7 +2422,7 @@ class LintOptions(BaseModel):
         alias="extend-ignore",
         description="A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.",
     )
-    extend_per_file_ignores: dict[str, Any] | None = Field(
+    extend_per_file_ignores: dict[str, object] | None = Field(
         None,
         alias="extend-per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).",
@@ -2553,7 +2520,7 @@ class LintOptions(BaseModel):
         alias="flake8-quotes",
         description="Options for the `flake8-quotes` plugin.",
     )
-    flake8_self: Flake8SelfOptions | None = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
+    flake8_self: Flake8SelfOptions | None = Field(default=None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
     flake8_tidy_imports: Flake8TidyImportsOptions | None = Field(
         None,
         alias="flake8-tidy-imports",
@@ -2583,15 +2550,15 @@ class LintOptions(BaseModel):
         alias="ignore-init-module-imports",
         description="Avoid automatically removing unused imports in `__init__.py` files. Such imports will still be flagged, but with a dedicated message suggesting that the import is either added to the module's `__all__` symbol, or re-exported with a redundant alias (e.g., `import os as os`).\n\nThis option is enabled by default, but you can opt-in to removal of imports via an unsafe fix.",
     )
-    isort: IsortOptions | None = Field(None, description="Options for the `isort` plugin.")
+    isort: IsortOptions | None = Field(default=None, description="Options for the `isort` plugin.")
     logger_objects: list[str] | None = Field(
         None,
         alias="logger-objects",
         description='A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `"logging_setup.logger"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).',
     )
-    mccabe: McCabeOptions | None = Field(None, description="Options for the `mccabe` plugin.")
-    pep8_naming: Pep8NamingOptions | None = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
-    per_file_ignores: dict[str, Any] | None = Field(
+    mccabe: McCabeOptions | None = Field(default=None, description="Options for the `mccabe` plugin.")
+    pep8_naming: Pep8NamingOptions | None = Field(default=None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
+    per_file_ignores: dict[str, object] | None = Field(
         None,
         alias="per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
@@ -2600,13 +2567,13 @@ class LintOptions(BaseModel):
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules and fixes.",
     )
-    pycodestyle: PycodestyleOptions | None = Field(None, description="Options for the `pycodestyle` plugin.")
-    pydoclint: PydoclintOptions | None = Field(None, description="Options for the `pydoclint` plugin.")
-    pydocstyle: PydocstyleOptions | None = Field(None, description="Options for the `pydocstyle` plugin.")
-    pyflakes: PyflakesOptions | None = Field(None, description="Options for the `pyflakes` plugin.")
-    pylint: PylintOptions | None = Field(None, description="Options for the `pylint` plugin.")
-    pyupgrade: PyUpgradeOptions | None = Field(None, description="Options for the `pyupgrade` plugin.")
-    ruff: RuffOptions | None = Field(None, description="Options for the `ruff` plugin")
+    pycodestyle: PycodestyleOptions | None = Field(default=None, description="Options for the `pycodestyle` plugin.")
+    pydoclint: PydoclintOptions | None = Field(default=None, description="Options for the `pydoclint` plugin.")
+    pydocstyle: PydocstyleOptions | None = Field(default=None, description="Options for the `pydocstyle` plugin.")
+    pyflakes: PyflakesOptions | None = Field(default=None, description="Options for the `pyflakes` plugin.")
+    pylint: PylintOptions | None = Field(default=None, description="Options for the `pylint` plugin.")
+    pyupgrade: PyUpgradeOptions | None = Field(default=None, description="Options for the `pyupgrade` plugin.")
+    ruff: RuffOptions | None = Field(default=None, description="Options for the `ruff` plugin")
     select: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to enable. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
@@ -2626,19 +2593,18 @@ class LintOptions(BaseModel):
         alias="typing-modules",
         description="A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
     )
-    unfixable: list[RuleSelector] | None = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
+    unfixable: list[RuleSelector] | None = Field(default=None, description="A list of rule codes or prefixes to consider non-fixable.")
 
 
 class Options(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    allowed_confusables: list[constr(min_length=1, max_length=1)] | None = Field(
+    allowed_confusables: list[Annotated[str, Field(min_length=1, max_length=1)]] | None = Field(
         None,
         alias="allowed-confusables",
         description='A list of allowed "confusable" Unicode characters to ignore when enforcing `RUF001`, `RUF002`, and `RUF003`.',
     )
-    analyze: AnalyzeOptions | None = Field(None, description="Options to configure import map generation.")
+    analyze: AnalyzeOptions | None = Field(default=None, description="Options to configure import map generation.")
     builtins: list[str] | None = Field(
         None,
         description="A list of builtins to treat as defined references, in addition to the system builtins.",
@@ -2686,7 +2652,7 @@ class Options(BaseModel):
         alias="extend-include",
         description="A list of file patterns to include when linting, in addition to those specified by [`include`](#include).\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
     )
-    extend_per_file_ignores: dict[str, Any] | None = Field(
+    extend_per_file_ignores: dict[str, object] | None = Field(
         None,
         alias="extend-per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, in addition to any rules excluded by [`per-file-ignores`](#lint_per-file-ignores).",
@@ -2793,7 +2759,7 @@ class Options(BaseModel):
         alias="flake8-quotes",
         description="Options for the `flake8-quotes` plugin.",
     )
-    flake8_self: Flake8SelfOptions | None = Field(None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
+    flake8_self: Flake8SelfOptions | None = Field(default=None, alias="flake8-self", description="Options for the `flake8_self` plugin.")
     flake8_tidy_imports: Flake8TidyImportsOptions | None = Field(
         None,
         alias="flake8-tidy-imports",
@@ -2814,7 +2780,7 @@ class Options(BaseModel):
         alias="force-exclude",
         description="Whether to enforce [`exclude`](#exclude) and [`extend-exclude`](#extend-exclude) patterns, even for paths that are passed to Ruff explicitly. Typically, Ruff will lint any paths passed in directly, even if they would typically be excluded. Setting `force-exclude = true` will cause Ruff to respect these exclusions unequivocally.\n\nThis is useful for [`pre-commit`](https://pre-commit.com/), which explicitly passes all changed files to the [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit) plugin, regardless of whether they're marked as excluded by Ruff's own settings.",
     )
-    format: FormatOptions | None = Field(None, description="Options to configure code formatting.")
+    format: FormatOptions | None = Field(default=None, description="Options to configure code formatting.")
     ignore: list[RuleSelector] | None = Field(
         None,
         description="A list of rule codes or prefixes to ignore. Prefixes can specify exact rules (like `F841`), entire categories (like `F`), or anything in between.\n\nWhen breaking ties between enabled and disabled rules (via `select` and `ignore`, respectively), more specific prefixes override less specific prefixes. `ignore` takes precedence over `select` if the same prefix appears in both.",
@@ -2833,7 +2799,7 @@ class Options(BaseModel):
         alias="indent-width",
         description="The number of spaces per indentation level (tab).\n\nUsed by the formatter and when enforcing long-line violations (like `E501`) to determine the visual width of a tab.\n\nThis option changes the number of spaces the formatter inserts when using soft-tabs (`indent-style = space`).\n\nPEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).",
     )
-    isort: IsortOptions | None = Field(None, description="Options for the `isort` plugin.")
+    isort: IsortOptions | None = Field(default=None, description="Options for the `isort` plugin.")
     line_length: LineLength | None = Field(
         None,
         alias="line-length",
@@ -2845,7 +2811,7 @@ class Options(BaseModel):
         alias="logger-objects",
         description='A list of objects that should be treated equivalently to a `logging.Logger` object.\n\nThis is useful for ensuring proper diagnostics (e.g., to identify `logging` deprecations and other best-practices) for projects that re-export a `logging.Logger` object from a common module.\n\nFor example, if you have a module `logging_setup.py` with the following contents: ```python import logging\n\nlogger = logging.getLogger(__name__) ```\n\nAdding `"logging_setup.logger"` to `logger-objects` will ensure that `logging_setup.logger` is treated as a `logging.Logger` object when imported from other modules (e.g., `from logging_setup import logger`).',
     )
-    mccabe: McCabeOptions | None = Field(None, description="Options for the `mccabe` plugin.")
+    mccabe: McCabeOptions | None = Field(default=None, description="Options for the `mccabe` plugin.")
     namespace_packages: list[str] | None = Field(
         None,
         alias="namespace-packages",
@@ -2856,13 +2822,13 @@ class Options(BaseModel):
         alias="output-format",
         description='The style in which violation messages should be formatted: `"full"` (default) (shows source), `"concise"`, `"grouped"` (group messages by file), `"json"` (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub Actions annotations), `"gitlab"` (GitLab CI code quality report), `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).',
     )
-    pep8_naming: Pep8NamingOptions | None = Field(None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
-    per_file_ignores: dict[str, Any] | None = Field(
+    pep8_naming: Pep8NamingOptions | None = Field(default=None, alias="pep8-naming", description="Options for the `pep8-naming` plugin.")
+    per_file_ignores: dict[str, object] | None = Field(
         None,
         alias="per-file-ignores",
         description="A list of mappings from file pattern to rule codes or prefixes to exclude, when considering any matching files. An initial '!' negates the file pattern.",
     )
-    per_file_target_version: dict[str, Any] | None = Field(
+    per_file_target_version: dict[str, object] | None = Field(
         None,
         alias="per-file-target-version",
         description='A list of mappings from glob-style file pattern to Python version to use when checking the corresponding file(s).\n\nThis may be useful for overriding the global Python version settings in `target-version` or `requires-python` for a subset of files. For example, if you have a project with a minimum supported Python version of 3.9 but a subdirectory of developer scripts that want to use a newer feature like the `match` statement from Python 3.10, you can use `per-file-target-version` to specify `"developer_scripts/*.py" = "py310"`.\n\nThis setting is used by the linter to enforce any enabled version-specific lint rules, as well as by the formatter for any version-specific formatting options, such as parenthesizing context managers on Python 3.10+.',
@@ -2871,11 +2837,11 @@ class Options(BaseModel):
         None,
         description="Whether to enable preview mode. When preview mode is enabled, Ruff will use unstable rules, fixes, and formatting.",
     )
-    pycodestyle: PycodestyleOptions | None = Field(None, description="Options for the `pycodestyle` plugin.")
-    pydocstyle: PydocstyleOptions | None = Field(None, description="Options for the `pydocstyle` plugin.")
-    pyflakes: PyflakesOptions | None = Field(None, description="Options for the `pyflakes` plugin.")
-    pylint: PylintOptions | None = Field(None, description="Options for the `pylint` plugin.")
-    pyupgrade: PyUpgradeOptions | None = Field(None, description="Options for the `pyupgrade` plugin.")
+    pycodestyle: PycodestyleOptions | None = Field(default=None, description="Options for the `pycodestyle` plugin.")
+    pydocstyle: PydocstyleOptions | None = Field(default=None, description="Options for the `pydocstyle` plugin.")
+    pyflakes: PyflakesOptions | None = Field(default=None, description="Options for the `pyflakes` plugin.")
+    pylint: PylintOptions | None = Field(default=None, description="Options for the `pylint` plugin.")
+    pyupgrade: PyUpgradeOptions | None = Field(default=None, description="Options for the `pyupgrade` plugin.")
     required_version: RequiredVersion | None = Field(
         None,
         alias="required-version",
@@ -2914,7 +2880,7 @@ class Options(BaseModel):
         alias="typing-modules",
         description="A list of modules whose exports should be treated equivalently to members of the `typing` module.\n\nThis is useful for ensuring proper type annotation inference for projects that re-export `typing` and `typing_extensions` members from a compatibility module. If omitted, any members imported from modules apart from `typing` and `typing_extensions` will be treated as ordinary Python objects.",
     )
-    unfixable: list[RuleSelector] | None = Field(None, description="A list of rule codes or prefixes to consider non-fixable.")
+    unfixable: list[RuleSelector] | None = Field(default=None, description="A list of rule codes or prefixes to consider non-fixable.")
     unsafe_fixes: bool | None = Field(
         None,
         alias="unsafe-fixes",

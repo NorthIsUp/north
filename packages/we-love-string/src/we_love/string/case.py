@@ -34,8 +34,7 @@ def camelcase(string: str) -> str:
 
     # Handle underscores first, then hyphens
     string = _CAMEL_CASE_UNDERSCORE_RE.sub(lambda m: m.group(1).upper(), string)
-    string = _CAMEL_CASE_HYPHEN_RE.sub(lambda m: m.group(1).upper(), string)
-    return string
+    return _CAMEL_CASE_HYPHEN_RE.sub(lambda m: m.group(1).upper(), string)
 
 
 def capitalcase(string: str) -> str:

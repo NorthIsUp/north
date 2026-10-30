@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class FollowImports(Enum):
@@ -16,521 +16,520 @@ class FollowImports(Enum):
     error = "error"
 
 
-class AllowRedefinition(BaseModel):
-    __root__: bool = Field(
+class AllowRedefinition(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Allows variables to be redefined with an arbitrary type, as long as the redefinition is in the same block and nesting level as the original definition.",
     )
 
 
-class AllowRedefinitionNew(BaseModel):
-    __root__: bool = Field(
+class AllowRedefinitionNew(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="By default, mypy won't allow a variable to be redefined with an unrelated type. This experimental flag enables the redefinition of unannotated variables with an arbitrary type. You will also need to enable `local_partial_types` (https://mypy.readthedocs.io/en/stable/config_file.html#confval-local_partial_types).",
     )
 
 
-class AllowUntypedGlobals(BaseModel):
-    __root__: bool = Field(
+class AllowUntypedGlobals(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Causes mypy to suppress errors caused by not being able to fully infer the types of global and class variables.",
     )
 
 
-class AlwaysFalse(BaseModel):
-    __root__: str | list[str] = Field(
+class AlwaysFalse(RootModel[str | list[str]]):
+    root: str | list[str] = Field(
         ...,
         description="Specifies a list of variables that mypy will treat as compile-time constants that are always false.",
     )
 
 
-class AlwaysTrue(BaseModel):
-    __root__: str | list[str] = Field(
+class AlwaysTrue(RootModel[str | list[str]]):
+    root: str | list[str] = Field(
         ...,
         description="Specifies a list of variables that mypy will treat as compile-time constants that are always true.",
     )
 
 
-class AnyExprsReport(BaseModel):
-    __root__: str = Field(
+class AnyExprsReport(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a text file report documenting how many expressions of type `Any` are present within your codebase.",
     )
 
 
-class CacheDir(BaseModel):
-    __root__: str = Field(
+class CacheDir(RootModel[str]):
+    root: str = Field(
         ...,
         description="Specifies the location where mypy stores incremental cache info. User home directory and environment variables will be expanded. This setting will be overridden by the `MYPY_CACHE_DIR` environment variable.",
     )
 
 
-class CacheFineGrained(BaseModel):
-    __root__: bool = Field(
+class CacheFineGrained(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Include fine-grained dependency information in the cache for the mypy daemon (https://mypy.readthedocs.io/en/stable/mypy_daemon.html).",
     )
 
 
-class CheckUntypedDefs(BaseModel):
-    __root__: bool = Field(
+class CheckUntypedDefs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Type-checks the interior of functions without type annotations.",
     )
 
 
-class CoberturaXmlReport(BaseModel):
-    __root__: str = Field(
+class CoberturaXmlReport(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a Cobertura XML type checking coverage report.",
     )
 
 
-class ColorOutput(BaseModel):
-    __root__: bool = Field(..., description="Shows error messages with color enabled.")
+class ColorOutput(RootModel[bool]):
+    root: bool = Field(..., description="Shows error messages with color enabled.")
 
 
-class CustomTypeshedDir(BaseModel):
-    __root__: str = Field(
+class CustomTypeshedDir(RootModel[str]):
+    root: str = Field(
         ...,
         description="This specifies the directory where mypy looks for standard library typeshed stubs, instead of the typeshed that ships with mypy. This is primarily intended to make it easier to test typeshed changes before submitting them upstream, but also allows you to use a forked version of typeshed.",
     )
 
 
-class CustomTypingModule(BaseModel):
-    __root__: str = Field(
+class CustomTypingModule(RootModel[str]):
+    root: str = Field(
         ...,
         description="Specifies a custom module to use as a substitute for the `typing` module.",
     )
 
 
-class DisableErrorCode(BaseModel):
-    __root__: str | list[str] = Field(..., description="Allows disabling one or multiple error codes globally.")
+class DisableErrorCode(RootModel[str | list[str]]):
+    root: str | list[str] = Field(..., description="Allows disabling one or multiple error codes globally.")
 
 
-class DisallowAnyDecorated(BaseModel):
-    __root__: bool = Field(
+class DisallowAnyDecorated(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows functions that have `Any` in their signature after decorator transformation.",
     )
 
 
-class DisallowAnyExplicit(BaseModel):
-    __root__: bool = Field(
+class DisallowAnyExplicit(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows explicit `Any` in type positions such as type annotations and generic type parameters.",
     )
 
 
-class DisallowAnyExpr(BaseModel):
-    __root__: bool = Field(..., description="Disallows all expressions in the module that have type `Any`.")
+class DisallowAnyExpr(RootModel[bool]):
+    root: bool = Field(..., description="Disallows all expressions in the module that have type `Any`.")
 
 
-class DisallowAnyGenerics(BaseModel):
-    __root__: bool = Field(
+class DisallowAnyGenerics(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows usage of generic types that do not specify explicit type parameters.",
     )
 
 
-class DisallowAnyUnimported(BaseModel):
-    __root__: bool = Field(
+class DisallowAnyUnimported(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows usage of types that come from unfollowed imports (anything imported from an unfollowed import is automatically given a type of `Any`).",
     )
 
 
-class DisallowIncompleteDefs(BaseModel):
-    __root__: bool = Field(
+class DisallowIncompleteDefs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows defining functions with incomplete type annotations, while still allowing entirely unannotated definitions.",
     )
 
 
-class DisallowSubclassingAny(BaseModel):
-    __root__: bool = Field(..., description="Disallows subclassing a value of type `Any`.")
+class DisallowSubclassingAny(RootModel[bool]):
+    root: bool = Field(..., description="Disallows subclassing a value of type `Any`.")
 
 
-class DisallowUntypedCalls(BaseModel):
-    __root__: bool = Field(
+class DisallowUntypedCalls(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows calling functions without type annotations from functions with type annotations. Note that when used in per-module options, it enables/disables this check INSIDE the module(s) specified, not for functions that come from that module(s).",
     )
 
 
-class DisallowUntypedDecorators(BaseModel):
-    __root__: bool = Field(
+class DisallowUntypedDecorators(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Reports an error whenever a function with type annotations is decorated with a decorator without annotations.",
     )
 
 
-class DisallowUntypedDefs(BaseModel):
-    __root__: bool = Field(
+class DisallowUntypedDefs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows defining functions without type annotations or with incomplete type annotations (a superset of `disallow_incomplete_defs`).",
     )
 
 
-class EnableErrorCode(BaseModel):
-    __root__: str | list[str] = Field(..., description="Allows enabling one or multiple error codes globally.")
+class EnableErrorCode(RootModel[str | list[str]]):
+    root: str | list[str] = Field(..., description="Allows enabling one or multiple error codes globally.")
 
 
-class ErrorSummary(BaseModel):
-    __root__: bool = Field(..., description="Shows a short summary line after error messages.")
+class ErrorSummary(RootModel[bool]):
+    root: bool = Field(..., description="Shows a short summary line after error messages.")
 
 
-class ExtraChecks(BaseModel):
-    __root__: bool = Field(
+class ExtraChecks(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Enable additional checks that are technically correct but impractical.",
     )
 
 
-class FollowImportsForStubs(BaseModel):
-    __root__: bool = Field(
+class FollowImportsForStubs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Determines whether to respect the `follow_imports` setting even for stub (`.pyi`) files.",
     )
 
 
-class FollowUntypedImports(BaseModel):
-    __root__: bool = Field(
+class FollowUntypedImports(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Makes mypy analyze imports from installed packages even if missing a py.typed marker or stubs.",
     )
 
 
-class ForceUnionSyntax(BaseModel):
-    __root__: bool = Field(
+class ForceUnionSyntax(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Always use `Union[]` and `Optional[]` for union types in error messages (instead of the `|` operator), even on Python 3.10+.",
     )
 
 
-class ForceUppercaseBuiltins(BaseModel):
-    __root__: bool = Field(
+class ForceUppercaseBuiltins(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Always use `List` instead of `list` in error messages, even on Python 3.9+.",
     )
 
 
-class HideErrorCodes(BaseModel):
-    __root__: bool = Field(
+class HideErrorCodes(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Hides error codes (https://mypy.readthedocs.io/en/stable/error_codes.html#error-codes) in error messages.",
     )
 
 
-class IgnoreErrors(BaseModel):
-    __root__: bool = Field(..., description="Ignores all non-fatal errors.")
+class IgnoreErrors(RootModel[bool]):
+    root: bool = Field(..., description="Ignores all non-fatal errors.")
 
 
-class IgnoreMissingImports(BaseModel):
-    __root__: bool = Field(
+class IgnoreMissingImports(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Suppresses error messages about imports that cannot be resolved.",
     )
 
 
-class ImplicitOptional(BaseModel):
-    __root__: bool = Field(
+class ImplicitOptional(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Causes mypy to treat arguments with a `None` default value as having an implicit `typing.Optional` type.",
     )
 
 
-class ImplicitReexport(BaseModel):
-    __root__: bool = Field(
+class ImplicitReexport(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="By default, imported values to a module are treated as exported and mypy allows other modules to import them. When false, mypy will not re-export unless the item is imported using from-as or is included in `__all__`. Note that mypy treats stub files as if this is always disabled.",
     )
 
 
-class Incremental(BaseModel):
-    __root__: bool = Field(
+class Incremental(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Enables incremental mode (https://mypy.readthedocs.io/en/stable/command_line.html#incremental).",
     )
 
 
-class JunitXml(BaseModel):
-    __root__: str = Field(
+class JunitXml(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a JUnit XML test result document with type checking results. This can make it easier to integrate mypy with continuous integration (CI) tools.",
     )
 
 
-class LinecountReport(BaseModel):
-    __root__: str = Field(
+class LinecountReport(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a text file report documenting the functions and lines that are typed and untyped within your codebase.",
     )
 
 
-class LinecoverageReport(BaseModel):
-    __root__: str = Field(
+class LinecoverageReport(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a JSON file that maps each source file's absolute filename to a list of line numbers that belong to typed functions in that file.",
     )
 
 
-class LineprecisionReport(BaseModel):
-    __root__: str = Field(
+class LineprecisionReport(RootModel[str]):
+    root: str = Field(
         ...,
         description="Causes mypy to generate a flat text file report with per-module statistics of how many lines are typechecked etc.",
     )
 
 
-class LocalPartialTypes(BaseModel):
-    __root__: bool = Field(
+class LocalPartialTypes(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disallows inferring variable type for `None` from two assignments in different scopes. This is always implicitly enabled when using the mypy daemon (https://mypy.readthedocs.io/en/stable/mypy_daemon.html).",
     )
 
 
-class NoImplicitOptional(BaseModel):
-    __root__: bool = Field(..., description="Inverse of implicit_optional.")
+class NoImplicitOptional(RootModel[bool]):
+    root: bool = Field(..., description="Inverse of implicit_optional.")
 
 
-class NoImplicitReexport(BaseModel):
-    __root__: bool = Field(
+class NoImplicitReexport(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="By default, imported values to a module are treated as exported and mypy allows other modules to import them. This flag changes the behavior to not re-export unless the item is imported using from-as or is included in `__all__`. Note this is always treated as enabled for stub files.",
     )
 
 
-class NoSitePackages(BaseModel):
-    __root__: bool = Field(
+class NoSitePackages(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disables using type information in installed packages (see PEP 561). This will also disable searching for a usable Python executable. This acts the same as :option:`--no-site-packages <mypy --no-site-packages>` command line flag.",
     )
 
 
-class Pdb(BaseModel):
-    __root__: bool = Field(
+class Pdb(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Invokes `pdb` (https://docs.python.org/3/library/pdb.html) on fatal error.",
     )
 
 
-class Plugins(BaseModel):
-    __root__: str | list[str] = Field(..., description="A comma-separated list of mypy plugins.")
+class Plugins(RootModel[str | list[str]]):
+    root: str | list[str] = Field(..., description="A comma-separated list of mypy plugins.")
 
 
-class Pretty(BaseModel):
-    __root__: bool = Field(
+class Pretty(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Use visually nicer output in error messages: use soft word wrap, show source code snippets, and show error location markers.",
     )
 
 
-class RaiseExceptions(BaseModel):
-    __root__: bool = Field(..., description="Raise exception on fatal error.")
+class RaiseExceptions(RootModel[bool]):
+    root: bool = Field(..., description="Raise exception on fatal error.")
 
 
-class ScriptsAreModules(BaseModel):
-    __root__: bool = Field(
+class ScriptsAreModules(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Makes script `x` become module `x` instead of `__main__`. This is useful when checking multiple scripts in a single run.",
     )
 
 
-class ShowAbsolutePath(BaseModel):
-    __root__: bool = Field(..., description="Show absolute paths to files.")
+class ShowAbsolutePath(RootModel[bool]):
+    root: bool = Field(..., description="Show absolute paths to files.")
 
 
-class ShowColumnNumbers(BaseModel):
-    __root__: bool = Field(..., description="Shows column numbers in error messages.")
+class ShowColumnNumbers(RootModel[bool]):
+    root: bool = Field(..., description="Shows column numbers in error messages.")
 
 
-class ShowErrorCodeLinks(BaseModel):
-    __root__: bool = Field(..., description="UNDOCUMENTED: show links for error codes.")
+class ShowErrorCodeLinks(RootModel[bool]):
+    root: bool = Field(..., description="UNDOCUMENTED: show links for error codes.")
 
 
-class ShowErrorContext(BaseModel):
-    __root__: bool = Field(..., description="Prefixes each error with the relevant context.")
+class ShowErrorContext(RootModel[bool]):
+    root: bool = Field(..., description="Prefixes each error with the relevant context.")
 
 
-class ShowTraceback(BaseModel):
-    __root__: bool = Field(..., description="Shows traceback on fatal error.")
+class ShowTraceback(RootModel[bool]):
+    root: bool = Field(..., description="Shows traceback on fatal error.")
 
 
-class SkipCacheMtimeChecks(BaseModel):
-    __root__: bool = Field(..., description="Skip cache internal consistency checks based on mtime.")
+class SkipCacheMtimeChecks(RootModel[bool]):
+    root: bool = Field(..., description="Skip cache internal consistency checks based on mtime.")
 
 
-class SkipVersionCheck(BaseModel):
-    __root__: bool = Field(
+class SkipVersionCheck(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Makes mypy use incremental cache data even if it was generated by a different version of mypy. (By default, mypy will perform a version check and regenerate the cache if it was written by older versions of mypy.)",
     )
 
 
-class SqliteCache(BaseModel):
-    __root__: bool = Field(..., description="Use an SQLite database to store the cache.")
+class SqliteCache(RootModel[bool]):
+    root: bool = Field(..., description="Use an SQLite database to store the cache.")
 
 
-class Strict(BaseModel):
-    __root__: bool = Field(
+class Strict(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Enable all optional error checking flags. You can see the list of flags enabled by strict mode in the full `mypy --help` output. The exact list of flags enabled by `strict` may change over time.",
     )
 
 
-class StrictBytes(BaseModel):
-    __root__: bool = Field(
+class StrictBytes(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Disable treating `bytearray` and `memoryview` as subtypes of `bytes`. This will be enabled by default in mypy 2.0.",
     )
 
 
-class StrictConcatenate(BaseModel):
-    __root__: bool = Field(
+class StrictConcatenate(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Make arguments prepended via `Concatenate` be truly positional-only.",
     )
 
 
-class StrictEquality(BaseModel):
-    __root__: bool = Field(
+class StrictEquality(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Prohibit equality checks, identity checks, and container checks between non-overlapping types.",
     )
 
 
-class StrictOptional(BaseModel):
-    __root__: bool = Field(
+class StrictOptional(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Enables or disables strict `Optional` checks. If `False`, mypy treats `None` as compatible with every type.",
     )
 
 
-class UntypedCallsExclude(BaseModel):
-    __root__: str | list[str] = Field(
+class UntypedCallsExclude(RootModel[str | list[str]]):
+    root: str | list[str] = Field(
         ...,
         description="Selectively excludes functions and methods defined in specific packages, modules, and classes from action of `disallow_untyped_calls`. This also applies to all submodules of packages (i.e. everything inside a given prefix). Note, this option does not support per-file configuration, the exclusions list is defined globally for all your code.",
     )
 
 
-class Verbosity(BaseModel):
-    __root__: int = Field(
+class Verbosity(RootModel[int]):
+    root: int = Field(
         ...,
         description="Controls how much debug output will be generated. Higher numbers are more verbose.",
     )
 
 
-class WarnIncompleteStub(BaseModel):
-    __root__: bool = Field(
+class WarnIncompleteStub(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Warns about missing type annotations in typeshed. This is only relevant in combination with `disallow_untyped_defs` or `disallow_incomplete_defs`.",
     )
 
 
-class WarnNoReturn(BaseModel):
-    __root__: bool = Field(
+class WarnNoReturn(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Shows errors for missing return statements on some execution paths.",
     )
 
 
-class WarnReturnAny(BaseModel):
-    __root__: bool = Field(
+class WarnReturnAny(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Shows a warning when returning a value with type `Any` from a function declared with a non-`Any` return type.",
     )
 
 
-class WarnUnreachable(BaseModel):
-    __root__: bool = Field(
+class WarnUnreachable(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Shows a warning when encountering any code inferred to be unreachable or redundant after performing type analysis.",
     )
 
 
-class WarnUnusedConfigs(BaseModel):
-    __root__: bool = Field(
+class WarnUnusedConfigs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Warns about per-module sections in the config file that do not match any files processed when invoking mypy. (This requires turning off incremental mode using `incremental = False`.)",
     )
 
 
-class WarnUnusedIgnores(BaseModel):
-    __root__: bool = Field(..., description="Warns about unneeded `# type: ignore` comments.")
+class WarnUnusedIgnores(RootModel[bool]):
+    root: bool = Field(..., description="Warns about unneeded `# type: ignore` comments.")
 
 
-class XmlReport(BaseModel):
-    __root__: str = Field(..., description="Causes mypy to generate an XML type checking coverage report.")
+class XmlReport(RootModel[str]):
+    root: str = Field(..., description="Causes mypy to generate an XML type checking coverage report.")
 
 
 class Override(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     module: str | list[str]
-    ignore_missing_imports: IgnoreMissingImports | None = False
-    follow_untyped_imports: FollowUntypedImports | None = False
-    follow_imports: FollowImports | None = "normal"
-    follow_imports_for_stubs: FollowImportsForStubs | None = False
-    no_site_packages: NoSitePackages | None = False
+    ignore_missing_imports: IgnoreMissingImports | None = IgnoreMissingImports(False)
+    follow_untyped_imports: FollowUntypedImports | None = FollowUntypedImports(False)
+    follow_imports: FollowImports | None = FollowImports("normal")
+    follow_imports_for_stubs: FollowImportsForStubs | None = FollowImportsForStubs(False)
+    no_site_packages: NoSitePackages | None = NoSitePackages(False)
     always_true: AlwaysTrue | None = None
     always_false: AlwaysFalse | None = None
-    disallow_any_unimported: DisallowAnyUnimported | None = False
-    disallow_any_expr: DisallowAnyExpr | None = False
-    disallow_any_decorated: DisallowAnyDecorated | None = False
-    disallow_any_explicit: DisallowAnyExplicit | None = False
-    disallow_any_generics: DisallowAnyGenerics | None = False
-    disallow_subclassing_any: DisallowSubclassingAny | None = False
-    disallow_untyped_calls: DisallowUntypedCalls | None = False
+    disallow_any_unimported: DisallowAnyUnimported | None = DisallowAnyUnimported(False)
+    disallow_any_expr: DisallowAnyExpr | None = DisallowAnyExpr(False)
+    disallow_any_decorated: DisallowAnyDecorated | None = DisallowAnyDecorated(False)
+    disallow_any_explicit: DisallowAnyExplicit | None = DisallowAnyExplicit(False)
+    disallow_any_generics: DisallowAnyGenerics | None = DisallowAnyGenerics(False)
+    disallow_subclassing_any: DisallowSubclassingAny | None = DisallowSubclassingAny(False)
+    disallow_untyped_calls: DisallowUntypedCalls | None = DisallowUntypedCalls(False)
     untyped_calls_exclude: UntypedCallsExclude | None = None
-    disallow_untyped_defs: DisallowUntypedDefs | None = False
-    disallow_incomplete_defs: DisallowIncompleteDefs | None = False
-    check_untyped_defs: CheckUntypedDefs | None = False
-    disallow_untyped_decorators: DisallowUntypedDecorators | None = False
-    implicit_optional: ImplicitOptional | None = False
-    no_implicit_optional: NoImplicitOptional | None = Field(default_factory=lambda: NoImplicitOptional.parse_obj(True))
-    no_implicit_reexport: NoImplicitReexport | None = False
-    strict_optional: StrictOptional | None = Field(default_factory=lambda: StrictOptional.parse_obj(True))
-    warn_unused_ignores: WarnUnusedIgnores | None = False
-    warn_no_return: WarnNoReturn | None = Field(default_factory=lambda: WarnNoReturn.parse_obj(True))
-    warn_return_any: WarnReturnAny | None = False
-    warn_unreachable: WarnUnreachable | None = False
-    ignore_errors: IgnoreErrors | None = False
-    allow_untyped_globals: AllowUntypedGlobals | None = False
-    allow_redefinition_new: AllowRedefinitionNew | None = False
-    allow_redefinition: AllowRedefinition | None = False
-    local_partial_types: LocalPartialTypes | None = False
+    disallow_untyped_defs: DisallowUntypedDefs | None = DisallowUntypedDefs(False)
+    disallow_incomplete_defs: DisallowIncompleteDefs | None = DisallowIncompleteDefs(False)
+    check_untyped_defs: CheckUntypedDefs | None = CheckUntypedDefs(False)
+    disallow_untyped_decorators: DisallowUntypedDecorators | None = DisallowUntypedDecorators(False)
+    implicit_optional: ImplicitOptional | None = ImplicitOptional(False)
+    no_implicit_optional: NoImplicitOptional | None = Field(default_factory=lambda: NoImplicitOptional.model_validate(True))
+    no_implicit_reexport: NoImplicitReexport | None = NoImplicitReexport(False)
+    strict_optional: StrictOptional | None = Field(default_factory=lambda: StrictOptional.model_validate(True))
+    warn_unused_ignores: WarnUnusedIgnores | None = WarnUnusedIgnores(False)
+    warn_no_return: WarnNoReturn | None = Field(default_factory=lambda: WarnNoReturn.model_validate(True))
+    warn_return_any: WarnReturnAny | None = WarnReturnAny(False)
+    warn_unreachable: WarnUnreachable | None = WarnUnreachable(False)
+    ignore_errors: IgnoreErrors | None = IgnoreErrors(False)
+    allow_untyped_globals: AllowUntypedGlobals | None = AllowUntypedGlobals(False)
+    allow_redefinition_new: AllowRedefinitionNew | None = AllowRedefinitionNew(False)
+    allow_redefinition: AllowRedefinition | None = AllowRedefinition(False)
+    local_partial_types: LocalPartialTypes | None = LocalPartialTypes(False)
     disable_error_code: DisableErrorCode | None = None
     enable_error_code: EnableErrorCode | None = None
-    extra_checks: ExtraChecks | None = False
-    implicit_reexport: ImplicitReexport | None = Field(default_factory=lambda: ImplicitReexport.parse_obj(True))
-    strict_concatenate: StrictConcatenate | None = False
-    strict_equality: StrictEquality | None = False
-    strict_bytes: StrictBytes | None = False
-    strict: Strict | None = False
-    show_error_context: ShowErrorContext | None = False
-    show_column_numbers: ShowColumnNumbers | None = False
-    show_error_code_links: ShowErrorCodeLinks | None = False
-    hide_error_codes: HideErrorCodes | None = False
-    pretty: Pretty | None = False
-    color_output: ColorOutput | None = Field(default_factory=lambda: ColorOutput.parse_obj(True))
-    error_summary: ErrorSummary | None = Field(default_factory=lambda: ErrorSummary.parse_obj(True))
-    show_absolute_path: ShowAbsolutePath | None = False
-    force_uppercase_builtins: ForceUppercaseBuiltins | None = False
-    force_union_syntax: ForceUnionSyntax | None = False
-    incremental: Incremental | None = Field(default_factory=lambda: Incremental.parse_obj(True))
-    cache_dir: CacheDir | None = Field(default_factory=lambda: CacheDir.parse_obj(".mypy_cache"))
-    sqlite_cache: SqliteCache | None = False
-    cache_fine_grained: CacheFineGrained | None = False
-    skip_version_check: SkipVersionCheck | None = False
-    skip_cache_mtime_checks: SkipCacheMtimeChecks | None = False
+    extra_checks: ExtraChecks | None = ExtraChecks(False)
+    implicit_reexport: ImplicitReexport | None = Field(default_factory=lambda: ImplicitReexport.model_validate(True))
+    strict_concatenate: StrictConcatenate | None = StrictConcatenate(False)
+    strict_equality: StrictEquality | None = StrictEquality(False)
+    strict_bytes: StrictBytes | None = StrictBytes(False)
+    strict: Strict | None = Strict(False)
+    show_error_context: ShowErrorContext | None = ShowErrorContext(False)
+    show_column_numbers: ShowColumnNumbers | None = ShowColumnNumbers(False)
+    show_error_code_links: ShowErrorCodeLinks | None = ShowErrorCodeLinks(False)
+    hide_error_codes: HideErrorCodes | None = HideErrorCodes(False)
+    pretty: Pretty | None = Pretty(False)
+    color_output: ColorOutput | None = Field(default_factory=lambda: ColorOutput.model_validate(True))
+    error_summary: ErrorSummary | None = Field(default_factory=lambda: ErrorSummary.model_validate(True))
+    show_absolute_path: ShowAbsolutePath | None = ShowAbsolutePath(False)
+    force_uppercase_builtins: ForceUppercaseBuiltins | None = ForceUppercaseBuiltins(False)
+    force_union_syntax: ForceUnionSyntax | None = ForceUnionSyntax(False)
+    incremental: Incremental | None = Field(default_factory=lambda: Incremental.model_validate(True))
+    cache_dir: CacheDir | None = Field(default_factory=lambda: CacheDir.model_validate(".mypy_cache"))
+    sqlite_cache: SqliteCache | None = SqliteCache(False)
+    cache_fine_grained: CacheFineGrained | None = CacheFineGrained(False)
+    skip_version_check: SkipVersionCheck | None = SkipVersionCheck(False)
+    skip_cache_mtime_checks: SkipCacheMtimeChecks | None = SkipCacheMtimeChecks(False)
     plugins: Plugins | None = None
-    pdb: Pdb | None = False
-    show_traceback: ShowTraceback | None = False
-    raise_exceptions: RaiseExceptions | None = False
+    pdb: Pdb | None = Pdb(False)
+    show_traceback: ShowTraceback | None = ShowTraceback(False)
+    raise_exceptions: RaiseExceptions | None = RaiseExceptions(False)
     custom_typing_module: CustomTypingModule | None = None
     custom_typeshed_dir: CustomTypeshedDir | None = None
-    warn_incomplete_stub: WarnIncompleteStub | None = False
+    warn_incomplete_stub: WarnIncompleteStub | None = WarnIncompleteStub(False)
     any_exprs_report: AnyExprsReport | None = None
     cobertura_xml_report: CoberturaXmlReport | None = None
     linecount_report: LinecountReport | None = None
@@ -538,14 +537,13 @@ class Override(BaseModel):
     lineprecision_report: LineprecisionReport | None = None
     xml_report: XmlReport | None = None
     junit_xml: JunitXml | None = None
-    scripts_are_modules: ScriptsAreModules | None = False
-    warn_unused_configs: WarnUnusedConfigs | None = False
-    verbosity: Verbosity | None = 0
+    scripts_are_modules: ScriptsAreModules | None = ScriptsAreModules(False)
+    warn_unused_configs: WarnUnusedConfigs | None = WarnUnusedConfigs(False)
+    verbosity: Verbosity | None = Verbosity(0)
 
 
 class Model(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     mypy_path: str | list[str] | None = Field(
         None,
@@ -588,7 +586,7 @@ class Model(BaseModel):
         description="Makes mypy analyze imports from installed packages even if missing a py.typed marker or stubs.",
     )
     follow_imports: FollowImports | None = Field(
-        "normal",
+        default=FollowImports("normal"),
         description="Directs what to do with imports when the imported module is found as a `.py` file and not part of the files, modules and packages provided on the command line.",
     )
     follow_imports_for_stubs: bool | None = Field(
@@ -716,8 +714,8 @@ class Model(BaseModel):
         False,
         description="Disallows inferring variable type for `None` from two assignments in different scopes. This is always implicitly enabled when using the mypy daemon (https://mypy.readthedocs.io/en/stable/mypy_daemon.html).",
     )
-    disable_error_code: str | list[str] | None = Field(None, description="Allows disabling one or multiple error codes globally.")
-    enable_error_code: str | list[str] | None = Field(None, description="Allows enabling one or multiple error codes globally.")
+    disable_error_code: str | list[str] | None = Field(default=None, description="Allows disabling one or multiple error codes globally.")
+    enable_error_code: str | list[str] | None = Field(default=None, description="Allows enabling one or multiple error codes globally.")
     implicit_reexport: bool | None = Field(
         True,
         description="By default, imported values to a module are treated as exported and mypy allows other modules to import them. When false, mypy will not re-export unless the item is imported using from-as or is included in `__all__`. Note that mypy treats stub files as if this is always disabled.",
@@ -777,7 +775,7 @@ class Model(BaseModel):
         description="Makes mypy use incremental cache data even if it was generated by a different version of mypy. (By default, mypy will perform a version check and regenerate the cache if it was written by older versions of mypy.)",
     )
     skip_cache_mtime_checks: bool | None = Field(False, description="Skip cache internal consistency checks based on mtime.")
-    plugins: str | list[str] | None = Field(None, description="A comma-separated list of mypy plugins.")
+    plugins: str | list[str] | None = Field(default=None, description="A comma-separated list of mypy plugins.")
     pdb: bool | None = Field(
         False,
         description="Invokes `pdb` (https://docs.python.org/3/library/pdb.html) on fatal error.",

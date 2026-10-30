@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING
+import random
 
 from pydantic import BaseModel, Field
-from we_love.avatars.avatar import AvatarConfig
+from we_love.avatars.avatar import Avatar, AvatarConfig
 from we_love.avatars.constants import (
     BASE_COLOR_PAIRS,
     EPITROCHOID_R_MAJOR_MAX,
@@ -35,9 +35,6 @@ from we_love.avatars.constants import (
 )
 from we_love.avatars.gradient import GradientConfig, GradientType
 from we_love.avatars.loop import LoopConfig, LoopType
-
-if TYPE_CHECKING:
-    from we_love.avatars.avatar import Avatar
 
 
 class AvatarGeneratorConfig(BaseModel):
@@ -174,9 +171,7 @@ class AvatarGenerator:
 
         # Combine: outbound[0,1,2,3=peak] + return[1,2,3=start]
         # Total: 7 colors with start appearing twice (start and end)
-        palette = outbound + return_path[1:]
-
-        return palette
+        return outbound + return_path[1:]
 
     def _generate_loop_color(self, hash_bytes: bytes, offset: int) -> tuple[int, int, int]:
         """Generate loop color that contrasts with background.
@@ -237,20 +232,17 @@ class AvatarGenerator:
         # Generate loops
         if self.config.random_loop:
             # Use true randomness for loop parameters
-            import random
 
             num_loops = self.config.max_loops
         else:
             # Deterministic from seed
             num_loops = self._get_deterministic_value(hash_bytes, 8, self.config.max_loops) + 1
 
-        loop_configs = []
+        loop_configs: list[LoopConfig] = []
         for i in range(num_loops):
             base_offset = 10 + i * 10
 
             if self.config.random_loop:
-                import random
-
                 # Random loop type
                 loop_types = [LoopType[t.upper()] for t in PREFERRED_LOOP_TYPES]
                 loop_type = random.choice(loop_types)
@@ -346,7 +338,6 @@ class AvatarGenerator:
         Returns:
             Avatar instance ready to render
         """
-        from we_love.avatars.avatar import Avatar
 
         config = self.generate_config(seed)
         return Avatar(config)

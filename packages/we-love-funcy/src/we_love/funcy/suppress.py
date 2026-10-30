@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, ParamSpec, Self, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, Self, TypeIs, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from types import TracebackType
+
+
+def is_exception_group(value: BaseException | None) -> TypeIs[BaseExceptionGroup[BaseException]]:
+    return isinstance(value, BaseExceptionGroup)
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +28,7 @@ class Suppress:
 
     def __init__(
         self,
-        *exceptions: type[BaseException | BaseExceptionGroup],
+        *exceptions: type[BaseException],
         msg: str = "",
     ) -> None:
         """
@@ -38,11 +43,12 @@ class Suppress:
         self.exceptions = exceptions
         self.msg = msg
 
-    def __call__(self, func: Callable[P, T]) -> Callable[P, T]:
+    def __call__(self, func: Callable[P, T]) -> Callable[P, T | None]:
         @wraps(func)
-        def wrapper(*args: P.args, **kwds: P.kwargs) -> T:
+        def wrapper(*args: P.args, **kwds: P.kwargs) -> T | None:
             with self:
                 return func(*args, **kwds)
+            return None
 
         return wrapper
 
@@ -51,8 +57,8 @@ class Suppress:
 
     def __exit__(
         self,
-        exc_type: type[BaseException | BaseExceptionGroup] | None,
-        exc_value: BaseException | BaseExceptionGroup | None,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool | None:
         """Suppress exceptions of the given types, raise the rest"""
@@ -64,7 +70,7 @@ class Suppress:
             if msg := self.format_msg(exc_type, exc_value):
                 logger.debug(msg)
             return True
-        if issubclass(exc_type, BaseExceptionGroup) and isinstance(exc_value, BaseExceptionGroup):
+        if issubclass(exc_type, BaseExceptionGroup) and is_exception_group(exc_value):
             # exc_value is a BaseExceptionGroup
             # exc_match are the exceptions in the group that are in self.exceptions
             # exc_rest is the rest of the exceptions in the group
@@ -74,7 +80,7 @@ class Suppress:
             _exc_match, exc_rest = exc_value.split(self.exceptions)
 
             if exc_rest is None:
-                if msg := self.format_msg(exc_type, exc_rest):
+                if msg := self.format_msg(type(exc_value), exc_rest):
                     logger.debug(msg)
                 return True
 
@@ -83,8 +89,8 @@ class Suppress:
 
     def format_msg(
         self,
-        exc_type: type[BaseException | BaseExceptionGroup] | None,
-        exc_value: BaseException | BaseExceptionGroup | None,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
     ) -> str:
         if self.msg:
             return self.msg.format(e=exc_value, exc_type=exc_type, exc_value=exc_value)

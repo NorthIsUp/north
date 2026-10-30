@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import UserString
 from functools import cached_property
-from typing import ClassVar, Literal, _LiteralGenericAlias, get_args
+from typing import ClassVar, get_args, override
 
 import uuid6
 
@@ -10,8 +10,9 @@ from .base32 import decode as b32decode
 from .base32 import encode as b32encode
 
 
-class TypeId[Prefix: _LiteralGenericAlias](UserString):
-    __typeid_prefix__: ClassVar[_LiteralGenericAlias]
+class TypeId[Prefix: str](UserString):
+    __test__: ClassVar[bool] = False
+    __typeid_prefix__: ClassVar[object]
     __typeid_prefix_str__: ClassVar[str]
 
     def __init__(self, id: str | uuid6.UUID) -> None:
@@ -22,7 +23,7 @@ class TypeId[Prefix: _LiteralGenericAlias](UserString):
                     if type(self) is not TypeId and prefix != self.__typeid_prefix_str__:
                         raise ValueError(f"Invalid prefix for {type(self).__name__}: {prefix}")
             case uuid6.UUID() as u:
-                s = self._convert_uuid_to_b32(u)
+                s = self.convert_uuid_to_b32(u)
             case _:
                 raise ValueError(f"Invalid id: {id}")
 
@@ -31,30 +32,31 @@ class TypeId[Prefix: _LiteralGenericAlias](UserString):
         else:
             super().__init__(f"{self.__typeid_prefix_str__}_{s}")
 
+    @override
     def __repr__(self) -> str:
         return f"TypeId['{self.prefix_str}']({self.suffix!r})"
 
     @classmethod
-    def __class_getitem__(cls, prefix: Prefix) -> type[TypeId[Prefix]]:
+    def __class_getitem__(cls, prefix: object) -> type[TypeId[Prefix]]:
         # ensure prefix is a Literal
         match prefix:
             case str() as literal_value:
-                literal_type = Literal[prefix]
+                literal_type = prefix
             case literal_type:  # already a Literal or TypeVar
-                literal_value = get_args(prefix)[0]
+                arguments: tuple[object, ...] = get_args(prefix)
+                if not arguments or not isinstance(arguments[0], str):
+                    raise TypeError("TypeId prefix must be a string Literal")
+                literal_value = arguments[0]
 
-        # Create a specialized subclass with that prefix
-        return type(
-            f"{literal_value.title()}Id",
-            (cls,),
-            {
-                "__typeid_prefix__": literal_type,
-                "__typeid_prefix_str__": literal_value,
-            },
-        )
+        specialized = type.__new__(type, f"{literal_value.title()}Id", (cls,), {})
+        if not issubclass(specialized, cls):
+            raise TypeError("TypeId specialization must inherit its base")
+        specialized.__typeid_prefix__ = literal_type
+        specialized.__typeid_prefix_str__ = literal_value
+        return specialized
 
     @property
-    def prefix(self) -> str:
+    def prefix(self) -> object:
         return self.__typeid_prefix__
 
     @cached_property
@@ -67,7 +69,7 @@ class TypeId[Prefix: _LiteralGenericAlias](UserString):
 
     @cached_property
     def uuid(self) -> uuid6.UUID:
-        return self._convert_b32_to_uuid(self.suffix)
+        return self.convert_b32_to_uuid(self.suffix)
 
     @property
     def uuid_str(self) -> str:
@@ -75,19 +77,19 @@ class TypeId[Prefix: _LiteralGenericAlias](UserString):
 
     @property
     def uuid_int(self) -> int:
-        return self._convert_b32_to_int(self.suffix)
+        return self.convert_b32_to_int(self.suffix)
 
     @staticmethod
-    def _convert_uuid_to_b32(uuid_instance: str | uuid6.UUID) -> str:
+    def convert_uuid_to_b32(uuid_instance: str | uuid6.UUID) -> str:
         if isinstance(uuid_instance, str):
             uuid_instance = uuid6.UUID(uuid_instance)
-        return b32encode(uuid_instance.bytes)
+        return b32encode(list(uuid_instance.bytes))
 
     @staticmethod
-    def _convert_b32_to_int(b32: str) -> int:
+    def convert_b32_to_int(b32: str) -> int:
         return int.from_bytes(b32decode(b32), byteorder="big")
 
     @staticmethod
-    def _convert_b32_to_uuid(b32: str) -> uuid6.UUID:
+    def convert_b32_to_uuid(b32: str) -> uuid6.UUID:
         uuid_int = int.from_bytes(b32decode(b32), byteorder="big")
         return uuid6.UUID(int=uuid_int, version=7)

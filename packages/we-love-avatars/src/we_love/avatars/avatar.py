@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image as PILImage
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 from we_love.avatars.gradient import Gradient, GradientConfig
 from we_love.avatars.loop import Loop, LoopConfig
 
@@ -96,14 +99,11 @@ class Avatar:
         """
         if parallel:
             # Parallel rendering using multiprocessing
-            from multiprocessing import Pool, cpu_count
 
             num_workers = workers or cpu_count()
 
             if progress:
                 try:
-                    from tqdm import tqdm
-
                     with Pool(num_workers) as pool:
                         frames = list(
                             tqdm(
@@ -121,10 +121,8 @@ class Avatar:
                     frames = pool.map(self.render_frame, range(self.total_frames))
 
             return frames
-        elif progress:
+        if progress:
             try:
-                from tqdm import tqdm
-
                 return [
                     self.render_frame(i)
                     for i in tqdm(
@@ -176,12 +174,10 @@ class Avatar:
 
         # Quantize frames to reduce color palette if needed
         if colors < 256:
-            from PIL import Image as PILImage
-
-            quantized = []
-            for frame in frames:
-                # Convert to palette mode with specified colors
-                quantized.append(frame.convert("P", palette=PILImage.ADAPTIVE, colors=colors).convert("RGB"))
+            # Convert to palette mode with specified colors
+            quantized: list[Image.Image] = [
+                frame.convert("P", palette=PILImage.Palette.ADAPTIVE, colors=colors).convert("RGB") for frame in frames
+            ]
             frames = quantized
 
         # Save as GIF
@@ -195,9 +191,7 @@ class Avatar:
         )
 
         if progress:
-            import os
-
-            size_mb = os.path.getsize(output_path) / (1024 * 1024)
+            size_mb = Path(output_path).stat().st_size / (1024 * 1024)
             print(f"✓ Saved {output_path} ({size_mb:.1f} MB)")
 
     def save_png(self, path: str | Path, frame: int = 0) -> None:

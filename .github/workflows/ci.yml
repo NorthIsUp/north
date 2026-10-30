@@ -30,8 +30,9 @@ jobs:
       - uses: jdx/mise-action@v2
         with:
           experimental: true
-      - run: ruff check .
-      - run: ruff format --check .
+      - run: uv sync --all-packages --frozen
+      - run: hk check
+      - run: uv run --all-packages --frozen pytest
 
   test:
     needs: discover
@@ -46,13 +47,13 @@ jobs:
         with:
           experimental: true
       - name: sync
-        run: uv sync --directory packages/${{ matrix.package }}
+        run: uv sync --all-packages --frozen
       - name: pytest
         working-directory: packages/${{ matrix.package }}
         # exit code 5 = "no tests collected" — acceptable for packages without tests
         run: |
           set +e
-          uv run pytest src -v --rootdir=.
+          uv run --all-packages --frozen pytest src -v --rootdir=.
           code=$?
           [ $code -eq 5 ] && exit 0
           exit $code

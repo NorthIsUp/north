@@ -36,9 +36,9 @@ class TestIsTupleOf:
 
     def test_not_a_tuple_fails(self) -> None:
         """Test non-tuple types return False."""
-        assert not is_tuple_of([1, 2, 3], int)  # type: ignore[arg-type]  Testing non-tuple
-        assert not is_tuple_of({1, 2, 3}, int)  # type: ignore[arg-type]  Testing non-tuple
-        assert not is_tuple_of("hello", str)  # type: ignore[arg-type]  Testing non-tuple
+        assert not is_tuple_of([1, 2, 3], int)
+        assert not is_tuple_of({1, 2, 3}, int)
+        assert not is_tuple_of("hello", str)
 
     def test_nested_tuples(self) -> None:
         """Test tuple of tuples."""
@@ -125,7 +125,7 @@ class TestMatchType:
         """Test matching generic set types."""
         assert match_type({"hello", "world"}, set[str])
         assert match_type({1, 2, 3}, set[int])
-        assert match_type(set(), set[str])  # empty set
+        assert match_type(set[str](), set[str])  # empty set
 
     def test_set_generic_mismatch(self) -> None:
         """Test non-matching generic set types."""

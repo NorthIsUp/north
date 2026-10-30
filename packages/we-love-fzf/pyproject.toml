@@ -12,15 +12,12 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.13",
 ]
-dependencies = []
+dependencies = ["pzp>=0.0.28"]
 
 [tool.uv.build-backend]
 namespace   = true
 module-name = "we_love"
 
-[tool.pyright]
-venv     = ".venv"
-venvPath = "."
 
 [dependency-groups]
 dev = ["pytest>=9"]

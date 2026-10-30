@@ -23,7 +23,7 @@ def find_newest_package_files(package_name: str, dist_dir: Path) -> list[Path]:
     # Find all files for this package
     patterns = [f"{file_package_name}-*.whl", f"{file_package_name}-*.tar.gz"]
 
-    all_files = []
+    all_files: list[Path] = []
     for pattern in patterns:
         all_files.extend(dist_dir.glob(pattern))
 
@@ -32,7 +32,7 @@ def find_newest_package_files(package_name: str, dist_dir: Path) -> list[Path]:
         return []
 
     # Group files by version
-    version_files = {}
+    version_files: dict[Version, list[Path]] = {}
     # Pattern to match both wheel and tar.gz files
     wheel_pattern = re.compile(rf"{re.escape(file_package_name)}-([^-]+)-.*\.whl$")
     tarball_pattern = re.compile(rf"{re.escape(file_package_name)}-([^-]+)\.tar\.gz$")

@@ -11,17 +11,31 @@ Check if a package in dist directory already exists on PyPI by comparing checksu
 
 import argparse
 import hashlib
-import json
+import re
 import sys
 from pathlib import Path
 
 import requests
+from pydantic import BaseModel, ValidationError
+
+
+class Digests(BaseModel):
+    sha256: str
+
+
+class ReleaseFile(BaseModel):
+    filename: str
+    digests: Digests
+
+
+class PyPIProject(BaseModel):
+    releases: dict[str, list[ReleaseFile]]
 
 
 def calculate_sha256(filepath: Path) -> str:
     """Calculate the SHA256 checksum of a file."""
     sha256 = hashlib.sha256()
-    with open(filepath, "rb") as f:
+    with Path(filepath).open("rb") as f:
         while chunk := f.read(8192):
             sha256.update(chunk)
     return sha256.hexdigest()
@@ -32,7 +46,6 @@ def normalize_package_name(name: str) -> str:
     Normalize package name according to PEP 503.
     PyPI normalizes names by lowercasing and converting runs of separators to single hyphens.
     """
-    import re
 
     return re.sub(r"[-_.]+", "-", name).lower()
 
@@ -53,14 +66,14 @@ def get_pypi_checksums(package_name: str) -> dict[str, dict[str, str]]:
         return {}
 
     try:
-        data = response.json()
-        checksums = {}
+        data = PyPIProject.model_validate_json(response.content)
+        checksums: dict[str, dict[str, str]] = {}
 
-        for version, files in data["releases"].items():
-            version_checksums = {}
+        for version, files in data.releases.items():
+            version_checksums: dict[str, str] = {}
             for file_info in files:
-                filename = file_info["filename"]
-                sha256_hash = file_info["digests"]["sha256"]
+                filename = file_info.filename
+                sha256_hash = file_info.digests.sha256
                 version_checksums[filename] = sha256_hash
 
             if version_checksums:  # Only include versions with files
@@ -68,7 +81,7 @@ def get_pypi_checksums(package_name: str) -> dict[str, dict[str, str]]:
 
         return checksums
 
-    except (KeyError, json.JSONDecodeError) as e:
+    except ValidationError as e:
         print(f"Unexpected data format for '{package_name}': {e}")
         return {}
 
@@ -80,7 +93,7 @@ def find_package_files(package_name: str, dist_dir: Path) -> list[Path]:
 
     patterns = [f"{file_package_name}-*.whl", f"{file_package_name}-*.tar.gz"]
 
-    files = []
+    files: list[Path] = []
     for pattern in patterns:
         files.extend(dist_dir.glob(pattern))
 
@@ -113,7 +126,7 @@ def check_package_exists_on_pypi(package_name: str, dist_dir: Path) -> bool:
     print(f"Found {len(pypi_checksums)} versions on PyPI")
 
     # Check each local file against PyPI
-    files_exist_on_pypi = []
+    files_exist_on_pypi: list[str] = []
 
     for local_file in local_files:
         local_checksum = calculate_sha256(local_file)
@@ -138,9 +151,8 @@ def check_package_exists_on_pypi(package_name: str, dist_dir: Path) -> bool:
         for filename in files_exist_on_pypi:
             print(f"     {filename}")
         return True
-    else:
-        print("\n✅ All files are new - safe to publish")
-        return False
+    print("\n✅ All files are new - safe to publish")
+    return False
 
 
 def main() -> None:

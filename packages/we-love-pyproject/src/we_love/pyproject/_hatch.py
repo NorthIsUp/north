@@ -5,9 +5,8 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class Platform(Enum):
@@ -40,8 +39,8 @@ class Metadata(BaseModel):
     )
 
 
-class Override(BaseModel):
-    __root__: Any = Field(..., description="TODO", title="Override")
+class Override(RootModel[object]):
+    root: object = Field(..., description="TODO", title="Override")
 
 
 class Overrides(BaseModel):
@@ -105,7 +104,7 @@ class Env(BaseModel):
         description="Glob patterns of environment variables to exclude",
         title="Environment variable exclude",
     )
-    scripts: dict[str, str | list[str]] | None = Field(None, description="Dictionary of scripts to run", title="Scripts")
+    scripts: dict[str, str | list[str]] | None = Field(default=None, description="Dictionary of scripts to run", title="Scripts")
     pre_install_commands: list[str] | None = Field(
         None,
         alias="pre-install-commands",
@@ -123,7 +122,7 @@ class Env(BaseModel):
         description="Python version to use or an absolute path to a python interpreter",
         title="Python version",
     )
-    platforms: list[Platform] | None = Field(None, description="List of platforms to build for", title="Platforms")
+    platforms: list[Platform] | None = Field(default=None, description="List of platforms to build for", title="Platforms")
     description: str | None = Field(
         None,
         description="Description of the environment for the `env show` command",
@@ -134,7 +133,7 @@ class Env(BaseModel):
         description='Type of environment. Without plugins, the only supported type is "virtual"',
         title="Type",
     )
-    matrix: list[dict[str, list[str]]] | None = Field(None, description="Matrix of environments", title="Matrix")
+    matrix: list[dict[str, list[str]]] | None = Field(default=None, description="Matrix of environments", title="Matrix")
     matrix_name_format: str | None = Field(
         "{value}",
         alias="matrix-name-format",
@@ -142,15 +141,15 @@ class Env(BaseModel):
         title="Matrix name format",
     )
     overrides: Overrides | None = None
-    requires: list[str] | None = Field(None, description="Required environment plugins", title="Requires")
+    requires: list[str] | None = Field(default=None, description="Required environment plugins", title="Requires")
 
 
-class Envs(BaseModel):
-    __root__: dict[str, Env]
+class Envs(RootModel[dict[str, Env]]):
+    root: dict[str, Env]
 
 
 class CollectorEnv(BaseModel):
-    collectors: dict[str, dict[str, Any]] | None = Field(None, description="Custom environment collectors", title="Collectors")
+    collectors: dict[str, dict[str, object]] | None = Field(default=None, description="Custom environment collectors", title="Collectors")
     requires: list[str] | None = Field(
         None,
         description="Required environment collectors for automatic management",
@@ -184,8 +183,8 @@ class Hook(BaseModel):
     )
 
 
-class Hooks(BaseModel):
-    __root__: dict[str, Hook]
+class Hooks(RootModel[dict[str, Hook]]):
+    root: dict[str, Hook]
 
 
 class Version(BaseModel):
@@ -194,7 +193,7 @@ class Version(BaseModel):
         description="A relative path to a file containing the project version",
         title="Path",
     )
-    pattern: str | None = Field(None, description="A regex pattern to extract the version", title="Pattern")
+    pattern: str | None = Field(default=None, description="A regex pattern to extract the version", title="Pattern")
     source: str | None = Field(
         None,
         description="A source to use for retrieving and updating the version.",
@@ -203,8 +202,8 @@ class Version(BaseModel):
 
 
 class Repos(BaseModel):
-    main: Any | None = None
-    test: Any | None = None
+    main: object | None = None
+    test: object | None = None
 
 
 class PublishIndex(BaseModel):
@@ -224,32 +223,32 @@ class Publish(BaseModel):
     index: PublishIndex | None = None
 
 
-class IgnoreVcs(BaseModel):
-    __root__: bool = Field(
+class IgnoreVcs(RootModel[bool]):
+    root: bool = Field(
         ...,
         description="Whether to ignore VCS .*ignore files and include those files by default",
         title="Ignore VCS in file selection",
     )
 
 
-class Include(BaseModel):
-    __root__: list[str] = Field(..., description="List of glob patterns to include files", title="Include files")
+class Include(RootModel[list[str]]):
+    root: list[str] = Field(..., description="List of glob patterns to include files", title="Include files")
 
 
-class Exclude(BaseModel):
-    __root__: list[str] = Field(..., description="List of glob patterns to exclude files", title="Exclude files")
+class Exclude(RootModel[list[str]]):
+    root: list[str] = Field(..., description="List of glob patterns to exclude files", title="Exclude files")
 
 
-class Artifacts(BaseModel):
-    __root__: list[str] = Field(
+class Artifacts(RootModel[list[str]]):
+    root: list[str] = Field(
         ...,
         description="List of glob patterns to include VCS-ignored files",
         title="Artifact files",
     )
 
 
-class OnlyInclude(BaseModel):
-    __root__: list[str] = Field(
+class OnlyInclude(RootModel[list[str]]):
+    root: list[str] = Field(
         ...,
         description="List of relative paths to directories or files to include, preventing directory traversal from project root. This option overrides any include patterns.",
         title="Only include specific paths",
@@ -257,11 +256,11 @@ class OnlyInclude(BaseModel):
 
 
 class Target(BaseModel):
-    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    ignore_vcs: IgnoreVcs | None = Field(default=IgnoreVcs.model_validate(False), alias="ignore-vcs")
     include: Include | None = None
     exclude: Exclude | None = None
     artifacts: Artifacts | None = None
-    only_include: OnlyInclude | None = Field(None, alias="only-include")
+    only_include: OnlyInclude | None = Field(default=None, alias="only-include")
     dependencies: list[str] | None = Field(
         None,
         description="Additional dependencies to install in the environment",
@@ -279,8 +278,8 @@ class Target(BaseModel):
         description="A list of the project’s runtime features to install",
         title="Required runtime features",
     )
-    versions: list[str] | None = Field(None, description="List of versions to build", title="Versions")
-    packages: list[str] | None = Field(None, description="List of packages to build", title="Packages")
+    versions: list[str] | None = Field(default=None, description="List of versions to build", title="Versions")
+    packages: list[str] | None = Field(default=None, description="List of packages to build", title="Packages")
     force_include: dict[str, str] | None = Field(
         None,
         alias="force-include",
@@ -293,15 +292,15 @@ class Target(BaseModel):
         description="Whether to only include non-artifact files in packages",
         title="Only packages",
     )
-    sources: dict[str, str] | None = Field(None, description="Rewrite relative paths", title="Sources")
+    sources: dict[str, str] | None = Field(default=None, description="Rewrite relative paths", title="Sources")
 
 
-class CustomTargets(BaseModel):
-    __root__: dict[str, Target]
+class CustomTargets(RootModel[dict[str, Target]]):
+    root: dict[str, Target]
 
 
 class Build1(BaseModel):
-    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    ignore_vcs: IgnoreVcs | None = Field(default=IgnoreVcs.model_validate(False), alias="ignore-vcs")
     include: Include | None = None
     exclude: Exclude | None = None
     artifacts: Artifacts | None = None
@@ -311,7 +310,7 @@ class Build1(BaseModel):
         description="Whether to only include non-artifact files in packages",
         title="Excluding files outside packages",
     )
-    sources: dict[str, str] | list[str] | None = Field(None, description="Rewrite relative paths", title="Sources")
+    sources: dict[str, str] | list[str] | None = Field(default=None, description="Rewrite relative paths", title="Sources")
     skip_excluded_dirs: bool | None = Field(
         False,
         alias="skip-excluded-dirs",
@@ -324,7 +323,7 @@ class Build1(BaseModel):
         description="Directory to write build artifacts to",
         title="Output directory",
     )
-    dev_mode_dirs: Any | None = Field(None, alias="dev-mode-dirs")
+    dev_mode_dirs: object | None = Field(default=None, alias="dev-mode-dirs")
     dev_mode_exact: bool | None = Field(
         None,
         alias="dev-mode-exact",
@@ -336,7 +335,7 @@ class Build1(BaseModel):
 
 
 class Build2(BaseModel):
-    ignore_vcs: IgnoreVcs | None = Field(False, alias="ignore-vcs")
+    ignore_vcs: IgnoreVcs | None = Field(default=IgnoreVcs.model_validate(False), alias="ignore-vcs")
     include: Include | None = None
     exclude: Exclude | None = None
     artifacts: Artifacts | None = None
@@ -346,7 +345,7 @@ class Build2(BaseModel):
         description="Whether to only include non-artifact files in packages",
         title="Excluding files outside packages",
     )
-    sources: dict[str, str] | list[str] | None = Field(None, description="Rewrite relative paths", title="Sources")
+    sources: dict[str, str] | list[str] | None = Field(default=None, description="Rewrite relative paths", title="Sources")
     skip_excluded_dirs: bool | None = Field(
         False,
         alias="skip-excluded-dirs",
@@ -365,30 +364,28 @@ class Build2(BaseModel):
         description="List of directories to add to PYTHONPATH in development mode",
         title="Dev mode directories",
     )
-    dev_mode_exact: Any | None = Field(None, alias="dev-mode-exact")
+    dev_mode_exact: object | None = Field(default=None, alias="dev-mode-exact")
     targets: CustomTargets | None = None
     hooks: Hooks | None = None
 
 
-class Build(BaseModel):
-    __root__: Build1 | Build2 = Field(..., description="Build configuration", title="Build")
+class Build(RootModel[Build1 | Build2]):
+    root: Build1 | Build2 = Field(..., description="Build configuration", title="Build")
 
 
 class Hatch1(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     metadata: Metadata | None = None
     env: CollectorEnv | None = None
     envs: Envs | None = None
     build: Build | None = None
-    version: Any | None = None
+    version: object | None = None
     publish: Publish | None = None
 
 
 class Hatch2(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     metadata: Metadata | None = None
     env: CollectorEnv | None = None
@@ -398,8 +395,5 @@ class Hatch2(BaseModel):
     publish: Publish | None = None
 
 
-class Hatch(BaseModel):
-    class Config:
-        extra = Extra.forbid
-
-    __root__: Hatch1 | Hatch2 = Field(..., title="Hatch")
+class Hatch(RootModel[Hatch1 | Hatch2]):
+    root: Hatch1 | Hatch2 = Field(..., title="Hatch")
