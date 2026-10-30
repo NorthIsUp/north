@@ -9,7 +9,7 @@ from asyncio import TaskGroup, subprocess
 from fnmatch import fnmatch
 from functools import cached_property
 from html.parser import HTMLParser
-from shlex import quote
+from pathlib import Path
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack, override
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from uuid import uuid4
@@ -17,6 +17,7 @@ from uuid import uuid4
 import httpx
 from anyio import Path as AsyncPath
 from pydantic import Field, PrivateAttr, RootModel, ValidationError
+from we_love.alfred.cleanup import CacheCleanup
 from we_love.alfred.editor import Editor, Editors
 from we_love.alfred.fast import cache_filename
 from we_love.alfred.fast import cache_path as fast_cache_path
@@ -590,14 +591,13 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
     def add_config_items(self) -> None:
         """Add configuration menu items."""
-        menu_cache = fast_cache_path(self.cache_name)
-        pidfile = quote(str(menu_cache) + ".refresh.pid")
-        self.add_exec(
-            "clear cache",
-            f'if [[ -f {pidfile} ]]; then kill "$(cat {pidfile})" 2>/dev/null; fi; '
-            f"rm -f {pidfile} {quote(str(menu_cache))}; "
-            f"if [[ -d {quote(str(self.icon_cache))} ]]; then find {quote(str(self.icon_cache))} -type f -delete; fi",
+        cleanup = CacheCleanup.from_environment(
+            fast_cache_path(self.cache_name),
+            Path(str(self.icon_cache)),
+            Path(str(self.home)),
+            os.environ,
         )
+        self.add_exec("clear cache", cleanup.command())
 
     def add_dev_workflow(self, editors: Sequence[str] = ("cursor", "vscode", "vscode-insiders", "xcode")) -> None:
         for editor in editors:

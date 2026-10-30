@@ -59,3 +59,9 @@ async HTTPX without `favicon`, Requests, or Beautiful Soup.
 it serves stale data while refreshing and returns an empty list on a cache miss
 or malformed data. All automatic retries use the same warming throttle.
 Call `fetch()` explicitly when a caller needs to wait for current PR data.
+
+The clear-cache action also clears Alfred's own cache directory for this workflow
+and `.cache` files in its data directory, while preserving settings and other
+workflow data. Paths are resolved when building the menu, before `zsh://` dispatch.
+Without a bundle ID or explicit workflow paths, shared workflow roots are never
+selected for deletion.
