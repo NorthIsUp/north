@@ -24,13 +24,10 @@ namespace   = true
 module-name = "we_love"
 
 [tool.uv.sources]
-we-love-pydantic = { path = "../we-love-pydantic" }
-we-love-registry = { path = "../we-love-registry" }
-we-love-string   = { path = "../we-love-string" }
+we-love-pydantic = { workspace = true }
+we-love-registry = { workspace = true }
+we-love-string   = { workspace = true }
 
-[tool.pyright]
-venv     = ".venv"
-venvPath = "."
 
 [dependency-groups]
 dev = ["pytest>=9"]

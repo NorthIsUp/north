@@ -74,5 +74,5 @@ def test_values() -> None:
     expected_uuid = "01958668-d7e4-7ee9-ba11-70720a9b2cb8"
 
     assert prefix == "enc"
-    assert str(TypeId._convert_b32_to_uuid(suffix)) == expected_uuid
-    assert TypeId._convert_uuid_to_b32(expected_uuid) == suffix
+    assert str(TypeId.convert_b32_to_uuid(suffix)) == expected_uuid
+    assert TypeId.convert_uuid_to_b32(expected_uuid) == suffix

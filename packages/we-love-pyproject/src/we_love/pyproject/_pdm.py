@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Extra, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CacheMethod(Enum):
@@ -17,11 +17,10 @@ class CacheMethod(Enum):
 
 
 class Install(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     cache: bool | None = Field(True, description="Enable caching of wheel installations")
-    cache_method: CacheMethod | None = Field("symlink", description="Specify how to create links to the caches")
+    cache_method: CacheMethod | None = Field(default=CacheMethod("symlink"), description="Specify how to create links to the caches")
     parallel: bool | None = Field(
         True,
         description="Whether to perform installation and uninstallation in parallel\nEnv var: PDM_PARALLEL_INSTALL",
@@ -29,15 +28,14 @@ class Install(BaseModel):
 
 
 class Python(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     use_pyenv: bool | None = Field(True, description="Use the pyenv interpreter")
     use_venv: bool | None = Field(
         True,
         description="Use virtual environments when available\nEnv var: PDM_USE_VENV",
     )
-    providers: list | None = Field(None, description="List of python provider names for findpython")
+    providers: list[object] | None = Field(default=None, description="List of python provider names for findpython")
 
 
 class Pypi(BaseModel):
@@ -45,13 +43,13 @@ class Pypi(BaseModel):
         "https://pypi.org/simple",
         description="The URL of PyPI mirror\nEnv var: PDM_PYPI_URL",
     )
-    username: str | None = Field(None, description="The username to access PyPI\nEnv var: PDM_PYPI_USERNAME")
-    password: str | None = Field(None, description="The password to access PyPI\nEnv var: PDM_PYPI_PASSWORD")
+    username: str | None = Field(default=None, description="The username to access PyPI\nEnv var: PDM_PYPI_USERNAME")
+    password: str | None = Field(default=None, description="The password to access PyPI\nEnv var: PDM_PYPI_PASSWORD")
     ignore_stored_index: bool | None = Field(
         False,
         description="Ignore the configured indexes\nEnv var: PDM_IGNORE_STORED_INDEX",
     )
-    verify_ssl: bool | None = Field("true", description="Verify SSL certificate when query PyPI")
+    verify_ssl: bool | None = Field(True, description="Verify SSL certificate when query PyPI")
     json_api: bool | None = Field(
         False,
         description="Consult PyPI's JSON API for package metadata\nEnv var: PDM_PYPI_JSON_API",
@@ -73,11 +71,10 @@ class Update(Enum):
 
 
 class Strategy(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    save: Save | None = Field("minimum", description="Specify how to save versions when a package is added")
-    update: Update | None = Field("reuse", description="The default strategy for updating packages")
+    save: Save | None = Field(default=Save("minimum"), description="Specify how to save versions when a package is added")
+    update: Update | None = Field(default=Update("reuse"), description="The default strategy for updating packages")
     resolve_max_rounds: int | None = Field(
         10000,
         description="Specify the max rounds of resolution process\nEnv var: PDM_RESOLVE_MAX_ROUNDS",
@@ -86,8 +83,7 @@ class Strategy(BaseModel):
 
 
 class Venv(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     backend: str | None = Field(
         "virtualenv",
@@ -113,23 +109,21 @@ class Type(Enum):
 
 
 class PypiDef(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     url: str = Field(..., description="The URL of custom package source")
-    username: str | None = Field(None, description="The username to access custom source")
-    password: str | None = Field(None, description="The password to access custom source")
-    type: Type | None = Field("index", description="index or find_links")
+    username: str | None = Field(default=None, description="The username to access custom source")
+    password: str | None = Field(default=None, description="The password to access custom source")
+    type: Type | None = Field(default=Type("index"), description="index or find_links")
     verify_ssl: bool | None = Field(True, description="Verify SSL certificate when query custom source")
 
 
 class RepositoryDef(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     url: str | None = Field("https://pypi.org/simple", description="The URL of custom package source")
-    username: str | None = Field(None, description="The username to access custom repository")
-    password: str | None = Field(None, description="The password to access custom repository")
+    username: str | None = Field(default=None, description="The username to access custom repository")
+    password: str | None = Field(default=None, description="The password to access custom repository")
     ca_certs: str | None = Field(
         None,
         description="Path to a PEM-encoded CA cert bundle (used for server cert verification)",
@@ -138,8 +132,7 @@ class RepositoryDef(BaseModel):
 
 
 class JsonSchemaForPdmPythonPackageManagerConfigurationHttpsPdmProjectOrgLatestReferenceConfiguration(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     build_isolation: bool | None = Field(
         True,

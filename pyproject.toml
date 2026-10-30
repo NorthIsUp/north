@@ -2,66 +2,32 @@
 line-length = 140
 preview = true
 target-version = "py313"
-extend-exclude = ["**/examples/**", "**/tests/**", "packages/tests"]
-# specific rules to enable
-lint.extend-select = [
-    "A",     # shadowing
-    "ANN",   # annotations
-    "ASYNC", # async rules
-    "B",     # bugbear common python bugs
-    "BLE",   # blind except
-    "COM",   # comma rules
-    "E",     # errors
-    "F",     # pyflakes
-    "FA",    # future annotations
-    "FURB",  # refurb rules
-    "I",     # imports + isort
-    "ISC",   # implicit string concatenation
-    "N",     # pep8-naming
-    "PLR",   # refactor rules
-    "RUF",   # ruff rules
-    "TC",    # type checking
-    "UP",    # upgrades
-    "YTT",   # modern syntax
-]
-# specific rules to exclude
+lint.select = ["ALL"]
 lint.ignore = [
-    "A002",    # Function argument {name} is shadowing a Python builtin # TODO: enable this
-    "A005",    # Module {name} shadows a Python standard-library module # TODO: enable this
-    "ANN401",  # any-type
-    "COM812",  # Trailing comma missing # TODO: enable this
-    "COM819",  # prohibited-trailing-comma
-    "E501",    # line too long
-    "PLR0911", # too many return statements for method
-    "PLR0913", # too many arguments for method
-    "PLR0917", # too many positional arguments for method
-    "PLR2004", # Magic value used in comparison
-    "PLR6301", #could be a function, class method, or static method
-    "RET504",  # Unnecessary assignment to {name} before return statement
-    "TC006",   # Type checking: Add quotes to type expression in typing.cast()
-    "TC007",   # Type checking: Add quotes to type alias
-    "BLE001",  # Blind Exception — fine for script-level error reporting
-    "N806",    # Variable in function should be lowercase — mathematical names OK
-    "N999",    # Invalid module name — we have dashes in package names
-    "PLR0912", # too many branches
-    "PLR0914", # too many local variables
-    "PLR0915", # too many statements
-    "PLR0916", # too many Boolean expressions
-    "RUF001",  # Ambiguous unicode characters in strings
-    "RUF067",  # __init__ module should only contain docstrings and re-exports
-    "RUF069",  # Unreliable floating-point equality — fine in tests and config
-    "TRY401",  # Redundant exception object in logging.exception
-    "T100",    # debugpy uses
-    "PYI036",  # __exit__ annotation style
-    "PYI063",  # PEP 570 syntax
-    "ANN001",  # Missing type annotation — strict; too many existing
-    "E741",    # Ambiguous variable name
+    # Ruff format owns layout; generated upstream schemas contain long descriptions.
+    "missing-trailing-comma", "prohibited-trailing-comma", "single-line-implicit-string-concatenation", "line-too-long",
+    # Public APIs retain their argument order and direct error messages.
+    "FBT", "EM", "raise-vanilla-args", "too-many-arguments", "too-many-positional-arguments", "builtin-argument-shadowing",
+    # Documentation and copyright policies are separate from correctness checks.
+    "D", "DOC", "missing-copyright-notice",
+    # Namespace distributions deliberately omit we_love/__init__.py.
+    "implicit-namespace-package", "invalid-module-name", "non-empty-init-module",
+    # Data-heavy schemas and rendering routines use many branches and numeric constants.
+    "complex-structure", "too-many-return-statements", "too-many-branches", "too-many-locals", "too-many-statements", "too-many-boolean-expressions", "magic-value-comparison", "no-self-use",
+    # CLI output, invariant assertions, deterministic artwork, and argument-vector subprocesses are intentional.
+    "print", "assert", "suspicious-non-cryptographic-random-usage", "suspicious-subprocess-import", "subprocess-without-shell-equals-true",
+    # Framework callbacks have prescribed names and unused context parameters.
+    "unused-function-argument", "unused-method-argument", "non-lowercase-variable-in-function", "pep484-style-positional-only-parameter",
+    # Catch/report at CLI and optional I/O boundaries; keep the original traceback.
+    "blind-except", "too-many-statements-in-try-clause", "try-consider-else",
+    # Existing public rendering and serialization behavior.
+    "ambiguous-unicode-character-string", "float-equality-comparison", "eq-without-hash", "uncapitalized-environment-variables",
 ]
 
 # specific fixes to be more aggressive with
 lint.extend-safe-fixes = [
     "FA",
-    "FA102", # Add 'from __future__ import annotations' import
+    "future-required-type-annotation", # Add 'from __future__ import annotations' import
     "TC",
     "UP",
 ]
@@ -75,8 +41,12 @@ lint.flake8-type-checking.runtime-evaluated-base-classes = [
 lint.future-annotations = true
 
 [tool.ruff.lint.per-file-ignores]
-"scripts/**" = ["T100", "ANN001", "ANN201", "EXE001", "EXE002"]
-"**/_dap.py" = ["T100"]
+"scripts/**" = ["debugger", "shebang-not-executable", "shebang-missing-executable-file"]
+"**/_dap.py" = ["debugger"]
+# These settings explicitly implement an opt-in debugger.
+"**/pydantic/cli.py" = ["debugger"]
+# Generated enum values mirror upstream Ruff rule prefixes.
+"**/pyproject/_ruff.py" = ["ambiguous-variable-name"]
 
 [tool.pyproject-fmt]
 column_width = 1          # always wrap lists
@@ -91,7 +61,7 @@ addopts = [
     "-p no:ddtrace.pytest_bdd",
     "-p no:ddtrace.pytest_benchmark",
 ]
-asyncio_mode = "auto"
+anyio_mode = "auto"
 filterwarnings = [
     "error::pytest.PytestUnknownMarkWarning",
     "ignore::DeprecationWarning:__main__",
@@ -101,7 +71,7 @@ filterwarnings = [
 log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_level = "DEBUG"
 testpaths = [
-    "coding_agent",
+    "packages",
 ]
 
 [tool.pyright]
@@ -109,29 +79,72 @@ venv = ".venv"
 venvPath = "."
 exclude = [
     "**/__pycache__",
-    "**/aws.py",
     "**/.venv",
 ]
-pythonVersion = "3.13" # this must match the project.requires-python
+pythonVersion = "3.15"
 reportConstantRedefinition = "error"
-reportDeprecated = "warning"
+reportDeprecated = "error"
 reportDuplicateImport = "error"
-reportImportCycles = "warning"
+reportImportCycles = "error"
 reportIncompatibleMethodOverride = "error"
-reportInconsistentConstructor = "warning"
+reportInconsistentConstructor = "error"
 reportInvalidTypeVarUse = "error"
-reportMatchNotExhaustive = "warning"
+reportMatchNotExhaustive = "error"
 reportMissingImports = "error"
 reportMissingModuleSource = "error"
-reportMissingTypeStubs = false
+reportMissingTypeStubs = "error"
 reportPrivateImportUsage = "error"
 reportSelfClsParameterName = "error"
-reportUnnecessaryTypeIgnoreComment = "warning"
+reportUnnecessaryTypeIgnoreComment = "error"
 reportUntypedBaseClass = "error"
 reportUntypedClassDecorator = "error"
-reportUntypedFunctionDecorator = "warning"
+reportUntypedFunctionDecorator = "error"
 reportUnusedImport = "error"
 strictDictionaryInference = true
 strictListInference = true
 strictSetInference = true
-typeCheckingMode = "basic"
+typeCheckingMode = "strict"
+
+reportImplicitOverride = "error"
+enableTypeIgnoreComments = false
+extraPaths = ["packages/we-love-alfred/src", "packages/we-love-avatars/src", "packages/we-love-cli/src", "packages/we-love-funcy/src", "packages/we-love-fzf/src", "packages/we-love-matchbox/src", "packages/we-love-pydantic/src", "packages/we-love-pyproject/src", "packages/we-love-registry/src", "packages/we-love-string/src", "packages/we-love-typeid/src"]
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
+[tool.ty.environment]
+python-version = "3.15"
+extra-paths = ["packages/we-love-alfred/src", "packages/we-love-avatars/src", "packages/we-love-cli/src", "packages/we-love-funcy/src", "packages/we-love-fzf/src", "packages/we-love-matchbox/src", "packages/we-love-pydantic/src", "packages/we-love-pyproject/src", "packages/we-love-registry/src", "packages/we-love-string/src", "packages/we-love-typeid/src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9",
+    "ruff>=0.17.3",
+    "pyright>=1.1.414",
+    "ty>=0.0.95",
+    "types-tqdm",
+    "types-requests",
+    "click",
+    "requests",
+    "debugpy",
+    "packaging",
+]
+
+[tool.uv.workspace]
+members = ["packages/we-love-*"]
+
+[tool.uv.sources]
+we-love-alfred = { workspace = true }
+we-love-avatars = { workspace = true }
+we-love-cli = { workspace = true }
+we-love-funcy = { workspace = true }
+we-love-fzf = { workspace = true }
+we-love-matchbox = { workspace = true }
+we-love-pydantic = { workspace = true }
+we-love-pyproject = { workspace = true }
+we-love-registry = { workspace = true }
+we-love-string = { workspace = true }
+we-love-typeid = { workspace = true }

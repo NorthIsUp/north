@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, ClassVar
 
-import asyncstdlib as a
 from anyio import Path as AsyncPath
 from pydantic import PrivateAttr
 from we_love.alfred.model import AlfredBaseModel
@@ -23,7 +22,7 @@ class Editor(AlfredBaseModel, arbitrary_types_allowed=True):
     async def exists(self) -> bool:
         if self._exists_cache is None:
             self._exists_cache = await self.path.exists()
-        return self._exists_cache  # type: ignore[return-value]
+        return self._exists_cache
 
     def open_cmd(self, path: PathLike[str]) -> str:
         return f"open -a '{self.name}' {path!s}"
@@ -52,7 +51,6 @@ class Editors:
         return sorted(cls._registry.values(), key=lambda x: priority.index(x.short_name), reverse=True)[:num]
 
     @classmethod
-    @a.cache
     async def discover_editors(cls) -> None:
         async with cls._discovery_lock:
             if cls._discovery_has_run:

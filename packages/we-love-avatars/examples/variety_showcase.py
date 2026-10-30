@@ -26,8 +26,8 @@ def generate_variety_showcase(count: int = 100) -> None:
     )
 
     # Track variety
-    gradient_types = Counter()
-    loop_types = Counter()
+    gradient_types: Counter[str] = Counter()
+    loop_types: Counter[str] = Counter()
 
     print(f"Generating {count} avatars from random UUIDs...")
     print()

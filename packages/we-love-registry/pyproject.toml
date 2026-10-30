@@ -15,15 +15,12 @@ classifiers = [
 dependencies = ["we-love-string", "pydantic>=2"]
 
 [tool.uv.sources]
-we-love-string = { path = "../we-love-string" }
+we-love-string = { workspace = true }
 
 [tool.uv.build-backend]
 namespace   = true
 module-name = "we_love"
 
-[tool.pyright]
-venv     = ".venv"
-venvPath = "."
 
 [dependency-groups]
 dev = ["pytest>=9"]

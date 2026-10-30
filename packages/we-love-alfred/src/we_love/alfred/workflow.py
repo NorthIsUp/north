@@ -2,20 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import os
+import sys
 from asyncio import TaskGroup, subprocess
+from fnmatch import fnmatch
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
-from urllib.parse import urlsplit, urlunsplit
+from html.parser import HTMLParser
+from shlex import quote
+from typing import TYPE_CHECKING, Self, TypedDict, Unpack, override
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import asyncstdlib as a
-import favicon
 import httpx
 from anyio import Path as AsyncPath
-from pydantic import Field, ValidationError
+from pydantic import Field, RootModel, ValidationError
 from we_love.alfred.editor import Editor, Editors
+from we_love.alfred.fast import cache_path as fast_cache_path
 from we_love.alfred.model import AlfredBaseModel
 
 if TYPE_CHECKING:
@@ -23,18 +26,33 @@ if TYPE_CHECKING:
     from os import PathLike
 
 
-HOME = AsyncPath(os.path.expanduser("~"))
+__lazy_modules__ = ("httpx", "we_love.alfred.editor")
+
+HOME = AsyncPath(os.environ["HOME"])
 
 
-def _glob(path: AsyncPath, pattern: str, case_sensitive: bool = False, recurse_symlinks: bool = False) -> AsyncIterator[AsyncPath]:
-    from anyio._core._fileio import _PathIterator
+async def _glob(path: AsyncPath, pattern: str, case_sensitive: bool = False, recurse_symlinks: bool = False) -> AsyncIterator[AsyncPath]:
+    if case_sensitive:
+        async for entry in path.glob(pattern, recurse_symlinks=recurse_symlinks):
+            yield entry
+    else:
+        async for entry in path.iterdir():
+            if fnmatch(entry.name.casefold(), pattern.casefold()):
+                yield entry
 
-    iters = path._path.glob(
-        pattern,
-        case_sensitive=case_sensitive,
-        recurse_symlinks=recurse_symlinks,
-    )
-    return _PathIterator(iters)
+
+class FaviconLinks(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[str] = []
+
+    @override
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        relation = attributes.get("rel") or ""
+        href = attributes.get("href")
+        if tag == "link" and "icon" in relation.lower() and href is not None and href:
+            self.links.append(href)
 
 
 def _just_netloc(url: str) -> str:
@@ -49,23 +67,22 @@ class AwsAccount(AlfredBaseModel):
     role_names: list[str] | tuple[str, ...] = ("AdministratorAccess",)
 
     @classmethod
-    def model_validate_list(cls, v: Any) -> list[Self]:
+    def model_validate_list(cls, v: object) -> list[Self]:
+        adapter = RootModel[list[object]]
         match v:
             case "null" | None:
                 return []
-            case str() if v.startswith("{") and v.endswith("}"):
+            case str() if v.startswith("{"):
                 return [cls.model_validate_json(v)]
-            case str() if v.startswith("[") and v.endswith("]"):
-                return [cls.model_validate(_) for _ in json.loads(v)]
-            case list() | tuple():
-                return [cls.model_validate(_) for _ in v]
+            case str():
+                return [cls.model_validate(item) for item in adapter.model_validate_json(v).root]
             case _:
-                raise ValueError(f"Invalid AWS accounts: {v}")
+                return [cls.model_validate(item) for item in adapter.model_validate(v).root]
 
 
-def _env[R](key: str, default: R, cast: Callable[[str | R], R]) -> Callable[[], R]:
+def env[R](key: str, default: R, converter: Callable[[str | R], R]) -> Callable[[], R]:
     def _() -> R:
-        return cast(os.environ.get(key, default))
+        return converter(os.environ.get(key, default))
 
     return _
 
@@ -84,7 +101,8 @@ class MenuItem(AlfredBaseModel):
 
     icon: dict[str, str] | None = None
 
-    def __post_init__(self) -> None:
+    @override
+    def model_post_init(self, context: object) -> None:
         if isinstance(self.alt, str):
             self.alt = {"subtitle": self.alt}
         if isinstance(self.cmd, str):
@@ -102,11 +120,10 @@ class AlfredMenu(AlfredBaseModel):
     """Pydantic model for the complete Alfred menu structure."""
 
     cache: MenuCache
-    items: list[MenuItem] = Field(default_factory=list)
+    items: list[MenuItem] = Field(default_factory=list[MenuItem])
 
 
 class AddItemArgs(TypedDict, total=False):
-    item_type: str
     title: str
     subtitle: str
     arg: str
@@ -130,14 +147,24 @@ class AddItemArgs(TypedDict, total=False):
     autocomplete: str
 
 
+class QueuedItem(AddItemArgs):
+    item_type: str
+
+
+class MenuItemOverrides(TypedDict, total=False):
+    alt: str | dict[str, str] | None
+    cmd: str | dict[str, str] | None
+
+
 class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_types_allowed=True):
     """Alfred workflow generator for MaxCare."""
 
+    cache_name: str | None = None
     cache_ttl: int = 3600
     home: AsyncPath = HOME
     xdg_cache_home: AsyncPath = HOME / ".cache"
     icon_cache: AsyncPath = HOME / ".cache" / "alfred-icons"
-    menu_items: list[MenuItem] = Field(default_factory=list)
+    menu_items: list[MenuItem] = Field(default_factory=list[MenuItem])
 
     # SF Symbols glyphs mapping
     glyphs: dict[str, str] = Field(
@@ -163,17 +190,14 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         return logging.getLogger(__name__)
 
     @cached_property
-    def _item_queue(self) -> asyncio.Queue[AddItemArgs]:
+    def _item_queue(self) -> asyncio.Queue[QueuedItem]:
         return asyncio.Queue()
 
-    @cached_property
+    @a.cached_property
     async def _has_magick_bin(self) -> bool:
-        async def _() -> bool:
-            proc = await subprocess.create_subprocess_exec("which", "magick", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            await proc.wait()
-            return proc.returncode == 0
-
-        return await asyncio.create_task(_())
+        proc = await subprocess.create_subprocess_exec("which", "magick", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        await proc.wait()
+        return proc.returncode == 0
 
     async def sfsymbol(self, symbol: str) -> str | None:
         """Generate SF Pro icon files for given symbol."""
@@ -187,23 +211,25 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
             await dark_path.parent.mkdir(parents=True, exist_ok=True)
 
+            async def render_icon(mode: str, path: AsyncPath) -> None:
+                process = await subprocess.create_subprocess_exec(
+                    "magick",
+                    "-background",
+                    "none",
+                    "-fill",
+                    mode,
+                    "-font",
+                    str(self.home / "Library/Fonts/SF-Pro.ttf"),
+                    "-pointsize",
+                    "300",
+                    f"label:{symbol}",
+                    str(path),
+                )
+                await process.wait()
+
             async with TaskGroup() as tg:
                 for mode, path in [("black", dark_path), ("white", light_path)]:
-                    tg.create_task(
-                        subprocess.create_subprocess_exec(
-                            "magick",
-                            "-background",
-                            "none",
-                            "-fill",
-                            mode,
-                            "-font",
-                            str(self.home / "Library/Fonts/SF-Pro.ttf"),
-                            "-pointsize",
-                            "300",
-                            f"label:{symbol}",
-                            str(path),
-                        )
-                    )
+                    tg.create_task(render_icon(mode, path))
 
         return str(dark_path) if (await dark_path.exists()) else None
 
@@ -219,13 +245,13 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         existing_icon: dict[str, str] | None = None,
     ) -> dict[str, str] | None:
         """Process different icon types and return icon dict."""
-        if existing_icon and icon_type in {"appicon", "urlicon", "clearbiticon"}:
+        if (existing_icon is not None and existing_icon) and icon_type in {"appicon", "urlicon", "clearbiticon"}:
             return existing_icon
 
         match icon_type:
             case "icon" if "*" in value:
                 async for icon_path in _glob(self.icon_cache, value, case_sensitive=False):
-                    return {"path": str(icon_path.absolute())}
+                    return {"path": str(await icon_path.absolute())}
                 return None
 
             case "icon":
@@ -234,15 +260,14 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
             case "glyph":
                 if value in self.glyphs:
                     icon_path = await self.sfsymbol(self.glyphs[value])
-                    return {"path": icon_path} if icon_path else None
-                elif await AsyncPath(value).exists():
+                    return {"path": icon_path} if (icon_path is not None and icon_path) else None
+                if await AsyncPath(value).exists():
                     return {"path": value}
-                else:
-                    print(
-                        f"glyph: '{value}' does not exist",
-                        file=__import__("sys").stderr,
-                    )
-                    return None
+                print(
+                    f"glyph: '{value}' does not exist",
+                    file=sys.stderr,
+                )
+                return None
 
             case "filetype":
                 return {"type": "filetype", "path": value}
@@ -264,7 +289,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
                 if await icon_path.exists():
                     return {"path": str(icon_path)}
 
-                elif await app_path.exists():
+                if await app_path.exists():
                     await icon_path.parent.mkdir(parents=True, exist_ok=True)
                     proc = await subprocess.create_subprocess_exec(
                         "sips",
@@ -275,12 +300,13 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
                         "--out",
                         str(icon_path),
                     )
+                    await proc.wait()
                     if proc.returncode == 0:
                         return {"path": str(icon_path)}
                     return None
 
             case "clearbiticon":
-                domain = value.split("://")[-1].split("/")[0].split(":")[0]
+                domain = value.rsplit("://", maxsplit=1)[-1].split("/", maxsplit=1)[0].split(":", maxsplit=1)[0]
                 icon_url = f"https://logo.clearbit.com/{domain}"
                 icon_path = self.icon_cache / f"{domain}.png"
                 return await self._download_icon(icon_url, icon_path)
@@ -294,14 +320,17 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
                 value_url = urlsplit(value)
 
                 async def _get_favicon() -> tuple[str, str]:
-                    icons = await asyncio.to_thread(favicon.get, value)
-                    if not icons:
-                        # Try root URL if the specific path returned no favicons
-                        icons = await asyncio.to_thread(favicon.get, urlunsplit(value_url._replace(path="")))
-                    if not icons:
-                        raise ValueError(f"no favicon found for '{value}'")
-                    icon = icons[0]
-                    return (icon.url, f"favicon.{icon.format}")
+                    async with httpx.AsyncClient(follow_redirects=True, timeout=2) as client:
+                        for page_url in (value, _just_netloc(value)):
+                            response = await client.get(page_url)
+                            response.raise_for_status()
+                            links = FaviconLinks()
+                            links.feed(response.text)
+                            if links.links:
+                                icon_url = urljoin(str(response.url), links.links[0])
+                                suffix = AsyncPath(urlsplit(icon_url).path).suffix or ".ico"
+                                return icon_url, f"favicon{suffix}"
+                    return urljoin(value, "/favicon.ico"), "favicon.ico"
 
                 return await self._download_icon(
                     _get_favicon,
@@ -326,20 +355,22 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         if (await icon_path.exists()) and (await icon_path.stat()).st_size > 20:
             return {"path": str(icon_path)}
 
-        if callable(url):
+        if not isinstance(url, str):
             try:
-                match await url():
-                    case str(url):
-                        pass
-                    case (str(url), str(filename)):
+                resolved = await url()
+                match resolved:
+                    case str() as resolved_url:
+                        url = resolved_url
+                    case (str(resolved_url), str(filename)):
+                        url = resolved_url
                         icon_path = icon_path.with_name(filename)
             except Exception:
-                self.logger.debug(f"Failed to resolve icon URL for '{icon_path}'")
+                self.logger.debug("Failed to resolve icon URL for '%s'", icon_path)
                 return None
 
         try:
             await icon_path.parent.mkdir(parents=True, exist_ok=True)
-            self.logger.debug(f"Downloading icon from {url} to {icon_path}")
+            self.logger.debug("Downloading icon from %s to %s", url, icon_path)
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     url,
@@ -348,7 +379,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
                         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
                     },
                 )
-                self.logger.debug(f"Response: {response.status_code}")
+                self.logger.debug("Response: %s", response.status_code)
                 response.raise_for_status()
                 await icon_path.write_bytes(response.content)
 
@@ -366,7 +397,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         self,
         item_type: str,
         *,
-        title: str,
+        title: str = "",
         subtitle: str | None = None,
         arg: str | None = None,
         url: str | None = None,
@@ -387,7 +418,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         uid: str | None = None,
         match: str | None = None,
         autocomplete: str | None = None,
-        **kwargs: str | None,
+        **kwargs: Unpack[MenuItemOverrides],
     ) -> None:
         """Add a menu item based on type using keyword arguments."""
         item_args = {"title": title}
@@ -395,34 +426,54 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
         match item_type:
             case "easy":
-                if not subtitle or not arg:
+                if not (subtitle is not None and subtitle) or not (arg is not None and arg):
                     raise ValueError("easy items require 'title', 'subtitle', and 'arg'")
                 item_args.update({"subtitle": subtitle, "arg": arg})
 
             case "url":
-                if not url:
+                if not (url is not None and url):
                     raise ValueError("url items require 'title' and 'url'")
                 item_args.update({
                     "subtitle": subtitle or f"open {title} in browser ({url})",
                     "arg": f"open {url}",
                 })
                 # Default to favicon if no icon specified
-                if not (icon or glyph or appicon or clearbiticon or urlicon or workflowicon or filetype or fileicon or utiicon):
+                if not (
+                    (icon is not None and icon)
+                    or (glyph is not None and glyph)
+                    or (appicon is not None and appicon)
+                    or (clearbiticon is not None and clearbiticon)
+                    or (urlicon is not None and urlicon)
+                    or (workflowicon is not None and workflowicon)
+                    or (filetype is not None and filetype)
+                    or (fileicon is not None and fileicon)
+                    or (utiicon is not None and utiicon)
+                ):
                     favicon = url
 
             case "exec":
-                if not command:
+                if not (command is not None and command):
                     raise ValueError("exec items require 'title' and 'command'")
                 item_args.update({"subtitle": subtitle or command, "arg": f"zsh://{command}"})
                 # Default to terminal glyph if no glyph specified
-                if not (icon or glyph or appicon or clearbiticon or urlicon or workflowicon or filetype or fileicon or utiicon):
+                if not (
+                    (icon is not None and icon)
+                    or (glyph is not None and glyph)
+                    or (appicon is not None and appicon)
+                    or (clearbiticon is not None and clearbiticon)
+                    or (urlicon is not None and urlicon)
+                    or (workflowicon is not None and workflowicon)
+                    or (filetype is not None and filetype)
+                    or (fileicon is not None and fileicon)
+                    or (utiicon is not None and utiicon)
+                ):
                     glyph = "terminal"
 
             case _:
                 raise ValueError(f"unknown item type: '{item_type}'")
 
         # Handle path argument
-        if path:
+        if path is not None and path:
             path_obj = await AsyncPath(path).expanduser()
             item_args.setdefault("uid", path)
             item_args.setdefault("arg", str(path_obj.relative_to(self.home, walk_up=True)))
@@ -441,20 +492,19 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
             "fileicon": fileicon,
             "utiicon": utiicon,
         }.items():
-            if icon_value:
+            if icon_value is not None and icon_value:
                 icon_dict = await self.process_icon(icon_type, icon_value, icon_dict)
                 break
 
         # Set additional overrides
-        if uid:
+        if uid is not None and uid:
             item_args["uid"] = uid
-        if match:
+        if match is not None and match:
             item_args["match"] = match
-        if autocomplete:
+        if autocomplete is not None and autocomplete:
             item_args["autocomplete"] = autocomplete
 
         # Add any additional kwargs
-        item_args.update({k: v for k, v in kwargs.items() if v is not None})
 
         # Generate UID and set defaults
         generated_uid = self.generate_uid(
@@ -470,7 +520,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         item_args.setdefault("autocomplete", item_args.get("arg", ""))
 
         # Create menu item
-        menu_item = MenuItem(icon=icon_dict, **item_args)
+        menu_item = MenuItem.model_validate({**item_args, **kwargs, "icon": icon_dict})
 
         self.menu_items.append(menu_item)
 
@@ -516,45 +566,34 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         self.queue_item("easy", **kwargs)
 
     async def _add_source_file(self, src_file: PathLike[str], editor: Editor | Sequence[Editor]) -> None:
-        match editor:
-            case Editor() as editor:
-                editors = [editor]
-            case [*editors]:
-                pass
-
-        async with TaskGroup() as tg:
-            for editor in editors:
-                tg.create_task(
-                    self.add_easy(
-                        AsyncPath(src_file).name,
-                        f"{editor.short_name} {src_file!s}",
-                        editor.open_cmd(src_file),
-                        **{k: v for k, v in {"appicon": editor.appicon}.items() if v is not None},
-                    )
-                )
+        editors = [editor] if isinstance(editor, Editor) else editor
+        for current_editor in editors:
+            options: AddItemArgs = {"title": AsyncPath(src_file).name}
+            if current_editor.appicon is not None:
+                options["appicon"] = current_editor.appicon
+            self.add_easy(
+                AsyncPath(src_file).name,
+                f"{current_editor.short_name} {src_file!s}",
+                current_editor.open_cmd(src_file),
+                **options,
+            )
 
     async def add_source_file(self, *srcs: PathLike[str], editor: Editor | Sequence[Editor] | None = None) -> None:
         if not srcs:
             raise ValueError("no source files provided")
-
-        match editor:
-            case None:
-                editors = await Editors.editors()
-            case [*editors]:
-                pass
-            case Editor() as editor:
-                editors = [editor]
-
+        editors = await Editors.editors() if editor is None else [editor] if isinstance(editor, Editor) else editor
         for src_file in srcs:
-            self._add_source_file(src_file, editors)
+            await self._add_source_file(src_file, editors)
 
     def add_config_items(self) -> None:
         """Add configuration menu items."""
-        icon_glob = self.icon_cache / "*"
-        menu_cache = "${XDG_CACHE_HOME:-$HOME/.cache}/alfred/maxcare-menu.json"
+        menu_cache = fast_cache_path(self.cache_name)
+        pidfile = quote(str(menu_cache) + ".refresh.pid")
         self.add_exec(
             "clear cache",
-            f'[[ -d "{self.icon_cache}/" ]] && rm "{icon_glob}"; rm -f "{menu_cache}" "/tmp/alfred/maxcare-menu.json"',
+            f'if [[ -f {pidfile} ]]; then kill "$(cat {pidfile})" 2>/dev/null; fi; '
+            f"rm -f {pidfile} {quote(str(menu_cache))}; "
+            f"if [[ -d {quote(str(self.icon_cache))} ]]; then find {quote(str(self.icon_cache))} -type f -delete; fi",
         )
 
     def add_dev_workflow(self, editors: Sequence[str] = ("cursor", "vscode", "vscode-insiders", "xcode")) -> None:
@@ -570,14 +609,15 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
         async with TaskGroup() as tg:
             try:
-                while item := await self._item_queue.get():
-                    tg.create_task(self.add_item(**cast(dict, item)))
+                while True:
+                    item = await self._item_queue.get()
+                    tg.create_task(self.add_item(**item))
             except asyncio.QueueShutDown:
                 pass
 
     async def builder(
         self,
-        *handlers: Callable[[Self], Coroutine[Any, Any, None]],
+        *handlers: Callable[[Self], Coroutine[object, object, None]],
         add_config: bool = True,
         cache: bool = True,
     ) -> Self:
@@ -605,31 +645,31 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         print(self.format_menu())
 
     @classmethod
-    @a.cache
-    async def cache_path(cls) -> AsyncPath:
-        cache_tail = AsyncPath("alfred/maxcare-menu.json")
-        if xdg_cache_home := os.environ.get("XDG_CACHE_HOME"):
-            return AsyncPath(xdg_cache_home) / cache_tail
-        elif await (cache_dir := HOME / ".cache").exists():
-            return cache_dir / cache_tail
-        else:
-            return AsyncPath("/tmp/") / cache_tail
+    async def cache_path(cls, name: str | None = None) -> AsyncPath:
+        return AsyncPath(fast_cache_path(name))
 
     @classmethod
-    async def read_cache(cls) -> Self | None:
-        cache_path = await cls.cache_path()
+    async def read_cache(cls, name: str | None = None) -> Self | None:
+        cache_path = await cls.cache_path(name)
         if await cache_path.exists() and (data := await cache_path.read_text()):
             try:
-                return cls.model_validate_json(data)
+                menu = AlfredMenu.model_validate_json(data)
+                return cls(cache_name=name, cache_ttl=menu.cache.seconds, menu_items=menu.items)
 
-            except (json.JSONDecodeError, ValidationError):
+            except ValidationError:
                 await cache_path.unlink()
         return None
 
     async def write_cache(self) -> None:
-        path = await self.cache_path()
+        path = AsyncPath(fast_cache_path(self.cache_name))
         await path.parent.mkdir(parents=True, exist_ok=True)
-        await path.write_text(self.format_menu())
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            await temporary.write_text(self.format_menu())
+            await temporary.replace(path)
+        finally:
+            await temporary.unlink(missing_ok=True)
 
+    @override
     def __str__(self) -> str:
         return self.format_menu()

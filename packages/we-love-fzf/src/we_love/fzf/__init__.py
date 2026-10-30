@@ -1,22 +1,19 @@
+"""Select typed values using the fzf executable."""
+
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable
-from typing import Literal, TypeVar, overload
+import subprocess
+from typing import TYPE_CHECKING, Literal, overload
 
-logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-_FmtT = Callable[[T], str]
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @overload
 def fzf_select[T](
     items: list[T],
     prompt: str = ...,
-    format_fn: _FmtT = ...,
+    format_fn: Callable[[T], str] = ...,
     height: int = ...,
     width: int = ...,
     many: Literal[False] = False,
@@ -28,59 +25,46 @@ def fzf_select[T](
 def fzf_select[T](
     items: list[T],
     prompt: str = ...,
-    format_fn: _FmtT = ...,
+    format_fn: Callable[[T], str] = ...,
     height: int = ...,
     width: int = ...,
     *,
-    many: bool = ...,
+    many: Literal[True],
     header: str | None = None,
 ) -> list[T] | None: ...
+
+
+@overload
+def fzf_select[T](
+    items: list[T],
+    prompt: str = ...,
+    format_fn: Callable[[T], str] = ...,
+    height: int = ...,
+    width: int = ...,
+    *,
+    many: bool,
+    header: str | None = None,
+) -> T | list[T] | None: ...
 
 
 def fzf_select[T](
     items: list[T],
     prompt: str = "Select an item: ",
-    format_fn: _FmtT = str,
+    format_fn: Callable[[T], str] = str,
     height: int = 40,
     width: int = 100,
     many: bool = False,
     header: str | None = None,
 ) -> T | list[T] | None:
-    """Select an item from a list using fzf.
-
-    Args:
-        items: List of items to select from
-        format_fn: Function to format items for display. Defaults to str.
-        height: Height of the fzf window. Defaults to 40.
-        width: Width of the fzf window. Defaults to 100.
-        many: Whether to allow multiple selections. Defaults to False.
-
-    Returns:
-        The selected item(s) or None if no selection was made
-    """
-    try:
-        import fzf
-
-        kwargs = {}
-        if header:
-            kwargs["header"] = header
-
-        return fzf.fzf_prompt(
-            items,
-            prompt_string=prompt,
-            multi=many,
-            processor=format_fn,
-            ansi=True,
-            escape_output=False,
-            **kwargs,
-        )
-
-    except RuntimeError:  # could not find fzf
-        from pzp import pzp
-
-        return pzp(
-            items,
-            format_fn=format_fn,
-            height=height,
-            prompt_str=prompt,
-        )
+    command = ["fzf", "--prompt", prompt, "--height", str(height), "--with-nth", "2..", "--delimiter", "\t"]
+    if many:
+        command.append("--multi")
+    if header is not None:
+        command.extend(("--header", header))
+    labels = [f"{index}\t{format_fn(item).replace(chr(10), ' ')}" for index, item in enumerate(items)]
+    result = subprocess.run(command, input="\n".join(labels), text=True, stdout=subprocess.PIPE, check=False)
+    if result.returncode in {1, 130} or not result.stdout.strip():
+        return None
+    result.check_returncode()
+    selected = [items[int(line.split("\t", 1)[0])] for line in result.stdout.splitlines()]
+    return selected if many else selected[0]

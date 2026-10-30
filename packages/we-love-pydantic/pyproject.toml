@@ -12,18 +12,16 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["stringcase", "pydantic>=2", "rich", "we-love-string"]
+dependencies = ["pydantic>=2", "rich", "we-love-string", "we-love-registry", "debugpy", "typing-extensions>=4.15"]
 
 [tool.uv.sources]
-we-love-string = { path = "../we-love-string" }
+we-love-string = { workspace = true }
+we-love-registry = { workspace = true }
 
 [tool.uv.build-backend]
 namespace   = true
 module-name = "we_love"
 
-[tool.pyright]
-venv     = ".venv"
-venvPath = "."
 
 [dependency-groups]
 dev = ["pytest>=9"]

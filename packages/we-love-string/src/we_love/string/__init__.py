@@ -23,10 +23,7 @@ def _to_camel_init_case(string: str, init_case: bool) -> str:
                 n += v.upper()
             else:
                 n += v
-        if v in {"_", " ", "-"}:
-            cap_next = True
-        else:
-            cap_next = False
+        cap_next = v in {"_", " ", "-"}
     return n
 
 
@@ -64,11 +61,7 @@ def _to_screaming_delimited(string: str, delimiter: str, screaming: bool) -> str
             n += delimiter
         else:
             n += v
-    if screaming:
-        n = n.upper()
-    else:
-        n = n.lower()
-    return n
+    return n.upper() if screaming else n.lower()
 
 
 def to_delimited(string: str, delimiter: str) -> str:

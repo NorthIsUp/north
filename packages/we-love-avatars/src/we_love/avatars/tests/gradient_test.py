@@ -63,7 +63,7 @@ def test_gradient_animation() -> None:
     frame2 = gradient.render(100, 100, frame=5, total_frames=10)
 
     # Frames should be different when animating
-    assert list(frame1.getdata()) != list(frame2.getdata())
+    assert list(frame1.get_flattened_data()) != list(frame2.get_flattened_data())
 
 
 def test_gradient_from_colors() -> None:
@@ -110,7 +110,7 @@ def test_gradient_smooth_loop() -> None:
     frame2 = gradient.render(100, 100, frame=15, total_frames=60)
 
     # Frames should be different when animating
-    assert list(frame1.getdata()) != list(frame2.getdata())
+    assert list(frame1.get_flattened_data()) != list(frame2.get_flattened_data())
 
 
 def test_gradient_wave() -> None:

@@ -5,8 +5,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated
 
-from pydantic import BaseModel, Extra, Field, conint
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 class ConsoleOutputStyle(Enum):
@@ -82,15 +83,16 @@ class LogLevel2(Enum):
     WARN = "WARN"
 
 
-class LogLevel(BaseModel):
-    __root__: conint(ge=0) | LogLevel1 | LogLevel2 = Field(..., description="A minimum log level. Can be level name or integer value.")
+class LogLevel(RootModel[Annotated[int, Field(ge=0)] | LogLevel1 | LogLevel2]):
+    root: Annotated[int, Field(ge=0)] | LogLevel1 | LogLevel2 = Field(
+        ..., description="A minimum log level. Can be level name or integer value."
+    )
 
 
 class IniOptions(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
-    addopts: list[str] | str | None = Field(None, description="Extra command line options to be added by default.")
+    addopts: list[str] | str | None = Field(default=None, description="Extra command line options to be added by default.")
     cache_dir: str | None = Field(
         ".pytest_cache",
         description="Sets directory for cache plugin. Can include environment variables.",
@@ -99,11 +101,13 @@ class IniOptions(BaseModel):
         False,
         description="Controls whether pytest attempts to identify namespace packages.",
     )
-    console_output_style: ConsoleOutputStyle | None = Field("progress", description="Sets console output style during test execution.")
-    doctest_encoding: str | None = Field(None, description="Sets default encoding for doctest files.")
-    doctest_optionflags: list[str] | str | None = Field(None, description="Specifies doctest flag names from the `doctest` module.")
+    console_output_style: ConsoleOutputStyle | None = Field(
+        default=ConsoleOutputStyle("progress"), description="Sets console output style during test execution."
+    )
+    doctest_encoding: str | None = Field(default=None, description="Sets default encoding for doctest files.")
+    doctest_optionflags: list[str] | str | None = Field(default=None, description="Specifies doctest flag names from the `doctest` module.")
     empty_parameter_set_mark: EmptyParameterSetMark | None = Field(
-        "skip",
+        default=EmptyParameterSetMark("skip"),
         description="Defines behavior for empty parameter sets in parameterization.",
     )
     faulthandler_timeout: int | None = Field(
@@ -114,18 +118,20 @@ class IniOptions(BaseModel):
         None,
         description="Sets action to take for matching warnings. Each item is a warning specification string.",
     )
-    junit_duration_report: JunitDurationReport | None = Field("total", description="Sets how to record test durations in JUnit XML report.")
-    junit_family: JunitFamily | None = Field("xunit2", description="Sets format of generated JUnit XML files.")
+    junit_duration_report: JunitDurationReport | None = Field(
+        default=JunitDurationReport("total"), description="Sets how to record test durations in JUnit XML report."
+    )
+    junit_family: JunitFamily | None = Field(default=JunitFamily("xunit2"), description="Sets format of generated JUnit XML files.")
     junit_logging: JunitLogging | None = Field(
-        "no",
+        default=JunitLogging("no"),
         description="Controls whether captured output is written to JUnit XML file.",
     )
     junit_log_passing_tests: bool | None = Field(
         True,
         description="If `junit_logging` is not 'no', controls whether to include output of passing tests.",
     )
-    junit_suite_name: str | None = Field(None, description="Sets name of root test suite in JUnit XML report.")
-    log_auto_indent: bool | conint(ge=0) | LogAutoIndent | None = Field(
+    junit_suite_name: str | None = Field(default=None, description="Sets name of root test suite in JUnit XML report.")
+    log_auto_indent: bool | Annotated[int, Field(ge=0)] | LogAutoIndent | None = Field(
         None,
         description="Allows selective auto-indentation of multiline log messages. Can be true, false, positive integer, 'On', or 'Off'.",
     )
@@ -134,7 +140,7 @@ class IniOptions(BaseModel):
         None,
         description="Sets date format for live logging using `time.strftime()` format.",
     )
-    log_cli_format: str | None = Field(None, description="Sets message format for live logging using `logging` format.")
+    log_cli_format: str | None = Field(default=None, description="Sets message format for live logging using `logging` format.")
     log_cli_level: LogLevel | None = Field(
         None,
         description="Sets minimum log level for live logging. Can be level name or integer value.",
@@ -143,12 +149,12 @@ class IniOptions(BaseModel):
         None,
         description="Sets date format for captured logging using `time.strftime()` format.",
     )
-    log_file: str | None = Field(None, description="Sets file path to write log messages to.")
+    log_file: str | None = Field(default=None, description="Sets file path to write log messages to.")
     log_file_date_format: str | None = Field(
         None,
         description="Sets date format for log file using `time.strftime()` format.",
     )
-    log_file_format: str | None = Field(None, description="Sets message format for log file using `logging` format.")
+    log_file_format: str | None = Field(default=None, description="Sets message format for log file using `logging` format.")
     log_file_level: LogLevel | None = Field(
         None,
         description="Sets minimum log level for log file. Can be level name or integer value.",
@@ -161,8 +167,8 @@ class IniOptions(BaseModel):
         None,
         description="Sets minimum log level for captured logging. Can be level name or integer value.",
     )
-    markers: list[str] | str | None = Field(None, description="Allows registering additional markers for test functions.")
-    minversion: str | None = Field(None, description="Specifies minimum required pytest version.")
+    markers: list[str] | str | None = Field(default=None, description="Allows registering additional markers for test functions.")
+    minversion: str | None = Field(default=None, description="Specifies minimum required pytest version.")
     norecursedirs: list[str] | str | None = Field(
         None,
         description="Sets base name patterns for directories to be skipped during test discovery. Uses fnmatch-style matching. Replaces default patterns.",
@@ -193,15 +199,15 @@ class IniOptions(BaseModel):
     )
     tmp_path_retention_count: int | None = Field(3, description="Number of sessions to retain `tmp_path` directories for.")
     tmp_path_retention_policy: TmpPathRetentionPolicy | None = Field(
-        "all",
+        default=TmpPathRetentionPolicy("all"),
         description="Controls which `tmp_path` directories to retain based on test outcome.",
     )
-    usefixtures: list[str] | str | None = Field(None, description="List of fixtures that will be applied to all test functions.")
-    verbosity_assertions: conint(ge=0) | VerbosityAssertions | None = Field(
+    usefixtures: list[str] | str | None = Field(default=None, description="List of fixtures that will be applied to all test functions.")
+    verbosity_assertions: Annotated[int, Field(ge=0)] | VerbosityAssertions | None = Field(
         None,
         description="Sets verbosity specific to assertion-related output. Can be integer or 'auto'.",
     )
-    verbosity_test_cases: conint(ge=0) | VerbosityTestCases | None = Field(
+    verbosity_test_cases: Annotated[int, Field(ge=0)] | VerbosityTestCases | None = Field(
         None,
         description="Sets verbosity specific to test case execution output. Can be integer or 'auto'.",
     )
@@ -212,15 +218,14 @@ class IniOptions(BaseModel):
 
 
 class IniOptionsAsyncio(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra="allow")
 
     asyncio_default_fixture_loop_scope: AsyncioScope | None = Field(
         None,
         description="Default event loop scope of asynchronous fixtures. When this configuration option is unset, it defaults to the fixture scope. In future versions of pytest-asyncio, the value will default to function when unset",
     )
     asyncio_default_test_loop_scope: AsyncioScope | None = Field(
-        "function",
+        default=AsyncioScope("function"),
         description="Default event loop scope of asynchronous tests. When this configuration option is unset, it default to function scope",
     )
     asyncio_mode: str | None = Field("strict", description="Sets the asyncio mode for pytest-asyncio.")
@@ -231,8 +236,7 @@ class IniOptionsModel(IniOptions, IniOptionsAsyncio):
 
 
 class Model(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     ini_options: IniOptionsModel | None = Field(
         None,

@@ -45,7 +45,6 @@ def example_deterministic_vs_random() -> None:
 
     seed = "compare"
 
-    # Deterministic (default)
     print("1. Deterministic (same seed = same loop):")
     config1 = avatar(seed)
     config2 = avatar(seed)

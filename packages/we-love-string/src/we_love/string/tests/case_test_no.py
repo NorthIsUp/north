@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
+from pydantic import RootModel
 from we_love.string.case import (
     alphanumcase,
     backslashcase,
@@ -20,9 +19,6 @@ from we_love.string.case import (
     trimcase,
     uppercase,
 )
-
-if TYPE_CHECKING:
-    from pytest import FixtureRequest
 
 # --- Test Data ---
 # Input string variations
@@ -90,8 +86,9 @@ TEST_STRINGS = [
         )
     )
 )
-def camelcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def camelcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -128,8 +125,9 @@ def camelcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def capitalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def capitalcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -166,8 +164,9 @@ def capitalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def constcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def constcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -204,8 +203,9 @@ def constcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def lowercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def lowercase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -242,8 +242,9 @@ def lowercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def pascalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def pascalcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -280,8 +281,9 @@ def pascalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def pathcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def pathcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -318,8 +320,9 @@ def pathcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def backslashcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def backslashcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -358,8 +361,9 @@ def backslashcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def sentencecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def sentencecase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -396,8 +400,9 @@ def sentencecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def snakecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def snakecase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -434,8 +439,9 @@ def snakecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def spinalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def spinalcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -472,8 +478,9 @@ def spinalcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def dotcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def dotcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -510,8 +517,9 @@ def dotcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def titlecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def titlecase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -548,8 +556,9 @@ def titlecase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def trimcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def trimcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -586,8 +595,9 @@ def trimcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def uppercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def uppercase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 @pytest.fixture(
@@ -624,8 +634,9 @@ def uppercase_scenarios(request: FixtureRequest) -> tuple[str, str]:
         )
     )
 )
-def alphanumcase_scenarios(request: FixtureRequest) -> tuple[str, str]:
-    return request.param
+def alphanumcase_scenarios(request: pytest.FixtureRequest) -> tuple[str, str]:
+    value: object = request.param
+    return RootModel[tuple[str, str]].model_validate(value).root
 
 
 # --- Test Functions ---
@@ -699,7 +710,6 @@ def test_titlecase(titlecase_scenarios: tuple[str, str]) -> None:
     # -> split -> ["string", "with", "", "", "", "", "", "", "", "", "", "symbols"]
     # -> title -> "String With           Symbols" (multiple spaces preserved)
     # if input_str == "String with !@#$%^&*()_+ symbols":
-    #     expected = "String With Symbols"  # Corrected expectation
     assert titlecase(input_str) == expected
 
 

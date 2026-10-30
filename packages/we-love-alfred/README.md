@@ -1,0 +1,56 @@
+# Fast Alfred Script Filters
+
+Use Python 3.15 or newer. Keep the cached entry point separate from the full
+builder: subclassing `AlfredWorkflow` loads Pydantic even with lazy imports.
+
+A small entry script can serve cached results without loading Pydantic or HTTPX:
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.15"
+# dependencies = ["we-love-alfred"]
+# ///
+import sys
+from pathlib import Path
+
+from we_love.alfred.fast import serve
+
+__lazy_modules__ = ("builder",)
+from builder import main
+
+if not serve(" ".join(sys.argv[1:]), script=Path(__file__).with_name("builder.py")):
+    main()
+```
+
+`builder.py` is a regular Python module using the same interpreter and installed
+dependencies as the entry script. Its `main()` should build and print the menu.
+When launched with `--no-cache`, it must rebuild instead of reading the cache.
+The detached refresh uses `sys.executable`, passes arguments directly without a
+shell, and sets `PYDANTIC_DISABLE_PLUGINS=__all__` in the child environment.
+Only use that setting when the builder does not need Pydantic plugins.
+
+`serve()` returns `False` for a missing, malformed, or unreadable cache. For a
+valid cache it filters each query token as a case-insensitive subsequence of the
+item's `match` value, falling back to `title`, prints the result, and returns
+`True`. It omits Alfred's `cache` field from filtered responses so Alfred cannot
+reuse one query's results for another query. It keeps serving stale data while
+refreshing; the `.refresh.pid` file throttles attempts to once per minute,
+including failed launches. A file lock prevents simultaneous launches.
+
+Caches live under `$XDG_CACHE_HOME/alfred/`, otherwise `~/.cache/alfred/` when
+`~/.cache` exists, otherwise the system temporary directory's `alfred/` folder.
+The filename uses `alfred_workflow_bundleid`; outside Alfred the compatibility
+fallback is `maxcare-menu.json`. Use `serve(name="my-workflow")` with
+`AlfredWorkflow(cache_name="my-workflow")` and
+`AlfredWorkflow.read_cache("my-workflow")` to select a name explicitly.
+The builder's clear-cache action uses the same cache and refresh marker paths.
+
+Both the fast writer and the builder replace completed cache files atomically.
+The fast path validates the menu envelope and item titles with the stdlib;
+the full builder validates the complete menu with Pydantic.
+
+Do not add `--refresh-package` to a Script Filter shebang: it reinstalls the
+package on every keystroke. Use it once from a terminal after changing a local
+package. HTTPX and editor discovery are lazy imports; favicon discovery uses
+async HTTPX without `favicon`, Requests, or Beautiful Soup.

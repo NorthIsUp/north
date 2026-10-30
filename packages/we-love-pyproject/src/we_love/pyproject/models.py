@@ -5,137 +5,50 @@ Pydantic models for pyproject.toml file structure with TOML serialization suppor
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Self, overload
+from typing import Self, TypedDict, Unpack, override
 
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_serializer
-from tomlkit.container import Container
-from tomlkit.items import Null
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, RootModel, ValidationError
+from tomlkit.exceptions import TOMLKitError
+from tomlkit.items import Table
 
-if TYPE_CHECKING:
-    from pydantic_core.core_schema import SerializerFunctionWrapHandler
+
+class TomlDumpOptions(TypedDict, total=False):
+    exclude_none: bool
+    exclude_unset: bool
+    exclude_defaults: bool
+    by_alias: bool
 
 
 class TomlSerializableModel(BaseModel):
-    """Base model with TOML serialization capabilities."""
+    """Models with an explicit TOML serialization boundary."""
 
-    # Accept population by field name and alias across all models
-    model_config = ConfigDict(populate_by_name=True)
-
-    @model_serializer(mode="wrap", when_used="always")
-    def _serialize(self, serializer: SerializerFunctionWrapHandler, info) -> Any:
-        """
-        Custom serializer that supports TOML output via context.
-
-        Note: Return type is Any to avoid Pydantic schema generation errors.
-        Actual return types:
-            - Container if context={'format': 'toml'}
-            - dict[str, Any] otherwise
-        """
-        # Get the default serialized data (with aliases)
-        data = serializer(self)
-
-        # Check if we should return TOML structures
-        if info.context and info.context.get("format") == "toml":
-            return self._convert_to_toml(data)
-
-        return data
-
-    # Overloaded model_dump for better type hints
-    @overload
-    def model_dump(
-        self,
-        *,
-        context: dict[Literal["format"], Literal["toml"]],
-        by_alias: bool = True,
-        **kwargs: Any,
-    ) -> Container: ...
-
-    @overload
-    def model_dump(
-        self,
-        *,
-        context: None = None,
-        by_alias: bool = False,
-        **kwargs: Any,
-    ) -> dict[str, Any]: ...
-
-    def model_dump(
-        self,
-        *,
-        context: dict[str, str] | None = None,
-        by_alias: bool = False,
-        **kwargs: Any,
-    ) -> dict[str, Any] | Container:
-        """
-        Dump model to dict or tomlkit Container based on context.
-
-        Args:
-            context: If {'format': 'toml'}, returns Container, otherwise dict
-            by_alias: Use field aliases in output
-            **kwargs: Additional arguments passed to BaseModel.model_dump
-
-        Returns:
-            Container if context={'format': 'toml'}, otherwise dict[str, Any]
-        """
-        return super().model_dump(context=context, by_alias=by_alias, **kwargs)
-
-    def _convert_to_toml(self, data: dict[str, Any]) -> Container:
-        """Convert a dict to tomlkit Container recursively."""
-        table = tomlkit.table()
-        for key, value in data.items():
-            table[key] = self._value_to_toml(value)
-        return table
-
-    def _value_to_toml(self, value: Any) -> Any:
-        """Convert a value to appropriate tomlkit type."""
-        match value:
-            case dict():
-                table = tomlkit.table()
-                for k, v in value.items():
-                    table[k] = self._value_to_toml(v)
-                return table
-            case list() | tuple() | set() | frozenset():
-                array = tomlkit.array()
-                array.extend([self._value_to_toml(v) for v in value])
-                return array
-            case None:
-                return Null()
-            case _:
-                return value
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     def model_dump_toml(
         self,
         target_document: tomlkit.TOMLDocument | None = None,
         drop_none: bool = True,
-        **kwargs: Any,
+        **kwargs: Unpack[TomlDumpOptions],
     ) -> tomlkit.TOMLDocument:
-        """Dump the model to TOML document using tomlkit."""
-        # Use model_dump with context to trigger TOML serialization
-        data = self.model_dump(
-            by_alias=True,
-            exclude_none=drop_none,
-            mode="python",
-            context={"format": "toml"},
-            **kwargs,
-        )
-
-        # Create or update target document
-        target_document = target_document or tomlkit.document()
-        if isinstance(data, Container):
-            target_document.update(data)
-        else:
-            # Fallback if serializer didn't return Container
-            for key, value in data.items():
-                target_document[key] = value
-
-        return target_document
+        options: TomlDumpOptions = {"exclude_none": drop_none, "by_alias": True, **kwargs}
+        data = RootModel[dict[str, JsonValue]].model_validate(self.model_dump(mode="json", **options)).root
+        document = target_document if target_document is not None else tomlkit.document()
+        for key, value in data.items():
+            if value is not None:
+                document.add(key, value)
+        if isinstance(self, UvWorkspacePyProjectToml) and self.tool is not None and self.tool.uv is not None:
+            uv_document = self.tool.uv.model_dump_toml(drop_none=drop_none, **kwargs)
+            tool_value = document["tool"]
+            if isinstance(tool_value, Table):
+                tool_value["uv"] = uv_document
+        return document
 
 
 class BuildSystem(TomlSerializableModel):
     """Build system configuration."""
 
-    build_backend: str = Field(alias="build-backend")
+    build_backend: str = Field(validation_alias="build-backend", serialization_alias="build-backend")
     requires: list[str]
     dependency_groups: DependencyGroup | None = None
 
@@ -152,15 +65,15 @@ class DependencyGroup(TomlSerializableModel):
 class RuffConfig(TomlSerializableModel):
     """Ruff configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    target_version: str = Field(alias="target-version")
+    target_version: str = Field(validation_alias="target-version", serialization_alias="target-version")
 
 
 class RuffLintConfig(TomlSerializableModel):
     """Ruff lint configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     extend_select: list[str] | None = None
     ignore: list[str] | None = None
@@ -169,9 +82,9 @@ class RuffLintConfig(TomlSerializableModel):
 class RuffTool(TomlSerializableModel):
     """Ruff tool configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    target_version: str = Field(alias="target-version")
+    target_version: str = Field(validation_alias="target-version", serialization_alias="target-version")
     lint: RuffLintConfig | None = None
 
 
@@ -185,7 +98,7 @@ class PytestMarker(TomlSerializableModel):
 class PytestIniOptions(TomlSerializableModel):
     """Pytest ini options configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     minversion: str | None = None
     addopts: list[str] | None = None
@@ -199,7 +112,7 @@ class PytestIniOptions(TomlSerializableModel):
 class PytestTool(TomlSerializableModel):
     """Pytest tool configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     ini_options: PytestIniOptions | None = None
 
@@ -207,32 +120,42 @@ class PytestTool(TomlSerializableModel):
 class ToolPyright(TomlSerializableModel):
     """Pyright tool configuration (tool.pyright)."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     include: list[str] | None = None
     exclude: list[str] | None = None
     ignore: list[str] | None = None
     strict: list[str] | None = None
-    venv_path: str | None = Field(None, alias="venvPath")
+    venv_path: str | None = Field(default=None, validation_alias="venvPath", serialization_alias="venvPath")
     venv: str | None = None
-    python_version: str | None = Field(None, alias="pythonVersion")
-    python_platform: str | None = Field(None, alias="pythonPlatform")
-    type_checking_mode: str | None = Field(None, alias="typeCheckingMode")
-    use_library_code_for_types: bool | None = Field(None, alias="useLibraryCodeForTypes")
-    report_missing_imports: str | None = Field(None, alias="reportMissingImports")
-    report_missing_type_stubs: str | None = Field(None, alias="reportMissingTypeStubs")
-    report_unused_import: str | None = Field(None, alias="reportUnusedImport")
-    report_unused_variable: str | None = Field(None, alias="reportUnusedVariable")
-    report_duplicate_import: str | None = Field(None, alias="reportDuplicateImport")
+    python_version: str | None = Field(default=None, validation_alias="pythonVersion", serialization_alias="pythonVersion")
+    python_platform: str | None = Field(default=None, validation_alias="pythonPlatform", serialization_alias="pythonPlatform")
+    type_checking_mode: str | None = Field(default=None, validation_alias="typeCheckingMode", serialization_alias="typeCheckingMode")
+    use_library_code_for_types: bool | None = Field(
+        default=None, validation_alias="useLibraryCodeForTypes", serialization_alias="useLibraryCodeForTypes"
+    )
+    report_missing_imports: str | None = Field(
+        default=None, validation_alias="reportMissingImports", serialization_alias="reportMissingImports"
+    )
+    report_missing_type_stubs: str | None = Field(
+        default=None, validation_alias="reportMissingTypeStubs", serialization_alias="reportMissingTypeStubs"
+    )
+    report_unused_import: str | None = Field(default=None, validation_alias="reportUnusedImport", serialization_alias="reportUnusedImport")
+    report_unused_variable: str | None = Field(
+        default=None, validation_alias="reportUnusedVariable", serialization_alias="reportUnusedVariable"
+    )
+    report_duplicate_import: str | None = Field(
+        default=None, validation_alias="reportDuplicateImport", serialization_alias="reportDuplicateImport"
+    )
 
 
 class UvBuildBackend(TomlSerializableModel):
     """UV build backend configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     namespace: bool | None = None
-    module_root: str | None = Field(None, alias="module-root")
+    module_root: str | None = Field(default=None, validation_alias="module-root", serialization_alias="module-root")
 
 
 class UvWorkspace(TomlSerializableModel):
@@ -340,29 +263,32 @@ class Package(TomlSerializableModel):
 class UvTool(TomlSerializableModel):
     """UV tool configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    build_backend: UvBuildBackend | None = Field(None, alias="build-backend")
+    build_backend: UvBuildBackend | None = Field(default=None, validation_alias="build-backend", serialization_alias="build-backend")
     workspace: UvWorkspace | None = None
     sources: dict[str, UvSource] | None = None
 
     @property
-    def _sources(self) -> dict[str, UvSource]:
+    def ensure_sources(self) -> dict[str, UvSource]:
         self.sources = self.sources or {}
         return self.sources
 
     @property
-    def _workspace(self) -> UvWorkspace:
+    def ensure_workspace(self) -> UvWorkspace:
         self.workspace = self.workspace or UvWorkspace(members=[])
         return self.workspace
 
-    def model_dump_toml(self, target_document: tomlkit.TOMLDocument | None = None, **kwargs: Any) -> tomlkit.TOMLDocument:
+    @override
+    def model_dump_toml(
+        self, target_document: tomlkit.TOMLDocument | None = None, drop_none: bool = True, **kwargs: Unpack[TomlDumpOptions]
+    ) -> tomlkit.TOMLDocument:
         """Dump TOML ensuring [tool.uv.sources] uses inline tables per entry."""
         # Call super to get the base serialization
-        result = super().model_dump_toml(target_document, **kwargs)
+        result = super().model_dump_toml(target_document, drop_none, **kwargs)
 
         # Do our work: format sources as inline tables
-        if self.sources:
+        if self.sources is not None:
             sources_table = tomlkit.table()
             for pkg_name, source_cfg in sorted(self.sources.items()):
                 inline = tomlkit.inline_table()
@@ -383,7 +309,7 @@ class Tool(TomlSerializableModel):
     uv: UvTool | None = None
 
     @property
-    def _uv(self) -> UvTool:
+    def ensure_uv(self) -> UvTool:
         self.uv = self.uv or UvTool()
         return self.uv
 
@@ -391,32 +317,38 @@ class Tool(TomlSerializableModel):
 class Project(TomlSerializableModel):
     """Project configuration."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     name: str
     version: str
     description: str | None = None
-    requires_python: str | None = Field(None, alias="requires-python")
+    requires_python: str | None = Field(default=None, validation_alias="requires-python", serialization_alias="requires-python")
     dependencies: list[str] | None = None
-    optional_dependencies: dict[str, list[str]] | None = Field(None, alias="optional-dependencies")
+    optional_dependencies: dict[str, list[str]] | None = Field(
+        default=None, validation_alias="optional-dependencies", serialization_alias="optional-dependencies"
+    )
     authors: list[dict[str, str]] | None = None
     maintainers: list[dict[str, str]] | None = None
     keywords: list[str] | None = None
     classifiers: list[str] | None = None
     urls: dict[str, str] | None = None
     scripts: dict[str, str] | None = None
-    gui_scripts: dict[str, str] | None = Field(None, alias="gui-scripts")
-    entry_points: dict[str, dict[str, str]] | None = Field(None, alias="entry-points")
+    gui_scripts: dict[str, str] | None = Field(default=None, validation_alias="gui-scripts", serialization_alias="gui-scripts")
+    entry_points: dict[str, dict[str, str]] | None = Field(
+        default=None, validation_alias="entry-points", serialization_alias="entry-points"
+    )
 
 
 class PyProjectToml(TomlSerializableModel):
     """Complete pyproject.toml file structure."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    build_system: BuildSystem | None = Field(None, alias="build-system")
+    build_system: BuildSystem | None = Field(default=None, validation_alias="build-system", serialization_alias="build-system")
     project: Project | None = None
-    dependency_groups: DependencyGroup | None = Field(None, alias="dependency-groups")
+    dependency_groups: DependencyGroup | None = Field(
+        default=None, validation_alias="dependency-groups", serialization_alias="dependency-groups"
+    )
     tool: Tool | None = None
 
     @classmethod
@@ -431,7 +363,7 @@ class PyProjectToml(TomlSerializableModel):
         return cls.model_validate(data)
 
     @property
-    def _tool(self) -> Tool:
+    def ensure_tool(self) -> Tool:
         self.tool = self.tool or Tool()
         return self.tool
 
@@ -453,19 +385,20 @@ class UvWorkspacePyProjectToml(PyProjectToml):
 
     def get_workspace_sources(self) -> dict[str, UvSource]:
         """Get workspace sources from uv.sources."""
-        if not self.tool or not self.tool.uv or not self.tool.uv.sources:
+        if not self.tool or not self.tool.uv or self.tool.uv.sources is None:
             return {}
         return self.tool.uv.sources
 
     def add_workspace_member(self, member: str) -> None:
         """Add a workspace member."""
-        if member not in self._tool._uv._workspace.members:
-            self.tool.uv.workspace.members.append(member)
-            self.tool.uv.workspace.members.sort()
+        workspace = self.ensure_tool.ensure_uv.ensure_workspace
+        if member not in workspace.members:
+            workspace.members.append(member)
+            workspace.members.sort()
 
     def add_workspace_source(self, package_name: str, source: UvSource) -> None:
         """Add a workspace source."""
-        self._tool._uv._sources[package_name] = source
+        self.ensure_tool.ensure_uv.ensure_sources[package_name] = source
 
     def remove_workspace_member(self, member: str) -> None:
         """Remove a workspace member."""
@@ -474,7 +407,7 @@ class UvWorkspacePyProjectToml(PyProjectToml):
 
     def remove_workspace_source(self, package_name: str) -> None:
         """Remove a workspace source."""
-        if self.tool and self.tool.uv and self.tool.uv.sources and package_name in self.tool.uv.sources:
+        if self.tool and self.tool.uv and self.tool.uv.sources is not None and package_name in self.tool.uv.sources:
             del self.tool.uv.sources[package_name]
 
 
@@ -501,5 +434,5 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         print("❌ pyproject.toml not found in current directory")
-    except (ValidationError, tomlkit.exceptions.TOMLKitError) as e:
+    except (ValidationError, TOMLKitError) as e:
         print(f"❌ Error: {e}")

@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Extra, Field, constr
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
-class PackageName(BaseModel):
-    __root__: str = Field(
+class PackageName(RootModel[str]):
+    root: str = Field(
         ...,
         description="Valid package name (importable or :pep:`561`).",
         title="Valid package name",
@@ -16,22 +18,19 @@ class PackageName(BaseModel):
 
 
 class FileDirective(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     file: str | list[str]
 
 
 class AttrDirective(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     attr: str
 
 
 class Find(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     where: list[str] | None = Field(
         None,
@@ -52,8 +51,7 @@ class Find(BaseModel):
 
 
 class FindDirective1(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     find: Find | None = Field(
         None,
@@ -65,13 +63,12 @@ class FileDirectiveForDependencies(FileDirective):
     pass
 
 
-class File(BaseModel):
-    __root__: str | list[str]
+class File(RootModel[str | list[str]]):
+    root: str | list[str]
 
 
 class FindDirective(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     find: Find | None = Field(
         None,
@@ -80,16 +77,14 @@ class FindDirective(BaseModel):
 
 
 class Readme(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
-    content_type: str | None = Field(None, alias="content-type")
+    content_type: str | None = Field(default=None, alias="content-type")
     file: File
 
 
 class Dynamic(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     version: AttrDirective | FileDirective | None = Field(
         None,
@@ -97,15 +92,16 @@ class Dynamic(BaseModel):
     )
     classifiers: FileDirective | None = None
     description: FileDirective | None = None
-    entry_points: FileDirective | None = Field(None, alias="entry-points")
+    entry_points: FileDirective | None = Field(default=None, alias="entry-points")
     dependencies: FileDirectiveForDependencies | None = None
-    optional_dependencies: dict[constr(regex=r".+"), FileDirectiveForDependencies] | None = Field(None, alias="optional-dependencies")
+    optional_dependencies: dict[Annotated[str, Field(pattern=".+")], FileDirectiveForDependencies] | None = Field(
+        default=None, alias="optional-dependencies"
+    )
     readme: FileDirective | Readme | None = None
 
 
 class ToolSetuptoolsTable(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     platforms: list[str] | None = None
     provides: list[str] | None = Field(
@@ -135,12 +131,12 @@ class ToolSetuptoolsTable(BaseModel):
         None,
         description="Packages that should be included in the distribution. It can be given either as a list of package identifiers or as a ``dict``-like structure with a single key ``find`` which corresponds to a dynamic call to ``setuptools.config.expand.find_packages`` function. The ``find`` key is associated with a nested ``dict``-like structure that can contain ``where``, ``include``, ``exclude`` and ``namespaces`` keys, mimicking the keyword arguments of the associated function.",
     )
-    package_dir: dict[constr(regex=r"^.*$"), str] | None = Field(
+    package_dir: dict[Annotated[str, Field(pattern="^.*$")], str] | None = Field(
         None,
         alias="package-dir",
         description=":class:`dict`-like structure mapping from package names to directories where their code can be found. The empty string (as key) means that all packages are contained inside the given directory will be included in the distribution.",
     )
-    package_data: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
+    package_data: dict[Annotated[str, Field(pattern="^.*$")], list[str]] | None = Field(
         None,
         alias="package-data",
         description="Mapping from package names to lists of glob patterns. Usually this option is not needed when using ``include-package-data = true`` For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
@@ -150,7 +146,7 @@ class ToolSetuptoolsTable(BaseModel):
         alias="include-package-data",
         description="Automatically include any data files inside the package directories that are specified by ``MANIFEST.in`` For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    exclude_package_data: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
+    exclude_package_data: dict[Annotated[str, Field(pattern="^.*$")], list[str]] | None = Field(
         None,
         alias="exclude-package-data",
         description="Mapping from package names to lists of glob patterns that should be excluded For more information on how to include data files, check ``setuptools`` `docs <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
@@ -160,13 +156,13 @@ class ToolSetuptoolsTable(BaseModel):
         alias="namespace-packages",
         description="**DEPRECATED**: use implicit namespaces instead (:pep:`420`).",
     )
-    py_modules: list[str] | None = Field(None, alias="py-modules", description="Modules that setuptools will manipulate")
-    data_files: dict[constr(regex=r"^.*$"), list[str]] | None = Field(
+    py_modules: list[str] | None = Field(default=None, alias="py-modules", description="Modules that setuptools will manipulate")
+    data_files: dict[Annotated[str, Field(pattern="^.*$")], list[str]] | None = Field(
         None,
         alias="data-files",
         description="``dict``-like structure where each key represents a directory and the value is a list of glob patterns that should be installed in them. **DISCOURAGED**: please notice this might not work as expected with wheels. Whenever possible, consider using data files inside the package directories (or create a new namespace package that only contains data files). See `data files support <https://setuptools.pypa.io/en/latest/userguide/datafiles.html>`_.",
     )
-    cmdclass: dict[constr(regex=r"^.*$"), str] | None = Field(
+    cmdclass: dict[Annotated[str, Field(pattern="^.*$")], str] | None = Field(
         None,
         description='Mapping of distutils-style command names to ``setuptools.Command`` subclasses which in turn should be represented by strings with a qualified class name (i.e., "dotted" form with module), e.g.::\n\n     cmdclass = {mycmd = "pkg.subpkg.module.CommandClass"}\n\n The command class should be a directly defined at the top-level of the containing module (no class nesting).',
     )

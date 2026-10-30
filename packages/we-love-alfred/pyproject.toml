@@ -2,8 +2,8 @@
 name            = "we-love-alfred"
 version         = "0.5.9"
 description     = "help make alfred commands nice for we-love namespace"
-requires-python = ">=3.13"
-dependencies    = ["favicon", "pydantic>=2", "httpx", "anyio", "asyncstdlib"]
+requires-python = ">=3.15"
+dependencies    = ["pydantic>=2", "httpx", "anyio", "asyncstdlib"]
 
 [build-system]
 requires      = ["uv_build>=0.8,<0.9"]
@@ -13,9 +13,6 @@ build-backend = "uv_build"
 namespace   = true
 module-name = "we_love"
 
-[tool.pyright]
-venv     = ".venv"
-venvPath = "."
 
 [dependency-groups]
 dev = ["pytest>=9"]

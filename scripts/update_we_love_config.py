@@ -16,29 +16,29 @@ and create new namespaced packages.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from textwrap import dedent
+from typing import override
 
 import click
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich.traceback import install as install_traceback
-from we_love.pyproject.models import Package, PyProjectToml, ToolPyright, UvSource
+from we_love.pyproject.models import Package, Tool, ToolPyright, UvSource, UvWorkspacePyProjectToml
 
 console = Console()
 install_traceback(show_locals=True)
 
 
-@dataclass
-class WeLoveWorkspaceManager:
+class WeLoveWorkspaceManager(BaseModel):
     """Manage we_love workspace packages and pyproject configuration."""
 
-    root: Path = field(default_factory=Path.cwd)
-    packages: list[Package] = field(default_factory=list)
+    root: Path = Field(default_factory=Path.cwd)
+    packages: list[Package] = Field(default_factory=list[Package])
 
     @cached_property
     def packages_dir(self) -> Path:
@@ -49,16 +49,17 @@ class WeLoveWorkspaceManager:
         return self.root / "pyproject.toml"
 
     @cached_property
-    def workspace_pyproject(self) -> PyProjectToml:
+    def workspace_pyproject(self) -> UvWorkspacePyProjectToml:
         """Loaded root pyproject.toml for the workspace."""
-        return PyProjectToml.from_file(self.workspace_config_path)
+        return UvWorkspacePyProjectToml.from_file(self.workspace_config_path)
 
     @cached_property
     def workspace_file_path(self) -> Path:
         """Path to the we_love.code-workspace file."""
         return self.root / "we-love.code-workspace"
 
-    def __post_init__(self) -> None:
+    @override
+    def model_post_init(self, context: object) -> None:
         self.scan_packages()
 
     def scan_packages(self) -> list[Package]:
@@ -124,13 +125,13 @@ class WeLoveWorkspaceManager:
         pyproject = self.workspace_pyproject
 
         member_paths = {f"packages/{pkg.path.name}" for pkg in self.packages}
-        uv_workspace = pyproject._tool._uv._workspace
+        uv_workspace = pyproject.ensure_tool.ensure_uv.ensure_workspace
         uv_workspace.members = sorted(member_paths)
 
-        uv_tool = pyproject._tool._uv
+        uv_tool = pyproject.ensure_tool.ensure_uv
         uv_tool.sources = {}
         for pkg in self.packages:
-            uv_tool._sources[pkg.name] = UvSource(workspace=True)
+            uv_tool.ensure_sources[pkg.name] = UvSource(workspace=True)
 
         pyproject.write(self.workspace_config_path)
 
@@ -144,7 +145,7 @@ class WeLoveWorkspaceManager:
 
         # Load existing workspace file
         try:
-            with open(self.workspace_file_path) as f:
+            with Path(self.workspace_file_path).open(encoding="utf-8") as f:
                 workspace_data = json.load(f)
         except Exception as e:
             console.print(f"[red]❌ Error reading {self.workspace_file_path}: {e}[/red]")
@@ -186,7 +187,7 @@ class WeLoveWorkspaceManager:
 
         # Write the updated workspace file
         try:
-            with open(self.workspace_file_path, "w") as f:
+            with Path(self.workspace_file_path).open("w", encoding="utf-8") as f:
                 json.dump(workspace_data, f, indent="\t")
 
             console.print(f"[green]✅ Updated {self.workspace_file_path} with {len(folders)} folders and exclusion patterns[/green]")
@@ -204,8 +205,6 @@ class WeLoveWorkspaceManager:
             if pkg.pyproject.tool is None or pkg.pyproject.tool.pyright is None:
                 # Ensure tool section exists
                 if pkg.pyproject.tool is None:
-                    from we_love.pyproject.models import Tool
-
                     pkg.pyproject.tool = Tool()
 
                 # Add pyright configuration
@@ -235,23 +234,23 @@ def update_workspace_config(packages: list[Package]) -> None:
         return
 
     # Load with models
-    pyproject = PyProjectToml.from_file(workspace_config_path)
+    pyproject = UvWorkspacePyProjectToml.from_file(workspace_config_path)
 
     # Build members list
     member_paths = {f"packages/{pkg.path.name}" for pkg in packages}
 
     # Ensure tool/uv/workspace exists and set members
-    uv_workspace = pyproject._tool._uv._workspace
+    uv_workspace = pyproject.ensure_tool.ensure_uv.ensure_workspace
     uv_workspace.members = sorted(member_paths)
 
     # Rebuild sources as inline tables (workspace = true)
-    uv_tool = pyproject._tool._uv
+    uv_tool = pyproject.ensure_tool.ensure_uv
     uv_tool.sources = {}
     for pkg in packages:
         uv_tool.sources[pkg.name] = UvSource(workspace=True)
 
     # Write back to file
-    pyproject.to_file(workspace_config_path)
+    pyproject.write(workspace_config_path)
 
     console.print(f"[green]✅ Updated {workspace_config_path} workspace members and sources[/green]")
 

@@ -1,32 +1,21 @@
 from __future__ import annotations
 
-import logging
-from typing import Any, ClassVar, cast
+from typing import ClassVar, override
 
-from pydantic._internal._model_construction import ModelMetaclass
-
-logger = logging.getLogger(__name__)
+from pydantic._internal._model_construction import ModelMetaclass  # ruff: ignore[import-private-name] -- Pydantic has no public model metaclass.
 
 
-class Singleton[T: Singleton](ModelMetaclass, type):
-    _instances: ClassVar[dict[type[Singleton[T]], Singleton[T]]] = {}
+class Singleton(ModelMetaclass):
+    """Cache model instances while exposing fresh construction for tests."""
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> T:
-        """
-        "usual" way of creating a new class instance.
+    _instances: ClassVar[dict[Singleton, object]] = {}
 
-        We override this to make sure we always return the same instance, if you
-        truly need a new instance use the new_instance() method
-        """
-        cls = cast(type[Singleton[T]], cls)
-        if cls not in cls._instances:
-            cls._instances[cls] = cls.new_instance(*args, **kwargs)
-        return cast(T, cls._instances[cls])
+    @override
+    def __call__(self, *args: object, **kwargs: object) -> object:
+        if self not in self._instances:
+            self._instances[self] = self.new_instance(*args, **kwargs)
+        return self._instances[self]
 
-    def new_instance(cls, *args: Any, **kwargs: Any) -> T:
-        """
-        Create a new instance of the singleton.
-
-        This is useful for testing.
-        """
-        return super().__call__(*args, **kwargs)
+    def new_instance(self, *args: object, **kwargs: object) -> object:
+        value: object = super().__call__(*args, **kwargs)
+        return value

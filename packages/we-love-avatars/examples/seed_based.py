@@ -1,6 +1,6 @@
 """Seed-based avatar generation examples."""
 
-from we_love.avatars import Avatar, avatar
+from we_love.avatars import Avatar, AvatarGeneratorConfig, avatar
 
 
 def example_simple_api() -> None:
@@ -66,7 +66,6 @@ def example_variations() -> None:
 
 def example_with_custom_config() -> None:
     """Use custom generator config for specific needs."""
-    from we_love.avatars import AvatarGeneratorConfig
 
     print("\nGenerating with custom config...")
 

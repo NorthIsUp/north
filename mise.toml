@@ -1,7 +1,7 @@
 [tools]
 pkl        = "latest"
 pre-commit = "latest"
-python     = "3.13"
+python     = "3.15"
 uv         = "latest"
 hk         = "latest"
 ruff       = "latest"
@@ -15,21 +15,11 @@ UV_PREVIEW = "1"
 
 [tasks.uv-sync]
 description = "Sync uv workspace"
-run = """#!/usr/bin/env zsh
-for file in packages/*/pyproject.toml ; do
-    pdir=${file:h}
-    [[ -d $pdir ]] || exit 1
-    print -Pu2 "%F{blue}+> syncing ${pdir:t}...%f"
-    uv sync --directory ${pdir} --color=always 2>&1 | awk '{print "  "$0}' || {
-        print -Pu2 "%F{red}+> uv sync failled, cleaning%f"
-        rm -rf ${pdir}/.venv
-    }
-done
-"""
+run = "uv sync --all-packages"
 
 [tasks.test]
 description = "Run ALL tests (including broken ones)"
-run         = "uv run pytest"
+run         = "uv run --all-packages pytest"
 
 [tasks.test-package]
 description = "Run tests for a specific package (e.g., mise run test-package we-love-matchbox)"
@@ -193,31 +183,9 @@ patterns = ["packages/*/pyproject.toml"]
 run      = "mise run uv-sync-changed"
 
 [tasks.uv-sync-changed]
-description = "Sync changes to uv workspace"
-dir = "{{ config_root }}"
-run = """#!/usr/bin/env zsh
-typeset -T MISE_WATCH_FILES_MODIFIED mise_watch_files_modified
+description = "Sync changes to the shared development environment"
+run = "uv sync --all-packages"
 
-for file in packages/*/pyproject.toml ; do
-    pdir=${file:h}
-    [[ -d $pdir ]] || exit 1
-    [[ ! -d ${pdir}/.venv ]] && {
-        print -u2 "+> ⚠️ missing .venv in '${pdir:t}', syncing"
-        uv sync --directory ${pdir} || {
-            print -u2 "+> 🚨 uv sync failled, cleaning"
-            rm -rf ${pdir}/.venv
-        }
-    }
-done
-
-for file in $mise_watch_files_modified; do
-    [[ $file == */pyproject.toml ]] && {
-        pdir=${file:h}
-        print -u2 "+> ℹ️ pyproject.toml changed, syncing ${pdir:t}"
-        uv sync --directory ${pdir} || {
-            print -u2 "+> 🚨 uv sync failled, cleaning"
-            rm -rf ${pdir}/.venv
-        }
-    }
-done
-"""
+[tasks.check]
+description = "Check every Python source, script, test, and example"
+run = "hk check"
