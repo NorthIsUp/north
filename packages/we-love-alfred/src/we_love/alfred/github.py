@@ -14,11 +14,12 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, NotRequired, Self, TypedDict
+
+from we_love.alfred.fast import atomic_write, is_list, spawn_refresh
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -26,8 +27,8 @@ if TYPE_CHECKING:
 # GUI apps do not inherit the interactive shell's PATH, so `gh` may be missing from it.
 TOOL_PATH = os.pathsep.join((
     os.environ.get("PATH", os.defpath),
-    os.path.expanduser("~/.local/share/mise/shims"),
-    os.path.expanduser("~/.local/bin"),
+    str(Path.home() / ".local/share/mise/shims"),
+    str(Path.home() / ".local/bin"),
     "/opt/homebrew/bin",
     "/usr/local/bin",
 ))
@@ -61,7 +62,7 @@ def menu_json(items: Sequence[AlfredItem], empty: str) -> str:
 
 def _age(path: Path) -> timedelta | None:
     try:
-        return timedelta(seconds=time.time() - path.stat().st_mtime)
+        return datetime.now(UTC) - datetime.fromtimestamp(path.stat().st_mtime, UTC)
     except FileNotFoundError:
         return None
 
@@ -87,18 +88,22 @@ class PullRequest:
                 "updatedAt": str(updated_at),
                 "url": str(url),
             }:
-                return cls(number, title, author, is_draft, datetime.fromisoformat(updated_at), url)
+                parsed = datetime.fromisoformat(updated_at)
+                if parsed.tzinfo is None:
+                    raise ValueError("PR updatedAt must include a timezone")
+                if isinstance(number, bool):
+                    raise TypeError("PR number must be an integer, not a boolean")
+                return cls(number, title, author, is_draft, parsed, url)
             case _:
                 raise ValueError(f"unexpected PR payload: {raw!r}")
 
     @classmethod
     def list_from_json(cls, data: str) -> list[Self]:
         """All rows, most recently updated first."""
-        match json.loads(data):
-            case list(rows):
-                return sorted(map(cls.from_json, rows), key=lambda pr: pr.updated_at, reverse=True)
-            case other:
-                raise ValueError(f"expected a list of PRs, got {type(other).__name__}")
+        value: object = json.loads(data)
+        if not is_list(value):
+            raise ValueError(f"expected a list of PRs, got {type(value).__name__}")
+        return sorted((cls.from_json(row) for row in value), key=lambda pr: pr.updated_at, reverse=True)
 
     def matches(self, terms: Iterable[str]) -> bool:
         return fuzzy_match(terms, f"{self.number} {self.title}")
@@ -156,10 +161,7 @@ class PullRequestCache:
         if out.returncode:
             raise RuntimeError(out.stderr.strip() or "gh pr list failed")
         PullRequest.list_from_json(out.stdout)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_name(self.path.name + ".tmp")
-        tmp.write_text(out.stdout)
-        tmp.replace(self.path)
+        atomic_write(self.path, out.stdout)
 
     def is_fresh(self) -> bool:
         return (cached := _age(self.path)) is not None and cached < self.ttl
@@ -168,23 +170,21 @@ class PullRequestCache:
         """Start a detached refresh if the cache is stale and no refresh started within `retry_every`."""
         if self.is_fresh():
             return
-        if (warming := _age(self.warming_path)) is not None and warming < self.retry_every:
-            return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.warming_path.touch()
-        subprocess.Popen(
-            [sys.executable, "-m", __name__, "refresh", self.repo, str(self.path)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
+        spawn_refresh(
+            [sys.executable, "-m", __name__, "refresh", self.repo, str(self.path), "--limit", str(self.limit)],
+            self.warming_path,
+            interval=self.retry_every,
         )
 
     def load(self) -> list[PullRequest]:
         """Cached PRs, even if stale; fetches synchronously only when there is no cache yet."""
         if _age(self.path) is None:
             self.fetch()
-        return PullRequest.list_from_json(self.path.read_text())
+        try:
+            return PullRequest.list_from_json(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            self.fetch()
+            return PullRequest.list_from_json(self.path.read_text(encoding="utf-8"))
 
     def search_items(self, args: str, *, keyword: str = "prs") -> list[AlfredItem]:
         """`[@author] [terms]`; an `@author` matching no login lists authors to autocomplete instead."""
@@ -228,6 +228,8 @@ def main(argv: Sequence[str]) -> None:
     match list(argv):
         case ["refresh", repo, path]:
             PullRequestCache(repo=repo, path=Path(path)).fetch()
+        case ["refresh", repo, path, "--limit", limit] if limit.isdecimal():
+            PullRequestCache(repo=repo, path=Path(path), limit=int(limit)).fetch()
         case _:
             raise SystemExit("usage: python -m we_love.alfred.github refresh <owner/repo> <cache.json>")
 

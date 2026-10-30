@@ -94,6 +94,11 @@ def write_cache(path: Path, menu: Menu) -> None:
     items = menu.get("items")
     if not isinstance(items, list) or not all(isinstance(item, dict) and isinstance(item.get("title"), str) for item in items):
         raise ValueError("Menu items must be objects with string titles")
+    atomic_write(path, payload)
+
+
+def atomic_write(path: Path, payload: str) -> None:
+    """Replace a UTF-8 payload atomically without sharing temporary filenames."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
         temporary = Path(stream.name)
@@ -114,10 +119,20 @@ def refresh(
     env: Mapping[str, str] | None = None,
 ) -> bool:
     """Launch at most one detached builder per interval, including failed attempts."""
-    marker = path.with_suffix(path.suffix + ".refresh.pid")
+    return spawn_refresh([sys.executable, str(script), *args], path.with_suffix(path.suffix + ".refresh.pid"), interval=interval, env=env)
+
+
+def spawn_refresh(
+    command: Sequence[str],
+    marker: Path,
+    *,
+    interval: timedelta = timedelta(minutes=1),
+    env: Mapping[str, str] | None = None,
+) -> bool:
+    """Throttle detached processes using a locked marker, even after a failed spawn."""
     marker.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with marker.open("a+") as stream:
+        with marker.open("a+", encoding="utf-8") as stream:
             try:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
@@ -132,7 +147,7 @@ def refresh(
             stream.flush()
             try:
                 child = subprocess.Popen(
-                    [sys.executable, str(script), *args],
+                    list(command),
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
