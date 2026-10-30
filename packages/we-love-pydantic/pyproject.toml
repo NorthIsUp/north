@@ -12,11 +12,10 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["pydantic>=2", "rich", "we-love-string", "we-love-registry", "debugpy", "typing-extensions>=4.15"]
+dependencies = ["pydantic>=2", "we-love-cli"]
 
 [tool.uv.sources]
-we-love-string = { workspace = true }
-we-love-registry = { workspace = true }
+we-love-cli = { workspace = true }
 
 [tool.uv.build-backend]
 namespace   = true

@@ -54,3 +54,8 @@ Do not add `--refresh-package` to a Script Filter shebang: it reinstalls the
 package on every keystroke. Use it once from a terminal after changing a local
 package. HTTPX and editor discovery are lazy imports; favicon discovery uses
 async HTTPX without `favicon`, Requests, or Beautiful Soup.
+
+`we_love.alfred.github.PullRequestCache.load()` also stays on the cached path:
+it serves stale data while refreshing and returns an empty list on a cache miss
+or malformed data. All automatic retries use the same warming throttle.
+Call `fetch()` explicitly when a caller needs to wait for current PR data.

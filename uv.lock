@@ -424,6 +424,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pzp"
+version = "0.0.28"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/d6/37b838d97b433c12b7cdb6d795c1e6fefbac74f90573d984e936918926a9/pzp-0.0.28.tar.gz", hash = "sha256:c4edf1dafe724f9731cf8a5aed483f7f6b1016425c30855258b7e3fcb9bbd04e", size = 25150, upload-time = "2025-02-08T17:02:42.1Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/7c/27586576587cbab57850081f04df07b7e3f185794982deacb1b697d73ecb/pzp-0.0.28-py2.py3-none-any.whl", hash = "sha256:e90deea90538d99199f9b129f46d09a0b3308ab4b59512d8e8629bba49834da5", size = 25630, upload-time = "2025-02-08T17:02:40.235Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
@@ -643,9 +652,14 @@ source = { editable = "packages/we-love-cli" }
 dependencies = [
     { name = "argcomplete" },
     { name = "pydantic" },
-    { name = "we-love-pydantic" },
+    { name = "rich" },
     { name = "we-love-registry" },
     { name = "we-love-string" },
+]
+
+[package.optional-dependencies]
+debug = [
+    { name = "debugpy" },
 ]
 
 [package.dev-dependencies]
@@ -656,11 +670,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "argcomplete" },
+    { name = "debugpy", marker = "extra == 'debug'" },
     { name = "pydantic", specifier = ">=2" },
-    { name = "we-love-pydantic", editable = "packages/we-love-pydantic" },
+    { name = "rich" },
     { name = "we-love-registry", editable = "packages/we-love-registry" },
     { name = "we-love-string", editable = "packages/we-love-string" },
 ]
+provides-extras = ["debug"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9" }]
@@ -684,6 +700,9 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 name = "we-love-fzf"
 version = "0.1.0"
 source = { editable = "packages/we-love-fzf" }
+dependencies = [
+    { name = "pzp" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -691,6 +710,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pzp", specifier = ">=0.0.28" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9" }]
@@ -715,12 +735,8 @@ name = "we-love-pydantic"
 version = "0.1.0"
 source = { editable = "packages/we-love-pydantic" }
 dependencies = [
-    { name = "debugpy" },
     { name = "pydantic" },
-    { name = "rich" },
-    { name = "typing-extensions" },
-    { name = "we-love-registry" },
-    { name = "we-love-string" },
+    { name = "we-love-cli" },
 ]
 
 [package.dev-dependencies]
@@ -730,12 +746,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "debugpy" },
     { name = "pydantic", specifier = ">=2" },
-    { name = "rich" },
-    { name = "typing-extensions", specifier = ">=4.15" },
-    { name = "we-love-registry", editable = "packages/we-love-registry" },
-    { name = "we-love-string", editable = "packages/we-love-string" },
+    { name = "we-love-cli", editable = "packages/we-love-cli" },
 ]
 
 [package.metadata.requires-dev]

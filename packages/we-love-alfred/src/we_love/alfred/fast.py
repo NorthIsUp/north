@@ -150,7 +150,7 @@ def spawn_refresh(
                 return False
             stream.seek(0)
             stream.truncate()
-            stream.write(str(os.getpid()))
+            stream.write("pending")
             stream.flush()
             try:
                 child = subprocess.Popen(

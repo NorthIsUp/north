@@ -176,10 +176,11 @@ def test_fetch_rejects_invalid_payload_without_replacing_cache(make_cache: Cache
     assert cache.path.read_text(encoding="utf-8") == previous
 
 
-def test_load_rebuilds_corrupt_cache(make_cache: CacheFactory, gh_output: list[str]) -> None:
+def test_load_schedules_corrupt_cache_refresh(make_cache: CacheFactory, spawned: list[list[str]], gh_output: list[str]) -> None:
     cache = make_cache()
     cache.path.write_text("broken", encoding="utf-8")
-    assert len(cache.load()) == len(ROWS)
+    assert cache.load() == []
+    assert len(spawned) == 1
 
 
 def test_warm_preserves_custom_limit(tmp_path: Path, spawned: list[list[str]]) -> None:
@@ -190,3 +191,29 @@ def test_warm_preserves_custom_limit(tmp_path: Path, spawned: list[list[str]]) -
 def test_from_json_rejects_naive_datetime() -> None:
     with pytest.raises(ValueError, match="timezone"):
         PullRequest.from_json(row(1, "Example", "author", "2026-10-30T12:00:00"))
+
+
+def test_missing_cache_reads_never_execute_gh(tmp_path: Path, spawned: list[list[str]], monkeypatch: pytest.MonkeyPatch) -> None:
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("Serving cached results must not run gh")
+
+    monkeypatch.setattr(github.subprocess, "run", forbidden)
+    cache = PullRequestCache(repo="acme/app", path=tmp_path / "missing.json")
+    assert cache.load() == []
+    assert cache.load() == []
+    assert len(spawned) == 1
+
+
+def test_corrupt_cache_reads_obey_retry_throttle(make_cache: CacheFactory, spawned: list[list[str]]) -> None:
+    cache = make_cache()
+    cache.path.write_text("broken", encoding="utf-8")
+    assert cache.load() == []
+    assert cache.load() == []
+    assert len(spawned) == 1
+
+
+def test_stale_reads_serve_data_while_refreshing(make_cache: CacheFactory, spawned: list[list[str]]) -> None:
+    cache = make_cache(age=timedelta(hours=2))
+    assert len(cache.load()) == len(ROWS)
+    assert len(cache.load()) == len(ROWS)
+    assert len(spawned) == 1

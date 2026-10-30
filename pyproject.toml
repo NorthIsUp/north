@@ -44,7 +44,7 @@ lint.future-annotations = true
 "scripts/**" = ["debugger", "shebang-not-executable", "shebang-missing-executable-file"]
 "**/_dap.py" = ["debugger"]
 # These settings explicitly implement an opt-in debugger.
-"**/pydantic/cli.py" = ["debugger"]
+"**/cli/debugging.py" = ["debugger"]
 # Generated enum values mirror upstream Ruff rule prefixes.
 "**/pyproject/_ruff.py" = ["ambiguous-variable-name"]
 
@@ -117,7 +117,7 @@ respect-type-ignore-comments = false
 
 [tool.ty.environment]
 python-version = "3.15"
-extra-paths = ["packages/we-love-alfred/src", "packages/we-love-avatars/src", "packages/we-love-cli/src", "packages/we-love-funcy/src", "packages/we-love-fzf/src", "packages/we-love-matchbox/src", "packages/we-love-pydantic/src", "packages/we-love-pyproject/src", "packages/we-love-registry/src", "packages/we-love-string/src", "packages/we-love-typeid/src"]
+extra-paths = ["typings", "packages/we-love-alfred/src", "packages/we-love-avatars/src", "packages/we-love-cli/src", "packages/we-love-funcy/src", "packages/we-love-fzf/src", "packages/we-love-matchbox/src", "packages/we-love-pydantic/src", "packages/we-love-pyproject/src", "packages/we-love-registry/src", "packages/we-love-string/src", "packages/we-love-typeid/src"]
 
 [dependency-groups]
 dev = [

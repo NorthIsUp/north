@@ -10,7 +10,7 @@ from we_love.string import to_snake
 from .autodiscover import autodiscover
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ type RegisterableTypesList = list[RegisterableTypes]
 type RegisterableTypesDict = dict[str, RegisterableTypes]
 
 
-class RegistryConfig(BaseModel):
+class Registry(BaseModel):
     """Registry for experiment configurations."""
 
     autodiscovery_module: str | list[str] | tuple[str, ...] = ()
@@ -32,76 +32,6 @@ class RegistryConfig(BaseModel):
 
     registry: RegisterableTypesDict = Field(default_factory=dict[str, RegisterableTypes])
 
-
-class Registry:
-    """A typed collection with validated configuration."""
-
-    def __init__(
-        self,
-        autodiscovery_module: str | list[str] | tuple[str, ...] = (),
-        autodiscovery_run: bool = False,
-        to_snake_case: bool = False,
-        to_lower: bool = False,
-        to_upper: bool = False,
-        registry: RegisterableTypesDict | None = None,
-    ) -> None:
-        self.config = RegistryConfig(
-            autodiscovery_module=autodiscovery_module,
-            autodiscovery_run=autodiscovery_run,
-            to_snake_case=to_snake_case,
-            to_lower=to_lower,
-            to_upper=to_upper,
-            registry={} if registry is None else registry,
-        )
-
-    @property
-    def autodiscovery_module(self) -> str | list[str] | tuple[str, ...]:
-        return self.config.autodiscovery_module
-
-    @autodiscovery_module.setter
-    def autodiscovery_module(self, value: str | list[str] | tuple[str, ...]) -> None:
-        self.config.autodiscovery_module = value
-
-    @property
-    def autodiscovery_run(self) -> bool:
-        return self.config.autodiscovery_run
-
-    @autodiscovery_run.setter
-    def autodiscovery_run(self, value: bool) -> None:
-        self.config.autodiscovery_run = value
-
-    @property
-    def to_snake_case(self) -> bool:
-        return self.config.to_snake_case
-
-    @to_snake_case.setter
-    def to_snake_case(self, value: bool) -> None:
-        self.config.to_snake_case = value
-
-    @property
-    def to_lower(self) -> bool:
-        return self.config.to_lower
-
-    @to_lower.setter
-    def to_lower(self, value: bool) -> None:
-        self.config.to_lower = value
-
-    @property
-    def to_upper(self) -> bool:
-        return self.config.to_upper
-
-    @to_upper.setter
-    def to_upper(self, value: bool) -> None:
-        self.config.to_upper = value
-
-    @property
-    def registry(self) -> RegisterableTypesDict:
-        return self.config.registry
-
-    @registry.setter
-    def registry(self, value: RegisterableTypesDict) -> None:
-        self.config.registry = value
-
     @cached_property
     def discovered(self) -> RegisterableTypesDict:
         self.autodiscover()
@@ -110,8 +40,10 @@ class Registry:
     def __getitem__(self, name: str) -> RegisterableTypes:
         return self.discovered[name]
 
-    def __iter__(self) -> Iterator[RegisterableTypes]:
-        return iter(self.all())
+    @property
+    def entries(self) -> Mapping[str, RegisterableTypes]:
+        self.autodiscover()
+        return self.registry
 
     def autodiscover(
         self,
@@ -128,11 +60,9 @@ class Registry:
             autodiscovery_module = self.autodiscovery_module
             if isinstance(autodiscovery_module, str):
                 autodiscovery_module = [autodiscovery_module]
-            assert [
-                *autodiscovery_module,
-                *extra_packages,
-            ], "no autodiscovery modules provided"
-            autodiscover([*autodiscovery_module, *extra_packages], recursive=submodules)
+            modules = [*autodiscovery_module, *extra_packages]
+            if modules:
+                autodiscover(modules, recursive=submodules)
 
         return self.all_raw()
 

@@ -37,11 +37,6 @@ class TomlSerializableModel(BaseModel):
         for key, value in data.items():
             if value is not None:
                 document.add(key, value)
-        if isinstance(self, UvWorkspacePyProjectToml) and self.tool is not None and self.tool.uv is not None:
-            uv_document = self.tool.uv.model_dump_toml(drop_none=drop_none, **kwargs)
-            tool_value = document["tool"]
-            if isinstance(tool_value, Table):
-                tool_value["uv"] = uv_document
         return document
 
 
@@ -376,6 +371,18 @@ class PyProjectToml(TomlSerializableModel):
 
 class UvWorkspacePyProjectToml(PyProjectToml):
     """PyProject.toml with UV workspace-specific functionality."""
+
+    @override
+    def model_dump_toml(
+        self, target_document: tomlkit.TOMLDocument | None = None, drop_none: bool = True, **kwargs: Unpack[TomlDumpOptions]
+    ) -> tomlkit.TOMLDocument:
+        document = super().model_dump_toml(target_document, drop_none, **kwargs)
+        if self.tool is not None and self.tool.uv is not None:
+            uv_document = self.tool.uv.model_dump_toml(drop_none=drop_none, **kwargs)
+            tool_value = document["tool"]
+            if isinstance(tool_value, Table):
+                tool_value["uv"] = uv_document
+        return document
 
     def get_workspace_members(self) -> list[str]:
         """Get workspace members from uv.workspace.members."""

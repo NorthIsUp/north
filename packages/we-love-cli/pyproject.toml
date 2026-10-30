@@ -12,11 +12,11 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "we-love-pydantic",
   "we-love-registry",
   "we-love-string",
   "pydantic>=2",
   "argcomplete",
+  "rich",
 ]
 
 [tool.uv.build-backend]
@@ -24,10 +24,12 @@ namespace   = true
 module-name = "we_love"
 
 [tool.uv.sources]
-we-love-pydantic = { workspace = true }
 we-love-registry = { workspace = true }
 we-love-string   = { workspace = true }
 
 
 [dependency-groups]
 dev = ["pytest>=9"]
+
+[project.optional-dependencies]
+debug = ["debugpy"]

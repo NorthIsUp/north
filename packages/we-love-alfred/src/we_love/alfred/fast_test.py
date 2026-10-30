@@ -78,6 +78,7 @@ def test_failed_refresh_is_throttled(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(subprocess, "Popen", spawn)
     path = tmp_path / "cache.json"
     assert not refresh(tmp_path / "full.py", path)
+    assert path.with_suffix(".json.refresh.pid").read_text(encoding="utf-8") == "pending"
     assert not refresh(tmp_path / "full.py", path)
 
 

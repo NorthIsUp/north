@@ -170,6 +170,9 @@ class PullRequestCache:
         """Start a detached refresh if the cache is stale and no refresh started within `retry_every`."""
         if self.is_fresh():
             return
+        self._schedule_refresh()
+
+    def _schedule_refresh(self) -> None:
         spawn_refresh(
             [sys.executable, "-m", __name__, "refresh", self.repo, str(self.path), "--limit", str(self.limit)],
             self.warming_path,
@@ -177,14 +180,14 @@ class PullRequestCache:
         )
 
     def load(self) -> list[PullRequest]:
-        """Cached PRs, even if stale; fetches synchronously only when there is no cache yet."""
-        if _age(self.path) is None:
-            self.fetch()
+        """Serve cached PRs and schedule stale or missing data through the same throttle."""
         try:
-            return PullRequest.list_from_json(self.path.read_text(encoding="utf-8"))
+            requests = PullRequest.list_from_json(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
-            self.fetch()
-            return PullRequest.list_from_json(self.path.read_text(encoding="utf-8"))
+            self._schedule_refresh()
+            return []
+        self.warm()
+        return requests
 
     def search_items(self, args: str, *, keyword: str = "prs") -> list[AlfredItem]:
         """`[@author] [terms]`; an `@author` matching no login lists authors to autocomplete instead."""

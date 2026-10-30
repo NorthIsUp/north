@@ -1,9 +1,6 @@
 import re
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import ClassVar, override
-
-MatchFuncT = Callable[[re.Pattern[str], str, int, int], re.Match[str] | None]
+from typing import override
 
 
 @dataclass
@@ -13,7 +10,6 @@ class RegexMatch:
 
     _match: re.Match[str] | None = None
     flags: re.RegexFlag = re.NOFLAG
-    match_func: ClassVar[MatchFuncT] = lambda pattern, value, start, end: pattern.search(value, start, end)
 
     def __post_init__(self) -> None:
         self.compiled_pattern = re.compile(self.pattern, self.flags)
@@ -23,8 +19,11 @@ class RegexMatch:
         if not isinstance(other, str):
             return NotImplemented
 
-        self._match = self.match_func(self.compiled_pattern, other, 0, len(other))
+        self._match = self.match_text(other)
         return self._match is not None
+
+    def match_text(self, text: str) -> re.Match[str] | None:
+        return self.compiled_pattern.search(text)
 
     def __getitem__(self, group: int | str) -> str | None:
         if self._match is None:
@@ -34,24 +33,28 @@ class RegexMatch:
             return value
         raise TypeError("Unexpected regular expression group")
 
-    def groups(self) -> tuple[str, ...]:
+    def groups(self) -> tuple[str | None, ...]:
         if self._match is None:
             raise ValueError("No match found")
-        return self._match.groups(default="")
+        return tuple(self[index] for index in range(1, self.compiled_pattern.groups + 1))
 
-    def groupdict(self) -> dict[str, str]:
+    def groupdict(self) -> dict[str, str | None]:
         if self._match is None:
             raise ValueError("No match found")
-        return self._match.groupdict(default="")
+        return {name: self[name] for name in self.compiled_pattern.groupindex}
 
 
 class ReSearch(RegexMatch):
-    match_func: ClassVar[MatchFuncT] = lambda pattern, value, start, end: pattern.search(value, start, end)
+    pass
 
 
 class ReMatch(RegexMatch):
-    match_func: ClassVar[MatchFuncT] = lambda pattern, value, start, end: pattern.match(value, start, end)
+    @override
+    def match_text(self, text: str) -> re.Match[str] | None:
+        return self.compiled_pattern.match(text)
 
 
 class ReFullmatch(RegexMatch):
-    match_func: ClassVar[MatchFuncT] = lambda pattern, value, start, end: pattern.fullmatch(value, start, end)
+    @override
+    def match_text(self, text: str) -> re.Match[str] | None:
+        return self.compiled_pattern.fullmatch(text)
