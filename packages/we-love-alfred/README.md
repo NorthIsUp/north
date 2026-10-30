@@ -39,7 +39,7 @@ refreshing; the `.refresh.pid` file throttles attempts to once per minute,
 including failed launches. A file lock prevents simultaneous launches.
 
 Caches live under `$XDG_CACHE_HOME/alfred/`, otherwise `~/.cache/alfred/` when
-`~/.cache` exists, otherwise the system temporary directory's `alfred/` folder.
+`~/.cache` exists, otherwise `/tmp/alfred/`.
 The filename uses `alfred_workflow_bundleid`; outside Alfred the compatibility
 fallback is `maxcare-menu.json`. Use `serve(name="my-workflow")` with
 `AlfredWorkflow(cache_name="my-workflow")` and

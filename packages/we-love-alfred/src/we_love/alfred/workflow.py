@@ -12,12 +12,13 @@ from html.parser import HTMLParser
 from shlex import quote
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack, override
 from urllib.parse import urljoin, urlsplit, urlunsplit
+from uuid import uuid4
 
-import asyncstdlib as a
 import httpx
 from anyio import Path as AsyncPath
-from pydantic import Field, RootModel, ValidationError
+from pydantic import Field, PrivateAttr, RootModel, ValidationError
 from we_love.alfred.editor import Editor, Editors
+from we_love.alfred.fast import cache_filename
 from we_love.alfred.fast import cache_path as fast_cache_path
 from we_love.alfred.model import AlfredBaseModel
 
@@ -161,6 +162,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
     cache_name: str | None = None
     cache_ttl: int = 3600
+    _magick_available: bool | None = PrivateAttr(default=None)
     home: AsyncPath = HOME
     xdg_cache_home: AsyncPath = HOME / ".cache"
     icon_cache: AsyncPath = HOME / ".cache" / "alfred-icons"
@@ -193,11 +195,12 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
     def _item_queue(self) -> asyncio.Queue[QueuedItem]:
         return asyncio.Queue()
 
-    @a.cached_property
     async def _has_magick_bin(self) -> bool:
-        proc = await subprocess.create_subprocess_exec("which", "magick", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        await proc.wait()
-        return proc.returncode == 0
+        if self._magick_available is None:
+            proc = await subprocess.create_subprocess_exec("which", "magick", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            await proc.wait()
+            self._magick_available = proc.returncode == 0
+        return self._magick_available
 
     async def sfsymbol(self, symbol: str) -> str | None:
         """Generate SF Pro icon files for given symbol."""
@@ -206,7 +209,7 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         light_path = icon_stem.with_suffix(".png").with_name(f"{icon_stem.stem}-light.png")
 
         if not await dark_path.exists():
-            if not await self._has_magick_bin:
+            if not await self._has_magick_bin():
                 return None
 
             await dark_path.parent.mkdir(parents=True, exist_ok=True)
@@ -646,11 +649,19 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
 
     @classmethod
     async def cache_path(cls, name: str | None = None) -> AsyncPath:
-        return AsyncPath(fast_cache_path(name))
+        filename = cache_filename(name)
+        xdg = os.environ.get("XDG_CACHE_HOME")
+        if xdg is not None and xdg:
+            root = AsyncPath(xdg)
+        elif await (HOME / ".cache").exists():
+            root = HOME / ".cache"
+        else:
+            root = AsyncPath("/tmp")  # ruff: ignore[hardcoded-temp-file] -- Compatibility path for existing Alfred workflows.
+        return root / "alfred" / filename
 
     @classmethod
     async def read_cache(cls, name: str | None = None) -> Self | None:
-        cache_path = await cls.cache_path(name)
+        cache_path = await cls.cache_path(name) if name is not None else await cls.cache_path()
         if await cache_path.exists() and (data := await cache_path.read_text()):
             try:
                 menu = AlfredMenu.model_validate_json(data)
@@ -661,9 +672,9 @@ class AlfredWorkflow(AlfredBaseModel, ignored_types=(AsyncPath,), arbitrary_type
         return None
 
     async def write_cache(self) -> None:
-        path = AsyncPath(fast_cache_path(self.cache_name))
+        path = await self.cache_path(self.cache_name) if self.cache_name is not None else await self.cache_path()
         await path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
         try:
             await temporary.write_text(self.format_menu())
             await temporary.replace(path)

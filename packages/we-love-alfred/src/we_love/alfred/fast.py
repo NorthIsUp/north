@@ -37,15 +37,22 @@ def is_json(value: object) -> TypeIs[JsonValue]:
     return value is None or isinstance(value, (bool, int, float, str))
 
 
-def cache_path(name: str | None = None) -> Path:
-    """Resolve a cache shared with the full builder, isolated by bundle ID."""
+def cache_filename(name: str | None = None) -> str:
+    """Use an explicit workflow name, bundle ID, or the compatibility filename."""
     workflow_name = name or os.environ.get("alfred_workflow_bundleid") or "maxcare-menu"
     if workflow_name in {".", ".."} or re.fullmatch(r"[\w.-]+", workflow_name) is None:
         raise ValueError("Cache name must be a filename without directory separators")
+    return f"{workflow_name}.json"
+
+
+def cache_path(name: str | None = None) -> Path:
+    """Resolve a cache shared with the full builder, isolated by bundle ID."""
     home = Path.home()
     xdg = os.environ.get("XDG_CACHE_HOME")
-    root = Path(xdg) if (xdg is not None and xdg) else home / ".cache" if (home / ".cache").exists() else Path(tempfile.gettempdir())
-    return root / "alfred" / f"{workflow_name}.json"
+    # Preserve the existing workflow fallback rather than macOS's per-user temp directory.
+    fallback = Path("/tmp")  # ruff: ignore[hardcoded-temp-file] -- Compatibility path for existing Alfred workflows.
+    root = Path(xdg) if xdg is not None and xdg else home / ".cache" if (home / ".cache").exists() else fallback
+    return root / "alfred" / cache_filename(name)
 
 
 def read_cache(path: Path) -> Menu | None:
@@ -130,8 +137,8 @@ def spawn_refresh(
     env: Mapping[str, str] | None = None,
 ) -> bool:
     """Throttle detached processes using a locked marker, even after a failed spawn."""
-    marker.parent.mkdir(parents=True, exist_ok=True)
     try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
         with marker.open("a+", encoding="utf-8") as stream:
             try:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

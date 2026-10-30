@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from anyio import Path as AsyncPath
+from we_love.alfred import workflow as workflow_module
 from we_love.alfred.editor import Editor
 from we_love.alfred.fast import cache_path, filter_menu, read_cache, refresh, write_cache
 from we_love.alfred.workflow import AlfredWorkflow, MenuItem
@@ -104,3 +105,14 @@ async def test_source_files_queue_editor_actions(tmp_path: Path) -> None:
     await workflow.add_source_file(tmp_path / "config.toml", editor=editor)
     await workflow.process_items()
     assert workflow.menu_items[0].title == "config.toml"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("with_home_cache", [False, True])
+async def test_fast_and_full_cache_fallbacks_match(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, with_home_cache: bool) -> None:
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(workflow_module, "HOME", AsyncPath(tmp_path))
+    if with_home_cache:
+        await (AsyncPath(tmp_path) / ".cache").mkdir()
+    assert str(await AlfredWorkflow.cache_path("example")) == str(cache_path("example"))
