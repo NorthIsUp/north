@@ -5,6 +5,27 @@ from typing import override
 
 @dataclass
 class RegexMatch:
+    """Search using a dotted value pattern and read captures in the case body.
+
+    >>> class Patterns:
+    ...     ticket = ReFullmatch(r"issue-(?P<number>\\d+)")
+    >>> match "issue-42":
+    ...     case Patterns.ticket as text:
+    ...         print(text, Patterns.ticket["number"])
+    ...     case _:
+    ...         print("not a ticket")
+    issue-42 42
+
+    The capture belongs to the last successful comparison only:
+
+    >>> Patterns.ticket == "other"
+    False
+    >>> Patterns.ticket.groups()
+    Traceback (most recent call last):
+        ...
+    ValueError: No match found
+    """
+
     pattern: str | re.Pattern[str]
     compiled_pattern: re.Pattern[str] = field(init=False)
 
@@ -16,6 +37,7 @@ class RegexMatch:
 
     @override
     def __eq__(self, other: object) -> bool:
+        self._match = None
         if not isinstance(other, str):
             return NotImplemented
 

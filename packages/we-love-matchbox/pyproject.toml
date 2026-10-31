@@ -5,8 +5,9 @@ requires = ["uv-build>=0.8,<0.9"]
 
 [project]
 name = "we-love-matchbox"
-version = "0.2.0"
-description = "Pattern matching and guards for the we-love namespace"
+version = "0.3.0"
+description = "Guards and regex value patterns for structural match statements"
+readme = "README.md"
 requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",

@@ -181,7 +181,7 @@ class TestMatchType:
     def test_invalid_class_raises(self) -> None:
         """Test that invalid classes raise ValueError."""
         with pytest.raises(ValueError, match="Invalid type specification"):
-            match_type("hello", None)
+            match_type("hello", 42)
 
     def test_custom_class(self) -> None:
         """Test matching custom class instances."""
@@ -194,19 +194,16 @@ class TestMatchType:
         assert not match_type(obj, str)
 
     def test_union_types(self) -> None:
-        """Test that union types are not directly supported."""
-        # Union types would need special handling
-
-        # This should raise as Union is not handled
-        with pytest.raises(ValueError, match="Invalid type specification"):
-            match_type("hello", str | int)
+        """A case guard accepts any supported arm of a union."""
+        assert match_type("hello", str | int)
+        assert match_type(1, str | int)
+        assert not match_type(None, str | int)
 
     def test_optional_types(self) -> None:
-        """Test that optional types are not directly supported."""
-
-        # Optional is just Union[T, None], so it's not handled
-        with pytest.raises(ValueError, match="Invalid type specification"):
-            match_type("hello", str | None)
+        """Optional fields accept None without coercing other values."""
+        assert match_type(None, str | None)
+        assert match_type("hello", str | None)
+        assert not match_type(1, str | None)
 
 
 class TestEdgeCases:
