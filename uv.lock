@@ -593,7 +593,7 @@ wheels = [
 
 [[package]]
 name = "we-love-alfred"
-version = "0.6.1"
+version = "0.7.0"
 source = { editable = "packages/we-love-alfred" }
 dependencies = [
     { name = "anyio" },

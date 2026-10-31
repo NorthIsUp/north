@@ -1,6 +1,6 @@
 [project]
 name            = "we-love-alfred"
-version         = "0.6.1"
+version         = "0.7.0"
 description     = "help make alfred commands nice for we-love namespace"
 requires-python = ">=3.15"
 dependencies    = ["pydantic>=2", "httpx", "anyio", "asyncstdlib"]
