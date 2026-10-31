@@ -7,6 +7,8 @@ import tomllib
 from typing import TYPE_CHECKING
 
 import pytest
+import tomlkit
+from we_love.pyproject import Project
 from we_love.pyproject.models import PyProjectToml, UvSource, UvWorkspacePyProjectToml
 
 if TYPE_CHECKING:
@@ -39,3 +41,22 @@ def test_workspace_members_and_inline_sources(tmp_path: Path) -> None:
     assert loaded.get_workspace_members() == ["packages/example"]
     assert loaded.get_workspace_sources()["example"].workspace
     assert "example = {workspace = true}" in path.read_text(encoding="utf-8")
+
+
+def test_standard_pytest_ruff_and_dependency_groups() -> None:
+    """Common valid TOML forms must load without requiring optional tool settings."""
+    model = PyProjectToml.model_validate({
+        "tool": {"ruff": {"line-length": 100}, "pytest": {"ini_options": {"addopts": "-q", "markers": ["slow: slow tests"]}}},
+        "dependency-groups": {"dev": [{"include-group": "test"}], "test": ["pytest"]},
+    })
+    dumped = model.model_dump_toml()
+    assert dumped["tool"]["ruff"]["line-length"] == 100
+    assert dumped["tool"]["pytest"]["ini_options"]["addopts"] == "-q"
+    assert dumped["dependency-groups"]["dev"][0]["include-group"] == "test"
+
+
+def test_dump_updates_existing_document() -> None:
+    """Serializing into a supplied document replaces existing fields instead of adding duplicates."""
+    document = tomlkit.parse('name = "old"\nversion = "0.1.0"\n')
+    result = Project(name="new", version="0.2.0").model_dump_toml(document)
+    assert result["name"] == "new"

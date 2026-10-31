@@ -1,4 +1,10 @@
-"""We Love namespace package for creating animated avatars with moving loops and gradient backgrounds."""
+"""Deterministic avatar configuration and image rendering.
+
+>>> config = AvatarConfig(width=8, height=8, fps=1, duration=0.1, loop_configs=[])
+>>> image = Avatar(config).render_frame(0)
+>>> image.size
+(8, 8)
+"""
 
 from we_love.avatars.avatar import Avatar, AvatarConfig
 from we_love.avatars.generator import AvatarGenerator, AvatarGeneratorConfig, avatar

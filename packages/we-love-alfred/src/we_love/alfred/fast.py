@@ -1,4 +1,9 @@
-"""Stdlib-only cached Script Filter entry point."""
+"""Stdlib-only cached Script Filter entry point.
+
+>>> menu = {"items": [{"title": "Hello"}, {"title": "Other"}]}
+>>> filter_menu(menu, "hello")["items"]
+[{'title': 'Hello'}]
+"""
 
 from __future__ import annotations
 

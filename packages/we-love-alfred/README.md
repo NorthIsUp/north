@@ -86,3 +86,14 @@ flow. The rotating refresh token is stored in the macOS Keychain under
 `okta_keychain_service`, and the app list is refetched once `okta_apps_ttl`
 (one day) has passed, keeping the old tiles through an Okta outage. Override
 `resolve_okta_client_id()` to read the client ID from somewhere else.
+
+
+## Verified API examples and boundaries
+
+```pycon
+>>> menu = {"items": [{"title": "Hello"}, {"title": "Other"}]}
+>>> filter_menu(menu, "hello")["items"]
+[{'title': 'Hello'}]
+```
+
+The fast path stays stdlib-only. Full workflows require Python 3.15. Okta cache timestamps must be timezone-aware, cache replacement uses unique temporary files, failed Keychain writes raise, and device-flow slow_down responses increase the polling interval by five seconds. See RFC 8628 section 3.5: https://www.rfc-editor.org/rfc/rfc8628#section-3.5 .

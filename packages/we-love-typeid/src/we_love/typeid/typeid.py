@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections import UserString
-from functools import cached_property
-from typing import ClassVar, get_args, override
+import re
+from typing import ClassVar, Self, get_args, override
 
 import uuid6
 
@@ -10,27 +9,32 @@ from .base32 import decode as b32decode
 from .base32 import encode as b32encode
 
 
-class TypeId[Prefix: str](UserString):
+class TypeId[Prefix: str = str](str):
+    __slots__ = ()
+
     __test__: ClassVar[bool] = False
     __typeid_prefix__: ClassVar[object]
     __typeid_prefix_str__: ClassVar[str]
 
-    def __init__(self, id: str | uuid6.UUID) -> None:
+    def __new__(cls, id: str | uuid6.UUID) -> Self:
+        value_type: type[Self] = cls
+        input_prefix = ""
         match id:
-            case str() as s:
-                if "_" in s:
-                    prefix, s = s.split("_", 1)
-                    if type(self) is not TypeId and prefix != self.__typeid_prefix_str__:
-                        raise ValueError(f"Invalid prefix for {type(self).__name__}: {prefix}")
-            case uuid6.UUID() as u:
-                s = self.convert_uuid_to_b32(u)
+            case str() as suffix:
+                if "_" in suffix:
+                    input_prefix, suffix = suffix.rsplit("_", 1)
+                    if not input_prefix:
+                        raise ValueError("An empty prefix must not have a separator")
+                    cls._validate_prefix(input_prefix)
+                    if cls is not TypeId and input_prefix != cls.__typeid_prefix_str__:
+                        raise ValueError(f"Invalid prefix for {cls.__name__}: {input_prefix}")
+            case uuid6.UUID() as value:
+                suffix = cls.convert_uuid_to_b32(value)
             case _:
                 raise ValueError(f"Invalid id: {id}")
-
-        if type(self) is TypeId:
-            super().__init__(s)
-        else:
-            super().__init__(f"{self.__typeid_prefix_str__}_{s}")
+        b32decode(suffix)
+        prefix = input_prefix if cls is TypeId else cls.__typeid_prefix_str__
+        return str.__new__(value_type, f"{prefix}_{suffix}" if prefix else suffix)
 
     @override
     def __repr__(self) -> str:
@@ -44,30 +48,38 @@ class TypeId[Prefix: str](UserString):
                 literal_type = prefix
             case literal_type:  # already a Literal or TypeVar
                 arguments: tuple[object, ...] = get_args(prefix)
-                if not arguments or not isinstance(arguments[0], str):
+                if len(arguments) != 1 or not isinstance(arguments[0], str):
                     raise TypeError("TypeId prefix must be a string Literal")
                 literal_value = arguments[0]
 
-        specialized = type.__new__(type, f"{literal_value.title()}Id", (cls,), {})
+        cls._validate_prefix(literal_value)
+
+        specialized = type.__new__(type, f"{literal_value.title()}Id", (cls,), {"__slots__": ()})
         if not issubclass(specialized, cls):
             raise TypeError("TypeId specialization must inherit its base")
         specialized.__typeid_prefix__ = literal_type
         specialized.__typeid_prefix_str__ = literal_value
         return specialized
 
+    @staticmethod
+    def _validate_prefix(prefix: str) -> str:
+        if len(prefix) > 63 or (prefix and re.fullmatch(r"[a-z](?:[a-z_]*[a-z])?", prefix) is None):
+            raise ValueError("TypeId prefixes must be at most 63 lowercase letters with internal underscores")
+        return prefix
+
     @property
     def prefix(self) -> object:
-        return self.__typeid_prefix__
+        return self.__typeid_prefix__ if type(self) is not TypeId else self.prefix_str
 
-    @cached_property
+    @property
     def prefix_str(self) -> str:
-        return self.__typeid_prefix_str__
+        return self.__typeid_prefix_str__ if type(self) is not TypeId else self.rsplit("_", 1)[0] if "_" in self else ""
 
-    @cached_property
+    @property
     def suffix(self) -> str:
-        return self.split("_")[1]
+        return self.rsplit("_", 1)[-1]
 
-    @cached_property
+    @property
     def uuid(self) -> uuid6.UUID:
         return self.convert_b32_to_uuid(self.suffix)
 
@@ -92,4 +104,4 @@ class TypeId[Prefix: str](UserString):
     @staticmethod
     def convert_b32_to_uuid(b32: str) -> uuid6.UUID:
         uuid_int = int.from_bytes(b32decode(b32), byteorder="big")
-        return uuid6.UUID(int=uuid_int, version=7)
+        return uuid6.UUID(int=uuid_int)

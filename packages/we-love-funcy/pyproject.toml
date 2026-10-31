@@ -4,8 +4,9 @@ requires      = ["uv-build>=0.8,<0.9"]
 
 [project]
 name = "we-love-funcy"
-version = "0.2.0"
+version = "0.2.1"
 description = "Functional utilities for the we-love namespace"
+readme = "README.md"
 requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",

@@ -1,3 +1,20 @@
+# we-love
+
+Typed Python packages with executable usage examples.
+
+| Package | Python |
+| --- | --- |
+| [we-love-alfred](packages/we-love-alfred/README.md) | 3.15+ |
+| [we-love-avatars](packages/we-love-avatars/README.md) | 3.13+ |
+| [we-love-cli](packages/we-love-cli/README.md) | 3.13+ |
+| [we-love-funcy](packages/we-love-funcy/README.md) | 3.13+ |
+| [we-love-fzf](packages/we-love-fzf/README.md) | 3.13+ |
+| [we-love-matchbox](packages/we-love-matchbox/README.md) | 3.13+ |
+| [we-love-pydantic](packages/we-love-pydantic/README.md) | 3.13+ |
+| [we-love-pyproject](packages/we-love-pyproject/README.md) | 3.13+ |
+| [we-love-registry](packages/we-love-registry/README.md) | 3.13+ |
+| [we-love-string](packages/we-love-string/README.md) | 3.13+ |
+| [we-love-typeid](packages/we-love-typeid/README.md) | 3.13+ |
 
 ## Development checks
 
@@ -36,3 +53,5 @@ GitHub menu cache reads never execute `gh`. A missing or malformed cache returns
 an empty result and schedules a throttled background refresh; use `fetch()` for
 an explicit blocking refresh. The FZF picker retains its pure-Python `pzp`
 fallback when the executable is unavailable.
+
+String 0.3.0 unifies alias word boundaries. TypeId 0.3.0 validates canonical suffixes at construction and preserves UUID version/variant bits; short placeholder suffixes are no longer accepted. See each package README for its contract and migration notes.

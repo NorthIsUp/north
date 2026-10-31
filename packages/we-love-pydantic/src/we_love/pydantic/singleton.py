@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar, override
 
-from pydantic._internal._model_construction import ModelMetaclass  # ruff: ignore[import-private-name] -- Pydantic has no public model metaclass.
+from pydantic._internal._model_construction import ModelMetaclass
 
 
 class Singleton(ModelMetaclass):

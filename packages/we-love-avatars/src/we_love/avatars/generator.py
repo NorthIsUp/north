@@ -40,13 +40,13 @@ from we_love.avatars.loop import LoopConfig, LoopType
 class AvatarGeneratorConfig(BaseModel):
     """Configuration for avatar generation from seeds."""
 
-    width: int = Field(default=512, description="Avatar width")
-    height: int = Field(default=512, description="Avatar height")
-    fps: int = Field(default=30, description="Frames per second")
-    duration: float = Field(default=30.0, description="Animation duration in seconds")
+    width: int = Field(gt=0, default=512, description="Avatar width")
+    height: int = Field(gt=0, default=512, description="Avatar height")
+    fps: int = Field(gt=0, default=30, description="Frames per second")
+    duration: float = Field(gt=0, allow_inf_nan=False, default=30.0, description="Animation duration in seconds")
     enable_zoom: bool = Field(default=True, description="Enable zoom and offset")
     enable_wave_gradients: bool = Field(default=True, description="Enable wave gradients")
-    max_loops: int = Field(default=1, description="Maximum number of loops")
+    max_loops: int = Field(gt=0, default=1, description="Maximum number of loops")
     random_loop: bool = Field(
         default=False,
         description="Use random loop parameters instead of deterministic (changes each generation)",

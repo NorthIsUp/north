@@ -4,8 +4,9 @@ requires      = ["uv-build>=0.8,<0.9"]
 
 [project]
 name            = "we-love-pyproject"
-version         = "0.2.0"
+version         = "0.2.1"
 description     = "models to manipulate pyproject files"
+readme = "README.md"
 requires-python = ">=3.13"
 dependencies    = ["tomlkit", "pydantic"]
 

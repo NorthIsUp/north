@@ -36,7 +36,7 @@ class TomlSerializableModel(BaseModel):
         document = target_document if target_document is not None else tomlkit.document()
         for key, value in data.items():
             if value is not None:
-                document.add(key, value)
+                document[key] = value
         return document
 
 
@@ -48,13 +48,17 @@ class BuildSystem(TomlSerializableModel):
     dependency_groups: DependencyGroup | None = None
 
 
+class DependencyInclude(TomlSerializableModel):
+    include_group: str = Field(alias="include-group")
+
+
 class DependencyGroup(TomlSerializableModel):
     """Dependency group configuration."""
 
-    dev: list[str] | None = None
-    test: list[str] | None = None
-    docs: list[str] | None = None
-    lint: list[str] | None = None
+    dev: list[str | DependencyInclude] | None = None
+    test: list[str | DependencyInclude] | None = None
+    docs: list[str | DependencyInclude] | None = None
+    lint: list[str | DependencyInclude] | None = None
 
 
 class RuffConfig(TomlSerializableModel):
@@ -62,7 +66,7 @@ class RuffConfig(TomlSerializableModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    target_version: str = Field(validation_alias="target-version", serialization_alias="target-version")
+    target_version: str | None = Field(default=None, validation_alias="target-version", serialization_alias="target-version")
 
 
 class RuffLintConfig(TomlSerializableModel):
@@ -79,7 +83,7 @@ class RuffTool(TomlSerializableModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
-    target_version: str = Field(validation_alias="target-version", serialization_alias="target-version")
+    target_version: str | None = Field(default=None, validation_alias="target-version", serialization_alias="target-version")
     lint: RuffLintConfig | None = None
 
 
@@ -96,8 +100,8 @@ class PytestIniOptions(TomlSerializableModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     minversion: str | None = None
-    addopts: list[str] | None = None
-    markers: list[PytestMarker] | None = None
+    addopts: str | list[str] | None = None
+    markers: list[str | PytestMarker] | None = None
     testpaths: list[str] | None = None
     python_files: list[str] | None = None
     python_classes: list[str] | None = None
@@ -150,6 +154,7 @@ class UvBuildBackend(TomlSerializableModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     namespace: bool | None = None
+    module_name: str | None = Field(default=None, validation_alias="module-name", serialization_alias="module-name")
     module_root: str | None = Field(default=None, validation_alias="module-root", serialization_alias="module-root")
 
 
@@ -230,7 +235,7 @@ class Package(TomlSerializableModel):
             ),
             tool=Tool(
                 uv=UvTool(
-                    build_backend=UvBuildBackend(namespace=True),
+                    build_backend=UvBuildBackend(namespace=True, module_name="we_love"),
                 ),
                 pyright=ToolPyright(
                     venv=".venv",

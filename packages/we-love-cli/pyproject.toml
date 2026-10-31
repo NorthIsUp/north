@@ -4,16 +4,17 @@ requires      = ["uv-build>=0.8,<0.9"]
 
 [project]
 name = "we-love-cli"
-version = "0.2.0"
+version = "0.2.1"
 description = "CLI utilities for the we-love namespace"
+readme = "README.md"
 requires-python = ">=3.13"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "we-love-registry>=0.2.0",
-  "we-love-string>=0.2.0",
+  "we-love-registry>=0.2.1",
+  "we-love-string>=0.3.0",
   "pydantic>=2",
   "argcomplete",
   "rich",

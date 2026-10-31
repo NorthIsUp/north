@@ -1,4 +1,8 @@
-"""Select typed values using the fzf executable."""
+"""Select typed objects using fzf with a pzp fallback.
+
+>>> fzf_select([]) is None
+True
+"""
 
 from __future__ import annotations
 
@@ -65,7 +69,10 @@ def fzf_select[T](
         command.append("--multi")
     if header is not None:
         command.extend(("--header", header))
-    labels = [f"{index}\t{format_fn(item).replace(chr(10), ' ')}" for index, item in enumerate(items)]
+    labels = [
+        f"{index}\t{format_fn(item).translate(str.maketrans({chr(10): ' ', chr(13): ' ', chr(9): ' '}))}"
+        for index, item in enumerate(items)
+    ]
     try:
         result = subprocess.run(command, input="\n".join(labels), text=True, stdout=subprocess.PIPE, check=False)
     except FileNotFoundError:

@@ -593,7 +593,7 @@ wheels = [
 
 [[package]]
 name = "we-love-alfred"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "packages/we-love-alfred" }
 dependencies = [
     { name = "anyio" },
@@ -620,7 +620,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-avatars"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-avatars" }
 dependencies = [
     { name = "numpy" },
@@ -647,7 +647,7 @@ dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "we-love-cli"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-cli" }
 dependencies = [
     { name = "argcomplete" },
@@ -683,7 +683,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-funcy"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-funcy" }
 
 [package.dev-dependencies]
@@ -698,7 +698,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-fzf"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-fzf" }
 dependencies = [
     { name = "pzp" },
@@ -732,7 +732,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-pydantic"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-pydantic" }
 dependencies = [
     { name = "pydantic" },
@@ -755,7 +755,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-pyproject"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-pyproject" }
 dependencies = [
     { name = "pydantic" },
@@ -778,7 +778,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-registry"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/we-love-registry" }
 dependencies = [
     { name = "pydantic" },
@@ -801,7 +801,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-string"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/we-love-string" }
 
 [package.dev-dependencies]
@@ -816,7 +816,7 @@ dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-typeid"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/we-love-typeid" }
 dependencies = [
     { name = "uuid6" },
