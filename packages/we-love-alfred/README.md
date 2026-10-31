@@ -65,3 +65,24 @@ and `.cache` files in its data directory, while preserving settings and other
 workflow data. Paths are resolved when building the menu, before `zsh://` dispatch.
 Without a bundle ID or explicit workflow paths, shared workflow roots are never
 selected for deletion.
+
+## Okta app tiles (opt-in)
+
+`we_love.alfred.okta.OktaAppsMixin` lists the signed-in user's Okta app tiles,
+each opening its Okta SSO link. Mix it into the builder's workflow, set
+`okta_org` and a client ID, pass `add_okta_items` to `builder()`, and handle
+`okta-login` in the script by awaiting `okta_login()` before rebuilding:
+
+```python
+class MyWorkflow(OktaAppsMixin, AlfredWorkflow):
+    okta_org: str = "https://example.okta.com"
+    okta_client_id: str = "0oa..."
+```
+
+The Okta app must be a public native OIDC app with the device authorization
+and refresh token grants and the `okta.users.read.self` API scope granted.
+Until the user connects, the menu shows one connect item that runs the device
+flow. The rotating refresh token is stored in the macOS Keychain under
+`okta_keychain_service`, and the app list is refetched once `okta_apps_ttl`
+(one day) has passed, keeping the old tiles through an Okta outage. Override
+`resolve_okta_client_id()` to read the client ID from somewhere else.
