@@ -5,14 +5,14 @@ requires = ["uv-build>=0.8,<0.9"]
 
 [project]
 name = "we-love-pydantic"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pydantic utilities for the we-love namespace"
 requires-python = ">=3.13"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.13",
 ]
-dependencies = ["pydantic>=2", "we-love-cli"]
+dependencies = ["pydantic>=2", "we-love-cli>=0.2.0"]
 
 [tool.uv.sources]
 we-love-cli = { workspace = true }
