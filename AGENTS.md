@@ -12,3 +12,8 @@
 - Run `mise run check` and `mise run test`, commit the release changes, and complete the authorized push and merge.
 - Publish only the intended release artifacts. Use a clean `dist/` directory for `publish-all` so old artifacts cannot be uploaded accidentally.
 - Verify each intended version on PyPI after publishing. Report publication failures explicitly; do not call a release complete after only a build or merge.
+
+## Publishing authentication
+
+- Local publishing credentials are available as `PYPI_TOKEN`. Legacy `UV_PUBLISH_USERNAME` and `UV_PUBLISH_PASSWORD` settings can override the intended authentication and cause a PyPI 403. Use `env -u UV_PUBLISH_USERNAME -u UV_PUBLISH_PASSWORD UV_PUBLISH_TOKEN="$PYPI_TOKEN" mise run publish-all`. Never print token values.
+- The CD workflow currently has no matching PyPI trusted publisher for `NorthIsUp/north`, workflow `cd.yml`, environment `pypi`. Do not assume workflow configuration proves PyPI trust is configured. Use the existing local token until trusted publishing is configured and verified.
