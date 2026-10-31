@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import UTC, datetime, timedelta
+from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeIs
 
@@ -72,22 +73,37 @@ def read_cache(path: Path) -> Menu | None:
 
 
 def filter_menu(menu: Menu, query: str) -> Menu:
-    """Match query tokens as case-insensitive subsequences of match or title."""
+    """Match query tokens as case-insensitive subsequences of match or title, best matches first."""
     items = menu.get("items")
     if not isinstance(items, list):
         raise TypeError("Menu items must be a list")
     tokens = query.casefold().split()
-    filtered: list[JsonValue] = []
+    ranked: list[tuple[int, JsonValue]] = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        text = item.get("match") or item.get("title")
-        if not isinstance(text, str):
+        title = item.get("title")
+        text = item.get("match") or title
+        if not isinstance(title, str) or not isinstance(text, str):
             continue
-        if all(_subsequence(token, text.casefold()) for token in tokens):
-            filtered.append(item)
+        scores = [_score(token, title.casefold(), text.casefold()) for token in tokens]
+        if None not in scores:
+            ranked.append((sum(score for score in scores if score is not None), item))
+    # sorted() is stable, so equally good matches keep the builder's order.
+    filtered = [item for _, item in sorted(ranked, key=itemgetter(0))]
     # Alfred's own cache must not reuse a query-filtered response for the next query.
     return {key: value for key, value in {**menu, "items": filtered}.items() if key != "cache"}
+
+
+def _score(token: str, title: str, text: str) -> int | None:
+    """Lower is better: a title word prefix, then a title substring, then a match substring, then scattered letters."""
+    if any(word.startswith(token) for word in title.split()):
+        return 0
+    if token in title:
+        return 1
+    if token in text:
+        return 2
+    return 3 if _subsequence(token, text) else None
 
 
 def _subsequence(needle: str, haystack: str) -> bool:
