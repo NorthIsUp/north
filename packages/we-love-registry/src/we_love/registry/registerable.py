@@ -62,7 +62,11 @@ class Registry(BaseModel):
                 autodiscovery_module = [autodiscovery_module]
             modules = [*autodiscovery_module, *extra_packages]
             if modules:
-                autodiscover(modules, recursive=submodules)
+                try:
+                    autodiscover(modules, recursive=submodules)
+                except Exception:
+                    self.autodiscovery_run = False
+                    raise
 
         return self.all_raw()
 

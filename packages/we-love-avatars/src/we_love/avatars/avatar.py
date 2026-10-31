@@ -20,18 +20,23 @@ class AvatarConfig(BaseModel):
     """Configuration for avatar generation."""
 
     width: int = Field(
+        gt=0,
         default=512,
         description="Avatar width in pixels",
     )
     height: int = Field(
+        gt=0,
         default=512,
         description="Avatar height in pixels",
     )
     fps: int = Field(
+        gt=0,
         default=30,
         description="Frames per second for animation",
     )
     duration: float = Field(
+        gt=0,
+        allow_inf_nan=False,
         default=2.0,
         description="Animation duration in seconds",
     )
@@ -61,7 +66,7 @@ class Avatar:
     @property
     def total_frames(self) -> int:
         """Calculate total number of frames in animation."""
-        return int(self.config.fps * self.config.duration)
+        return max(1, int(self.config.fps * self.config.duration))
 
     def render_frame(self, frame: int) -> Image.Image:
         """Render a single frame of the animation.

@@ -13,12 +13,14 @@ from __future__ import annotations
 import asyncio
 import shlex
 import sys
+from asyncio import create_subprocess_exec, sleep
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Literal, Self
+from uuid import uuid4
 
 import httpx
 from anyio import Path as AsyncPath
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import AwareDatetime, BaseModel, Field, TypeAdapter, ValidationError
 from we_love.alfred.fast import cache_path
 from we_love.alfred.workflow import AlfredWorkflow
 
@@ -34,8 +36,12 @@ DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code"
 class OktaDeviceCode(BaseModel):
     device_code: str
     verification_uri_complete: str
-    expires_in: timedelta
-    interval: timedelta = timedelta(seconds=5)
+    expires_in: timedelta = Field(gt=timedelta())
+    interval: timedelta = Field(default=timedelta(seconds=5), gt=timedelta())
+
+
+class OktaOAuthError(BaseModel):
+    error: str
 
 
 class OktaTokens(BaseModel):
@@ -56,7 +62,7 @@ APP_LINKS = TypeAdapter(list[OktaAppLink])
 
 class OktaAppsCache(BaseModel):
     v: Literal[1] = 1
-    fetched_at: datetime
+    fetched_at: AwareDatetime
     links: list[OktaAppLink]
 
     @classmethod
@@ -71,14 +77,17 @@ class OktaAppsCache(BaseModel):
 
     async def save(self, path: AsyncPath) -> None:
         await path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(".tmp")
-        await temporary.write_text(self.model_dump_json(by_alias=True))
-        await temporary.replace(path)
+        temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+        try:
+            await temporary.write_text(self.model_dump_json(by_alias=True))
+            await temporary.replace(path)
+        finally:
+            await temporary.unlink(missing_ok=True)
 
 
 async def keychain(*args: str, stdin: str | None = None) -> str | None:
     """Run `security`; secrets go through stdin (`security -i`) so they never reach argv."""
-    proc = await asyncio.create_subprocess_exec(
+    proc = await create_subprocess_exec(
         "/usr/bin/security",
         *args,
         stdin=asyncio.subprocess.PIPE,
@@ -118,7 +127,9 @@ class OktaAppsMixin(AlfredWorkflow):
         return ("-s", self.okta_keychain_service, "-a", self.okta_org)
 
     async def _store_refresh_token(self, token: str) -> None:
-        await keychain("-i", stdin=shlex.join(["add-generic-password", "-U", *self._okta_keychain, "-w", token]) + "\n")
+        result = await keychain("-i", stdin=shlex.join(["add-generic-password", "-U", *self._okta_keychain, "-w", token]) + "\n")
+        if result is None:
+            raise RuntimeError("Could not save the Okta refresh token in Keychain")
 
     async def okta_login(self) -> None:
         """Device authorization grant: open Okta's approval page, keep the refresh token, then cache the apps."""
@@ -127,10 +138,12 @@ class OktaAppsMixin(AlfredWorkflow):
         async with self.okta_http() as session:
             response = await session.post("/oauth2/v1/device/authorize", data={"client_id": client_id, "scope": SCOPE})
             device = OktaDeviceCode.model_validate_json(response.raise_for_status().content)
-            await asyncio.create_subprocess_exec("open", device.verification_uri_complete)
+            browser = await create_subprocess_exec("open", device.verification_uri_complete)
+            if await browser.wait() != 0:
+                raise RuntimeError("Could not open the Okta authorization page")
             async with asyncio.timeout(device.expires_in.total_seconds()):
                 while True:
-                    await asyncio.sleep(device.interval.total_seconds())
+                    await sleep(device.interval.total_seconds())
                     response = await session.post(
                         "/oauth2/v1/token",
                         data={"client_id": client_id, "grant_type": DEVICE_GRANT, "device_code": device.device_code},
@@ -138,7 +151,10 @@ class OktaAppsMixin(AlfredWorkflow):
                     if response.is_success:
                         await self._store_refresh_token(OktaTokens.model_validate_json(response.content).refresh_token)
                         break
-                    if response.json().get("error") not in {"authorization_pending", "slow_down"}:
+                    error = OktaOAuthError.model_validate_json(response.content).error
+                    if error == "slow_down":
+                        device.interval += timedelta(seconds=5)
+                    if error not in {"authorization_pending", "slow_down"}:
                         response.raise_for_status()
         await self.fetch_okta_apps(client_id)
 

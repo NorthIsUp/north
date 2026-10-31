@@ -4,8 +4,11 @@ import json
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, override
 
+import anyio
+import anyio.lowlevel
 import httpx
 import pytest
+from pydantic import ValidationError
 from we_love.alfred import okta
 from we_love.alfred.okta import OktaAppLink, OktaAppsCache, OktaAppsMixin
 
@@ -130,3 +133,82 @@ async def test_okta_outage_keeps_stale_tiles(make_workflow: Callable[..., Workfl
     workflow = make_workflow(cached=LINKS[:1], age=timedelta(days=2), stored="refresh-1")
     workflow.okta_down = True
     assert await titles(workflow) == ["Sentry"]
+
+
+async def test_concurrent_cache_writes_are_atomic(tmp_path: Path) -> None:
+    """Two overlapping builders must leave one complete cache and no shared-temp race."""
+    first = OktaAppsCache(fetched_at=datetime.now(UTC), links=[])
+    second = OktaAppsCache(fetched_at=datetime.now(UTC), links=[OktaAppLink.model_validate(LINKS[0])])
+    path = okta.AsyncPath(tmp_path / "cache.json")
+    async with anyio.create_task_group() as group:
+        group.start_soon(first.save, path)
+        group.start_soon(second.save, path)
+    loaded = await OktaAppsCache.load(path)
+    candidates = (first, second)
+    assert loaded in candidates
+    assert [entry async for entry in okta.AsyncPath(tmp_path).glob(".*.tmp")] == []
+
+
+async def test_failed_keychain_write_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed credential write must not be treated as a successful token rotation."""
+
+    async def failed(*args: str, stdin: str | None = None) -> str | None:
+        await anyio.lowlevel.checkpoint()
+        return "refresh-1" if stdin is None else None
+
+    monkeypatch.setattr(okta, "keychain", failed)
+    with pytest.raises(RuntimeError, match="Keychain"):
+        await Workflow().fetch_okta_apps("client")
+
+
+def test_naive_cache_time_is_rejected() -> None:
+    """Malformed timestamp data must be rejected before timezone-aware TTL arithmetic."""
+    with pytest.raises(ValidationError):
+        OktaAppsCache.model_validate({"fetched_at": "2026-01-01T00:00:00", "links": []})
+
+
+async def test_login_slow_down_changes_subsequent_polling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Device authorization backs off after slow_down and waits for browser launch."""
+    delays: list[float] = []
+    original_sleep = okta.sleep
+    token_requests = 0
+
+    async def sleep(seconds: float) -> None:
+        delays.append(seconds)
+        await original_sleep(0)
+
+    class Browser:
+        async def wait(self) -> int:
+            await original_sleep(0)
+            return 0
+
+    async def open_browser(*args: str) -> Browser:
+        await original_sleep(0)
+        return Browser()
+
+    def device_api(request: httpx.Request) -> httpx.Response:
+        nonlocal token_requests
+        if request.url.path.endswith("/device/authorize"):
+            return httpx.Response(
+                200, json={"device_code": "device", "verification_uri_complete": "https://example.test", "expires_in": 60, "interval": 1}
+            )
+        token_requests += 1
+        if token_requests == 1:
+            return httpx.Response(400, json={"error": "slow_down"})
+        return httpx.Response(200, json={"access_token": "access", "refresh_token": "refresh"})
+
+    class DeviceWorkflow(Workflow):
+        @override
+        def okta_http(self) -> httpx.AsyncClient:
+            return httpx.AsyncClient(base_url=self.okta_org, transport=httpx.MockTransport(device_api))
+
+        @override
+        async def fetch_okta_apps(self, client_id: str) -> OktaAppsCache | None:
+            await original_sleep(0)
+            return None
+
+    monkeypatch.setattr(okta, "sleep", sleep)
+    monkeypatch.setattr(okta, "create_subprocess_exec", open_browser)
+    monkeypatch.setattr(okta, "keychain", Keychain(None))
+    await DeviceWorkflow().okta_login()
+    assert delays == [1.0, 6.0]

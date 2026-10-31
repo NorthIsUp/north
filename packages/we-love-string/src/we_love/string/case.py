@@ -1,271 +1,89 @@
-"""
-String convert functions
-"""
+"""ASCII identifier case conversion with shared word boundaries."""
 
 import re
 
-# Pre-compiled regex patterns for speed
-_SNAKE_CASE_DELIMITER_TRANSLATION = str.maketrans("-. ", "___")
-_SNAKE_CASE_CAPITAL_RE = re.compile(r"[A-Z]")
-_CAMEL_CASE_UNDERSCORE_RE = re.compile(r"_+([a-zA-Z])")
-_CAMEL_CASE_HYPHEN_RE = re.compile(r"-+([a-zA-Z])")
-_PATH_CASE_RE = re.compile(r"_")
-_BACKSLASH_CASE_RE = re.compile(r"_")
-_SENTENCE_CASE_DELIMITER_RE = re.compile(r"[\\-_\\.\\s]")
-_SENTENCE_CASE_CAPITAL_RE = re.compile(r"[A-Z]")
-_SPINAL_CASE_RE = re.compile(r"_")
-_DOT_CASE_RE = re.compile(r"_")
-_ALPHANUM_FILTER_RE = re.compile(r"[^a-zA-Z0-9]")
 
+def _words(value: str) -> list[str]:
+    value = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", value)
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value)
+    return [match.group(0) for match in re.finditer(r"[A-Za-z0-9]+", value)]
 
-def camelcase(string: str) -> str:
-    """Convert string into camel case. Optimized for speed.
 
-    Args:
-        string: String to convert.
+def to_delimited(value: str, delimiter: str) -> str:
+    return delimiter.join(word.lower() for word in _words(value))
 
-    Returns:
-        string: Camel case string.
 
-    """
+def to_camel(value: str) -> str:
+    return "".join(word.capitalize() for word in _words(value))
 
-    if not string:
-        return ""
 
-    # Handle underscores first, then hyphens
-    string = _CAMEL_CASE_UNDERSCORE_RE.sub(lambda m: m.group(1).upper(), string)
-    return _CAMEL_CASE_HYPHEN_RE.sub(lambda m: m.group(1).upper(), string)
+def to_lower_camel(value: str) -> str:
+    words = _words(value)
+    return words[0].lower() + "".join(word.capitalize() for word in words[1:]) if words else ""
 
 
-def capitalcase(string: str) -> str:
-    """Convert string into capital case.
-    First letters will be uppercase.
+def to_snake(value: str) -> str:
+    return to_delimited(value, "_")
 
-    Args:
-        string: String to convert.
 
-    Returns:
-        string: Capital case string.
+def to_kebab(value: str) -> str:
+    return to_delimited(value, "-")
 
-    """
 
-    if not string:
-        return ""
-    # Use slicing and upper() for potential micro-optimization over calling uppercase()
-    s = str(string)
-    return s[0].upper() + s[1:]
+def to_screaming_delimited(value: str, delimiter: str) -> str:
+    return to_delimited(value, delimiter).upper()
 
 
-def constcase(string: str) -> str:
-    """Convert string into upper snake case. Optimized for speed.
+def to_screaming_snake(value: str) -> str:
+    return to_screaming_delimited(value, "_")
 
-    Args:
-        string: String to convert.
 
-    Returns:
-        string: Const cased string.
+def to_screaming_kebab(value: str) -> str:
+    return to_screaming_delimited(value, "-")
 
-    """
 
-    if not string:
-        return ""
-    s = str(string).translate(_SNAKE_CASE_DELIMITER_TRANSLATION)
-    result = _SNAKE_CASE_CAPITAL_RE.sub(lambda m: "_" + m.group(0), s)
-    return result.upper()
+def capitalcase(value: str) -> str:
+    return value[:1].upper() + value[1:]
 
 
-def lowercase(string: str) -> str:
-    """Convert string into lower case.
+def lowercase(value: str) -> str:
+    return value.lower()
 
-    Args:
-        string: String to convert.
 
-    Returns:
-        string: Lowercase case string.
+def uppercase(value: str) -> str:
+    return value.upper()
 
-    """
 
-    return str(string).lower()
+def trimcase(value: str) -> str:
+    return value.strip()
 
 
-def pascalcase(string: str) -> str:
-    """Convert string into pascal case. Optimized for speed.
+def pathcase(value: str) -> str:
+    return to_delimited(value, "/")
 
-    Args:
-        string: String to convert.
 
-    Returns:
-        string: Pascal case string.
+def backslashcase(value: str) -> str:
+    return to_delimited(value, "\\")
 
-    """
 
-    if not string:
-        return ""
-    # Handle underscores first, then hyphens
-    s = _CAMEL_CASE_UNDERSCORE_RE.sub(lambda m: m.group(1).upper(), string)
-    s = _CAMEL_CASE_HYPHEN_RE.sub(lambda m: m.group(1).upper(), s)
-    return s[0].upper() + s[1:]
+def sentencecase(value: str) -> str:
+    return capitalcase(to_delimited(value, " "))
 
 
-def pathcase(string: str) -> str:
-    """Convert string into path case. Optimized for speed.
+def titlecase(value: str) -> str:
+    return " ".join(word.capitalize() for word in _words(value))
 
-    Args:
-        string: String to convert.
 
-    Returns:
-        string: Path cased string.
+def dotcase(value: str) -> str:
+    return to_delimited(value, ".")
 
-    """
 
-    return _PATH_CASE_RE.sub("/", snakecase(string))
+def alphanumcase(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "", value)
 
 
-def backslashcase(string: str) -> str:
-    """Convert string into spinal case.
-    Join punctuation with backslash.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Spinal cased string.
-
-    """
-    return _BACKSLASH_CASE_RE.sub(r"\\\\", snakecase(string))
-
-
-def sentencecase(string: str) -> str:
-    """Convert string into sentence case. Optimized for speed.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Sentence cased string.
-
-    """
-    joiner = " "
-    s = _SENTENCE_CASE_DELIMITER_RE.sub(joiner, str(string))
-    if not s:
-        return ""
-    # Apply capitalcase logic directly after handling uppercase letters
-    transformed = _SENTENCE_CASE_CAPITAL_RE.sub(lambda m: joiner + m.group(0).lower(), s).strip()
-    return transformed[0].upper() + transformed[1:] if transformed else ""
-
-
-def snakecase(string: str) -> str:
-    """Convert string into snake case. Optimized for speed.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Snake cased string.
-
-    """
-
-    if not string:
-        return ""
-    # Use translate for faster delimiter replacement
-    s = str(string).translate(_SNAKE_CASE_DELIMITER_TRANSLATION)
-    # Apply lowercase transformation during substitution
-    result = _SNAKE_CASE_CAPITAL_RE.sub(lambda m: "_" + m.group(0).lower(), s)
-    return result[0].lower() + result[1:]
-
-
-def spinalcase(string: str) -> str:
-    """Convert string into spinal case. Optimized for speed.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Spinal cased string.
-
-    """
-
-    return _SPINAL_CASE_RE.sub("-", snakecase(string))
-
-
-def dotcase(string: str) -> str:
-    """Convert string into dot case. Optimized for speed.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Dot cased string.
-
-    """
-
-    return _DOT_CASE_RE.sub(".", snakecase(string))
-
-
-def titlecase(string: str) -> str:
-    """Convert string into sentence case.
-    First letter capped while each punctuations is capitalsed
-    and joined with space.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Title cased string.
-
-    """
-
-    # Avoid list comprehension for potential speedup
-    words = snakecase(string).split("_")
-    if not words:
-        return ""
-
-    # Build the string directly
-    result = words[0][0].upper() + words[0][1:] if words[0] else ""
-    for word in words[1:]:
-        if word:
-            result += " " + word[0].upper() + word[1:]
-        else:
-            result += " "  # Handle potential empty strings from multiple underscores
-    return result
-
-
-def trimcase(string: str) -> str:
-    """Convert string into trimmed string.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Trimmed case string
-    """
-
-    return str(string).strip()
-
-
-def uppercase(string: str) -> str:
-    """Convert string into upper case.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: Uppercase case string.
-
-    """
-
-    return str(string).upper()
-
-
-def alphanumcase(string: str) -> str:
-    """Cuts all non-alphanumeric symbols. Optimized for speed.
-
-    Args:
-        string: String to convert.
-
-    Returns:
-        string: String with cutted non-alphanumeric symbols.
-
-    """
-    # Using regex sub is often faster than filter/join for this
-    return _ALPHANUM_FILTER_RE.sub("", str(string))
+camelcase = to_lower_camel
+pascalcase = to_camel
+snakecase = to_snake
+constcase = to_screaming_snake
+spinalcase = to_kebab

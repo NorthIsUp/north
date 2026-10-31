@@ -41,6 +41,8 @@ lint.flake8-type-checking.runtime-evaluated-base-classes = [
 lint.future-annotations = true
 
 [tool.ruff.lint.per-file-ignores]
+# Validated immutable identifiers need str semantics; UserString operations reconstruct invalid sliced IDs.
+"**/typeid/typeid.py" = ["subclass-builtin"]
 "scripts/**" = ["debugger", "shebang-not-executable", "shebang-missing-executable-file"]
 "**/_dap.py" = ["debugger"]
 # These settings explicitly implement an opt-in debugger.
@@ -54,6 +56,7 @@ indent = 4
 keep_full_version = false # remove unnecessary trailing ``.0``'s from version specifiers
 
 [tool.pytest.ini_options]
+consider_namespace_packages = true
 addopts = [
     "-vv",
     "-ra",

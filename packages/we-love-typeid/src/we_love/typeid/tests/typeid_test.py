@@ -6,10 +6,10 @@ TestId = TypeId[Literal["test"]]
 
 
 def test_ids() -> None:
-    assert TestId("hi") == TestId("hi")
-    assert TestId("hi") != TestId("hi2")
-    assert TestId("hi") != TestId("test_1234")
-    assert TestId("hi") != TestId("test_1234")
+    assert TestId("00000000000000000000000000") == TestId("00000000000000000000000000")
+    assert TestId("00000000000000000000000000") != TestId("00000000000000000000000001")
+    assert TestId("00000000000000000000000000") != TestId("test_00000000000000000000000002")
+    assert TestId("00000000000000000000000000") != TestId("test_00000000000000000000000002")
 
 
 def test_type_safety() -> None:
@@ -29,8 +29,8 @@ def test_type_safety() -> None:
     assert user_id.__typeid_prefix__ == Literal["user"]
     assert user_id.__typeid_prefix_str__ == "user"
 
-    enc = EncId("1234")
-    user = user_id("abcd")
+    enc = EncId("00000000000000000000000000")
+    user = user_id("00000000000000000000000000")
 
     # Test that instances have correct prefixes
     assert enc.prefix == Literal["enc"]
@@ -40,11 +40,11 @@ def test_type_safety() -> None:
     assert user.prefix_str == "user"
 
     # Test that string representation includes prefix
-    assert str(enc) == "enc_1234"
-    assert str(user) == "user_abcd"
+    assert str(enc) == "enc_00000000000000000000000000"
+    assert str(user) == "user_00000000000000000000000000"
 
     # Test that different types are not equal even with same suffix
-    enc_duplicate = EncId("abcd")
+    enc_duplicate = EncId("00000000000000000000000000")
     assert user != enc_duplicate
 
     # Test type safety function
@@ -53,7 +53,7 @@ def test_type_safety() -> None:
 
     # This should work fine
     result = take_enc_id(enc)
-    assert result == "Processing enc_1234"
+    assert result == "Processing enc_00000000000000000000000000"
 
     # Note: take_enc_id(user) would fail static type checking
     # but we can't test that at runtime without a type checker

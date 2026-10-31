@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 class ConversionError(ValueError):
     def __init__(self, message: str, value: object) -> None:
+        super().__init__(message)
         self.message = message
         self.value = value
 
@@ -76,9 +77,10 @@ class IntConverter(BaseConverter[int]):
 
     @override
     def decode(self, s: str) -> int:
-        if s.isdigit():
+        try:
             return int(s)
-        raise ConversionError(f"Invalid int: '{s}'", s)
+        except ValueError as exc:
+            raise ConversionError(f"Invalid int: '{s}'", s) from exc
 
 
 class FloatConverter(BaseConverter[float]):
@@ -90,9 +92,10 @@ class FloatConverter(BaseConverter[float]):
 
     @override
     def decode(self, s: str) -> float:
-        if s.replace(".", "", 1).isdigit():
+        try:
             return float(s)
-        raise ConversionError(f"Invalid float: '{s}'", s)
+        except ValueError as exc:
+            raise ConversionError(f"Invalid float: '{s}'", s) from exc
 
 
 class BoolConverter(BaseConverter[bool]):
@@ -181,4 +184,4 @@ class ListConverter[T](BaseConverter[list[T]]):
 
     @override
     def decode(self, s: str) -> list[T]:
-        return [self.converter.decode(item.strip()) for item in s.split(",")]
+        return [self.converter.decode(item.strip()) for item in s.split(",")] if s else []

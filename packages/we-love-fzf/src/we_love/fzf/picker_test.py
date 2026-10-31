@@ -64,3 +64,15 @@ def test_process_failure_is_not_mistaken_for_cancellation(fzf_result: list[subpr
 def test_empty_input_does_not_start_a_picker(fallback: list[list[str]]) -> None:
     assert fzf.fzf_select(list[str]()) is None
     assert fallback == []
+
+
+def test_labels_cannot_inject_terminal_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Embedded newlines, carriage returns, and tabs stay within one displayed item."""
+
+    def run(command: list[str], *, input: str, text: bool, stdout: int, check: bool) -> subprocess.CompletedProcess[str]:
+        assert input == "0\tfirst second third fourth"
+        return subprocess.CompletedProcess(command, 0, stdout="0\tfirst second third fourth\n")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    value = "first\nsecond\rthird\tfourth"
+    assert fzf.fzf_select([value]) is value

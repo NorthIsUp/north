@@ -77,7 +77,7 @@ def autodiscover_iter[R](
         recursive: Whether to recursively import submodules
 
     Returns:
-        Dictionary of module names to imported modules
+        Imported submodules, or values produced by key. Import failures propagate.
     """
 
     match package:
@@ -98,18 +98,8 @@ def autodiscover_iter[R](
     if not hasattr(package, "__path__"):
         return
 
-    logger.info("Walking packages for %s", package.__path__)
-    for _loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-        full_name = f"{package.__name__}.{name}"
-        logger.debug("Importing module: %s", full_name)
-        try:
-            module = importlib.import_module(full_name)
-        except ModuleNotFoundError:
-            logger.exception("Error importing module: %s", full_name)
-            continue
-
-        logger.info("Found module: %s at %s", full_name, module.__file__)
+    for _loader, full_name, is_pkg in pkgutil.iter_modules(package.__path__, prefix=f"{package.__name__}."):
+        module = importlib.import_module(full_name)
         yield from key(module) if key is not None else (module,)
-
         if recursive and is_pkg:
-            yield from autodiscover_iter(full_name, recursive, key=key) if key is not None else autodiscover_iter(full_name, recursive)
+            yield from autodiscover_iter(module, recursive, key=key) if key is not None else autodiscover_iter(module, recursive)

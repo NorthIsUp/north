@@ -1,11 +1,25 @@
+"""Selective exception suppression for contexts and decorators.
+
+>>> with Suppress(ValueError):
+...     int("invalid")
+>>> @Suppress(ValueError)
+... def number(text):
+...     return int(text)
+>>> number("12")
+12
+>>> number("invalid") is None
+True
+"""
+
 from __future__ import annotations
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, ParamSpec, Self, TypeIs, TypeVar
+from inspect import isawaitable, iscoroutinefunction
+from typing import TYPE_CHECKING, Self, TypeGuard, TypeIs, overload
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
     from types import TracebackType
 
 
@@ -16,8 +30,12 @@ def is_exception_group(value: BaseException | None) -> TypeIs[BaseExceptionGroup
 logger = logging.getLogger(__name__)
 
 
-P = ParamSpec("P")
-T = TypeVar("T")
+def _is_async[**P](func: Callable[P, object]) -> TypeGuard[Callable[P, Awaitable[object]]]:
+    return iscoroutinefunction(func)
+
+
+def _is_awaitable(value: object) -> TypeIs[Awaitable[object]]:
+    return isawaitable(value)
 
 
 class Suppress:
@@ -43,11 +61,33 @@ class Suppress:
         self.exceptions = exceptions
         self.msg = msg
 
-    def __call__(self, func: Callable[P, T]) -> Callable[P, T | None]:
-        @wraps(func)
-        def wrapper(*args: P.args, **kwds: P.kwargs) -> T | None:
+    @overload
+    def __call__[**P, R](self, func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R | None] | None]: ...
+
+    @overload
+    def __call__[**P, R](self, func: Callable[P, R]) -> Callable[P, R | None]: ...
+
+    def __call__[**P](self, func: Callable[P, object]) -> Callable[P, object]:
+        async def await_result(value: Awaitable[object]) -> object:
             with self:
-                return func(*args, **kwds)
+                return await value
+            return None
+
+        if _is_async(func):
+
+            @wraps(func)
+            async def async_wrapper(*args: P.args, **kwds: P.kwargs) -> object:
+                with self:
+                    return await func(*args, **kwds)
+                return None
+
+            return async_wrapper
+
+        @wraps(func)
+        def wrapper(*args: P.args, **kwds: P.kwargs) -> object:
+            with self:
+                result = func(*args, **kwds)
+                return await_result(result) if _is_awaitable(result) else result
             return None
 
         return wrapper
@@ -80,7 +120,7 @@ class Suppress:
             _exc_match, exc_rest = exc_value.split(self.exceptions)
 
             if exc_rest is None:
-                if msg := self.format_msg(type(exc_value), exc_rest):
+                if msg := self.format_msg(type(exc_value), exc_value):
                     logger.debug(msg)
                 return True
 

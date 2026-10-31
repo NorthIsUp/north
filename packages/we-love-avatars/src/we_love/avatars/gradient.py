@@ -5,7 +5,7 @@ from typing import Self
 
 import numpy as np
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class GradientType(StrEnum):
@@ -25,6 +25,7 @@ class GradientConfig(BaseModel):
     """Configuration for gradient backgrounds."""
 
     colors: list[tuple[int, int, int]] = Field(
+        min_length=2,
         default_factory=lambda: [(255, 0, 128), (128, 0, 255)],
         description="List of RGB colors to interpolate between",
     )
@@ -60,6 +61,13 @@ class GradientConfig(BaseModel):
         default=0.008,
         description="Drift speed for cloud movement",
     )
+
+    @field_validator("colors")
+    @classmethod
+    def valid_rgb(cls, colors: list[tuple[int, int, int]]) -> list[tuple[int, int, int]]:
+        if any(not 0 <= channel <= 255 for color in colors for channel in color):
+            raise ValueError("RGB channels must be between 0 and 255")
+        return colors
 
 
 class Gradient:
@@ -147,6 +155,8 @@ class Gradient:
         Returns:
             PIL Image with gradient background
         """
+        if width <= 0 or height <= 0 or total_frames <= 0:
+            raise ValueError("Dimensions and total_frames must be positive")
         # Create coordinate grids
         x = np.linspace(0, 1, width)
         y = np.linspace(0, 1, height)

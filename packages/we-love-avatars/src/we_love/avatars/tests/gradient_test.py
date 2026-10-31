@@ -77,11 +77,8 @@ def test_gradient_from_colors() -> None:
 
 def test_gradient_insufficient_colors() -> None:
     """Test gradient with insufficient colors raises error."""
-    config = GradientConfig(colors=[(255, 0, 0)])
-    gradient = Gradient(config)
-
-    with pytest.raises(ValueError, match="At least 2 colors required"):
-        gradient.render(100, 100)
+    with pytest.raises(ValueError, match="at least 2"):
+        GradientConfig(colors=[(255, 0, 0)])
 
 
 def test_gradient_angle() -> None:

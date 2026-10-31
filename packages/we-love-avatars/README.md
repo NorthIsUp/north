@@ -332,3 +332,15 @@ mise run clean-all
 ## License
 
 MIT
+
+
+## Verified API examples and boundaries
+
+```pycon
+>>> config = AvatarConfig(width=8, height=8, fps=1, duration=0.1, loop_configs=[])
+>>> image = Avatar(config).render_frame(0)
+>>> image.size
+(8, 8)
+```
+
+`avatar(seed)` creates an AvatarConfig; pass it to Avatar, then render_frame, save_png or save_gif. Equal seeds and generator settings produce equal configurations unless random_loop is enabled. Dimensions, frame rate, duration and max_loops must be positive; RGB channels must be in range and gradients require at least two colors. Positive sub-frame durations still produce one frame. Parallel rendering uses Python multiprocessing; protect script entry points with the usual __main__ guard.
