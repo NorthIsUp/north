@@ -144,9 +144,9 @@ uv publish dist/${package_name}-*.whl dist/${package_name}-*.tar.gz
 
 [tasks.publish-all]
 description = "Build and publish all packages to PyPI"
-depends = ["build"]
 run = """#!/usr/bin/env zsh
-echo "Publishing all packages..."
+set -euo pipefail
+uv build --all-packages --out-dir dist
 uv publish dist/*
 """
 
