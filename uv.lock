@@ -593,7 +593,7 @@ wheels = [
 
 [[package]]
 name = "we-love-alfred"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/we-love-alfred" }
 dependencies = [
     { name = "anyio" },
@@ -606,17 +606,6 @@ dependencies = [
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "anyio" },
-    { name = "asyncstdlib" },
-    { name = "httpx" },
-    { name = "pydantic", specifier = ">=2" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-avatars"
@@ -633,17 +622,6 @@ dependencies = [
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = ">=2.0.0" },
-    { name = "pillow", specifier = ">=13.0.0" },
-    { name = "pydantic", specifier = ">=2.10.0" },
-    { name = "tqdm", specifier = ">=4.66.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "we-love-cli"
@@ -667,20 +645,6 @@ dev = [
     { name = "pytest" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "argcomplete" },
-    { name = "debugpy", marker = "extra == 'debug'" },
-    { name = "pydantic", specifier = ">=2" },
-    { name = "rich" },
-    { name = "we-love-registry", editable = "packages/we-love-registry" },
-    { name = "we-love-string", editable = "packages/we-love-string" },
-]
-provides-extras = ["debug"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
-
 [[package]]
 name = "we-love-funcy"
 version = "0.2.0"
@@ -690,11 +654,6 @@ source = { editable = "packages/we-love-funcy" }
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-fzf"
@@ -709,12 +668,6 @@ dev = [
     { name = "pytest" },
 ]
 
-[package.metadata]
-requires-dist = [{ name = "pzp", specifier = ">=0.0.28" }]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
-
 [[package]]
 name = "we-love-matchbox"
 version = "0.2.0"
@@ -724,11 +677,6 @@ source = { editable = "packages/we-love-matchbox" }
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-pydantic"
@@ -744,15 +692,6 @@ dev = [
     { name = "pytest" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2" },
-    { name = "we-love-cli", editable = "packages/we-love-cli" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
-
 [[package]]
 name = "we-love-pyproject"
 version = "0.2.0"
@@ -766,15 +705,6 @@ dependencies = [
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic" },
-    { name = "tomlkit" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-registry"
@@ -790,15 +720,6 @@ dev = [
     { name = "pytest" },
 ]
 
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2" },
-    { name = "we-love-string", editable = "packages/we-love-string" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
-
 [[package]]
 name = "we-love-string"
 version = "0.2.0"
@@ -808,11 +729,6 @@ source = { editable = "packages/we-love-string" }
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]
 
 [[package]]
 name = "we-love-typeid"
@@ -826,9 +742,3 @@ dependencies = [
 dev = [
     { name = "pytest" },
 ]
-
-[package.metadata]
-requires-dist = [{ name = "uuid6", specifier = ">=0.1" }]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9" }]

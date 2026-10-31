@@ -11,7 +11,7 @@ import pytest
 from anyio import Path as AsyncPath
 from we_love.alfred import workflow as workflow_module
 from we_love.alfred.editor import Editor
-from we_love.alfred.fast import cache_path, filter_menu, read_cache, refresh, write_cache
+from we_love.alfred.fast import Menu, cache_path, filter_menu, read_cache, refresh, write_cache
 from we_love.alfred.workflow import AlfredWorkflow, MenuItem
 
 if TYPE_CHECKING:
@@ -45,6 +45,22 @@ def test_cache_roundtrip_filters_match_and_title(tmp_path: Path) -> None:
     assert filter_menu(menu, "dsbrd") == {"items": [{"title": "Open dashboard"}]}
     path.write_text('{"items": [')
     assert read_cache(path) is None
+
+
+def test_filter_ranks_title_matches_above_scattered_letters() -> None:
+    menu: Menu = {
+        "items": [
+            {"title": "user.workflow.A59C", "match": "code /tmp/a1-m2-p3-l4-i5-t6-u7-d8-e9/workspace"},
+            {"title": "Experiments + Feature Flags", "match": "experiments amplitude flags"},
+            {"title": "Clamp utility"},
+            {"title": "Amplitude"},
+        ]
+    }
+    match filter_menu(menu, "amplitude"):
+        case {"items": [{"title": first}, {"title": second}, {"title": third}]}:
+            assert (first, second, third) == ("Amplitude", "Experiments + Feature Flags", "user.workflow.A59C")
+        case unexpected:
+            pytest.fail(f"unexpected ranking: {unexpected}")
 
 
 def test_refresh_preserves_argv_and_throttles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
