@@ -7,13 +7,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from . import guards, regex
+from . import guards, json, regex
 
 if TYPE_CHECKING:
     from types import ModuleType
 
 
-@pytest.mark.parametrize("module", [guards, regex])
+__all__ = []
+
+
+@pytest.mark.parametrize("module", [guards, json, regex])
 def test_match_statement_doctests(module: ModuleType) -> None:
     """Users can copy the documented guard and regex cases and get the shown output."""
     result = doctest.testmod(module, raise_on_error=True)

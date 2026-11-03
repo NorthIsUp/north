@@ -97,3 +97,49 @@ Fix dictionary guard narrowing and stale regex captures; add validated union
 and nested type matching, export all public guards/matching modes, and include
 executable `match` examples. Previously rejected unions now match normally;
 `None` is accepted as shorthand for `type(None)`.
+
+## JSON types and match guards (0.4.0)
+
+The package exports the complete decoded JSON type family and a corresponding
+`is_json_*` guard for each alias:
+
+```python
+type JsonNull = None
+type JsonBool = bool
+type JsonNumber = int | float
+type JsonString = str
+type JsonObject = dict[str, JsonValue]
+type JsonArray = list[JsonValue]
+type JsonValue = JsonNull | JsonBool | JsonNumber | JsonString | JsonObject | JsonArray
+```
+
+```python
+from we_love.matchbox import is_json_array, is_json_object
+
+match payload:
+    case _ if is_json_object(payload):
+        # payload: JsonObject
+        print(payload.keys())
+    case _ if is_json_array(payload):
+        # payload: JsonArray
+        print(len(payload))
+```
+
+The guards validate Python values already decoded from JSON; they do not parse
+JSON text or coerce values. Objects require string keys and arrays require
+lists. Containers are checked at every depth, including empty containers.
+Tuples, sets, bytes, and arbitrary objects are rejected. Cycles are rejected;
+shared references without cycles are accepted. Validation uses an explicit
+stack, so deeply nested values do not consume Python's recursion limit.
+
+`is_json_number` excludes booleans and NaN/infinity. `is_json_value` accepts
+booleans as their own JSON category. Python's type system cannot express the
+finite-float constraint or exclude `bool` from `int`, so the numeric alias alone
+does not enforce those restrictions. `TypeGuard` narrowing describes the
+validated value at the time of the call; later mutations must preserve it.
+
+These are typing aliases, so use guards rather than class patterns such as
+`case JsonObject()`. The JSON-specific guards are the validation API for the recursive aliases;
+`match_type` continues to support the type-expression language documented above.
+Executable match-case examples live in `we_love.matchbox.json` and run in the
+normal pytest suite.

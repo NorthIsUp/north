@@ -5,7 +5,7 @@ requires = ["uv-build>=0.8,<0.9"]
 
 [project]
 name = "we-love-matchbox"
-version = "0.3.0"
+version = "0.4.0"
 description = "Guards and regex value patterns for structural match statements"
 readme = "README.md"
 requires-python = ">=3.13"
