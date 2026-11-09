@@ -1,0 +1,20 @@
+[package]
+name = "we-love-alfred"
+version = "0.1.0"
+description = "Build fast, cached Alfred Script Filter menus"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["std", "clock", "serde"] }
+glob = "0.3.4"
+log = "0.4.35"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+tl = "0.7.8"
+ureq = { version = "3.5.1", features = ["json"] }
+url = "2.5.8"

@@ -15,6 +15,13 @@ local linters = new Mapping<String, Step> {
     ["ty"] {
         check = "uv run --all-packages --frozen ty check --python .venv --error-on-warning"
     }
+    ["cargo-fmt"] {
+        check = "cargo fmt --all --check"
+        fix = "cargo fmt --all"
+    }
+    ["clippy"] {
+        check = "cargo clippy --workspace --all-targets --locked -- -D warnings"
+    }
 }
 
 hooks {
