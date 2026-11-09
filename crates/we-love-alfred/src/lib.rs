@@ -10,7 +10,7 @@ mod icons;
 mod item;
 mod menu;
 pub mod okta;
-mod shell;
+pub mod shell;
 pub mod tailscale;
 mod template;
 pub mod update;

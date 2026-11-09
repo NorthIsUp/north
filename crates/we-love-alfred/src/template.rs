@@ -8,7 +8,8 @@ use toml::{Table, Value};
 use crate::{Error, Result};
 
 /// Values a template can reference, innermost first: loop bindings, then `[vars]`.
-/// `{env.NAME}` reads the environment; `{{` and `}}` are literal braces.
+/// `{env.NAME}` reads the environment, `{name:-fallback}` defaults a missing or empty value,
+/// and `{{` and `}}` are literal braces.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Scope<'a> {
     pub vars: &'a Table,
@@ -45,6 +46,14 @@ impl Scope<'_> {
     }
 
     fn lookup(&self, template: &str, name: &str, depth: usize) -> Result<String> {
+        // `{name:-fallback}`: shell-style default when the value is missing or empty.
+        if let Some((name, fallback)) = name.split_once(":-") {
+            return match self.lookup(template, name.trim(), depth) {
+                Ok(value) if !value.is_empty() => Ok(value),
+                Ok(_) | Err(Error::Template { .. }) => self.render_at(fallback, depth + 1),
+                Err(e) => Err(e),
+            };
+        }
         let missing = || Error::Template {
             template: template.into(),
             name: name.into(),

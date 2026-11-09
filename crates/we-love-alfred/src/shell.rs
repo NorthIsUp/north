@@ -1,3 +1,5 @@
+//! Process helpers for Alfred's minimal environment.
+
 use std::env;
 use std::ffi::OsString;
 use std::process::Stdio;
@@ -9,7 +11,7 @@ use crate::cache::home;
 use crate::{Error, Result};
 
 /// Same rules as Python's `shlex.quote`: safe strings pass through unquoted.
-pub(crate) fn quote(s: &str) -> String {
+pub fn quote(s: &str) -> String {
     let safe = |c: char| c.is_ascii_alphanumeric() || "@%+=:,./_-".contains(c);
     if !s.is_empty() && s.chars().all(safe) {
         s.to_owned()
@@ -18,7 +20,7 @@ pub(crate) fn quote(s: &str) -> String {
     }
 }
 
-pub(crate) fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String {
+pub fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String {
     parts
         .into_iter()
         .map(|part| quote(part.as_ref()))
@@ -27,7 +29,7 @@ pub(crate) fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String 
 }
 
 /// `$PATH` plus mise, Homebrew and `~/.local/bin`: Alfred doesn't inherit the login shell's PATH.
-pub(crate) fn tool_path() -> OsString {
+pub fn tool_path() -> OsString {
     let home = home();
     let current = env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin".into());
     let extra = [
@@ -40,14 +42,14 @@ pub(crate) fn tool_path() -> OsString {
 }
 
 /// A command found on [`tool_path`].
-pub(crate) fn tool(program: impl AsRef<std::ffi::OsStr>) -> Command {
+pub fn tool(program: impl AsRef<std::ffi::OsStr>) -> Command {
     let mut command = Command::new(program);
     command.env("PATH", tool_path());
     command
 }
 
 /// Stdout of `command`; a nonzero exit is an error carrying stderr. Killed after `timeout`.
-pub(crate) async fn output(command: &mut Command, timeout: Duration) -> Result<String> {
+pub async fn output(command: &mut Command, timeout: Duration) -> Result<String> {
     let program = command
         .as_std()
         .get_program()

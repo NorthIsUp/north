@@ -37,6 +37,7 @@ Every string is a template:
 - `{name}` reads `[vars]` or a loop binding.
 - `{name.field}` reaches into a table.
 - `{env.NAME}` reads the environment.
+- `{name:-fallback}` uses the fallback when the value is missing or empty.
 - `{{` and `}}` are literal braces.
 
 ```toml
