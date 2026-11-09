@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
-use crate::fast::{cache_filename, refresh_marker};
+use crate::cache::{validate_name, with_suffix};
 use crate::shell::quote;
 
 /// Paths the "clear cache" action deletes.
@@ -33,13 +33,12 @@ impl CacheCleanup {
         let bundle = environment
             .get("alfred_workflow_bundleid")
             .filter(|b| !b.is_empty())
-            .and_then(|b| cache_filename(Some(b)).ok())
-            .map(|file| file.trim_end_matches(".json").to_owned());
+            .and_then(|b| validate_name(b).ok());
 
         let workflow_path = |key: &str, root: &Path| {
             let path = match environment.get(key).filter(|raw| !raw.is_empty()) {
                 Some(raw) => PathBuf::from(raw),
-                None => root.join(bundle.as_ref()?),
+                None => root.join(bundle?),
             };
             let blocked =
                 home.ancestors().any(|a| a == path) || path == cache_root || path == data_root;
@@ -57,7 +56,7 @@ impl CacheCleanup {
 
     /// A POSIX shell command that stops a pending refresh and deletes the caches.
     pub fn command(&self) -> String {
-        let marker = quote(&refresh_marker(&self.menu_cache).to_string_lossy());
+        let marker = quote(&with_suffix(&self.menu_cache, ".refresh.pid").to_string_lossy());
         let mut commands = vec![
             format!(
                 "if [ -f {marker} ]; then refresh_pid=$(cat {marker}); \
@@ -111,9 +110,9 @@ mod tests {
         )
     }
 
-    #[test]
-    fn cleanup_preserves_workflow_data_and_sibling_caches() {
-        let _serial = crate::serial();
+    #[tokio::test]
+    async fn cleanup_preserves_workflow_data_and_sibling_caches() {
+        let _serial = crate::serial().await;
         for explicit_paths in [false, true] {
             let dir = tempfile::tempdir().unwrap();
             let home = dir.path();
@@ -139,7 +138,7 @@ mod tests {
             }
             let sibling = cache.parent().unwrap().join("another-workflow/cache.json");
             fs::create_dir_all(sibling.parent().unwrap()).unwrap();
-            let marker = refresh_marker(&cleanup.menu_cache);
+            let marker = with_suffix(&cleanup.menu_cache, ".refresh.pid");
             let doomed = [
                 cache.join("old.json"),
                 data.join("state.cache"),

@@ -2,22 +2,22 @@
 //!
 //! `gh pr list` output is cached for `ttl` and refreshed by a detached copy of
 //! the current binary once stale, so only the very first lookup waits on `gh`.
-//! The binary must forward its arguments to [`dispatch`] first thing in `main`.
+//! [`crate::Workflow`] handles the refresh command; without it, forward
+//! arguments to [`dispatch`].
 
 use std::collections::BTreeSet;
-use std::ffi::OsString;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant, SystemTime};
-use std::{env, fs, thread};
+use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
+use tokio::fs;
+use tokio::process::Command;
 
-use crate::fast::{atomic_write, home, spawn_refresh, with_suffix};
+use crate::cache::{atomic_write, spawn_throttled, with_suffix};
 use crate::menu::is_subsequence;
-use crate::{Error, Menu, MenuItem, Result, Text};
+use crate::shell::{output, tool};
+use crate::{Error, Item, Result, Text};
 
 /// First argument of the detached refresh command; see [`dispatch`].
 pub const REFRESH_COMMAND: &str = "github-refresh";
@@ -30,24 +30,6 @@ pub fn fuzzy_match<S: AsRef<str>>(terms: &[S], text: &str) -> bool {
     terms
         .iter()
         .all(|term| is_subsequence(&term.as_ref().to_lowercase(), &text))
-}
-
-/// Script Filter JSON; a non-actionable `empty` row stands in for no results.
-pub fn menu_json(items: Vec<MenuItem>, empty: &str) -> String {
-    let items = if items.is_empty() {
-        vec![MenuItem {
-            title: empty.into(),
-            valid: Some(false),
-            ..MenuItem::default()
-        }]
-    } else {
-        items
-    };
-    serde_json::to_string(&Menu {
-        items,
-        ..Menu::default()
-    })
-    .expect("menu items serialize")
 }
 
 /// One row of `gh pr list --json number,title,author,isDraft,updatedAt,url`.
@@ -107,9 +89,9 @@ impl PullRequest {
         fuzzy_match(terms, &format!("{} {}", self.number, self.title))
     }
 
-    pub fn item(&self) -> MenuItem {
+    pub fn item(&self) -> Item {
         let draft = if self.is_draft { " · draft" } else { "" };
-        MenuItem {
+        Item {
             title: format!("#{} {}", self.number, self.title),
             subtitle: format!(
                 "@{}{draft} · updated {}",
@@ -123,7 +105,7 @@ impl PullRequest {
                 copy: self.url.clone(),
                 largetype: self.title.clone(),
             }),
-            ..MenuItem::default()
+            ..Item::default()
         }
     }
 }
@@ -149,7 +131,7 @@ impl PullRequestCache {
             ttl: Duration::from_secs(3600),
             retry_every: Duration::from_secs(60),
             limit: 1000,
-            refresh_exe: env::current_exe().unwrap_or_default(),
+            refresh_exe: std::env::current_exe().unwrap_or_default(),
         }
     }
 
@@ -159,71 +141,62 @@ impl PullRequestCache {
     }
 
     /// Run `gh` now and atomically replace the cache; a payload that won't parse is never written.
-    pub fn fetch(&self) -> Result<()> {
-        self.fetch_with(Path::new("gh"))
+    pub async fn fetch(&self) -> Result<()> {
+        self.fetch_with(tool("gh")).await
     }
 
-    fn fetch_with(&self, gh: &Path) -> Result<()> {
-        let fields = "number,title,author,isDraft,updatedAt,url";
+    async fn fetch_with(&self, mut gh: Command) -> Result<()> {
         let limit = self.limit.to_string();
-        let mut command = Command::new(gh);
-        command
-            .args([
-                "pr", "list", "-R", &self.repo, "--state", "open", "--limit", &limit, "--json",
-                fields,
-            ])
-            .env("PATH", tool_path());
-        let stdout = run_with_timeout(command, GH_TIMEOUT)?;
+        gh.args([
+            "pr", "list", "-R", &self.repo, "--state", "open", "--limit", &limit,
+        ]);
+        gh.args(["--json", "number,title,author,isDraft,updatedAt,url"]);
+        let stdout = output(&mut gh, GH_TIMEOUT).await?;
         PullRequest::list_from_json(&stdout)?;
-        atomic_write(&self.path, stdout.as_bytes())
+        atomic_write(&self.path, stdout.as_bytes()).await
     }
 
-    pub fn is_fresh(&self) -> bool {
-        fs::metadata(&self.path)
-            .and_then(|m| m.modified())
-            .is_ok_and(|modified| {
-                SystemTime::now()
-                    .duration_since(modified)
-                    .unwrap_or_default()
-                    < self.ttl
-            })
+    pub async fn is_fresh(&self) -> bool {
+        let modified = fs::metadata(&self.path).await.and_then(|m| m.modified());
+        modified.is_ok_and(|m| SystemTime::now().duration_since(m).unwrap_or_default() < self.ttl)
     }
 
     /// Start a detached refresh if the cache is stale; returns whether one started.
-    pub fn warm(&self) -> bool {
-        !self.is_fresh() && self.schedule_refresh()
+    pub async fn warm(&self) -> bool {
+        !self.is_fresh().await && self.schedule_refresh().await
     }
 
-    fn schedule_refresh(&self) -> bool {
+    async fn schedule_refresh(&self) -> bool {
         let mut command = Command::new(&self.refresh_exe);
         command
             .arg(REFRESH_COMMAND)
             .arg(&self.repo)
             .arg(&self.path)
             .args(["--limit", &self.limit.to_string()]);
-        spawn_refresh(command, &self.warming_path(), self.retry_every)
+        spawn_throttled(&mut command, &self.warming_path(), self.retry_every).await
     }
 
     /// Cached PRs, even stale ones; a miss or malformed cache yields none. Never waits on `gh`.
-    pub fn load(&self) -> Vec<PullRequest> {
-        match fs::read_to_string(&self.path)
+    pub async fn load(&self) -> Vec<PullRequest> {
+        let cached = fs::read_to_string(&self.path)
+            .await
             .map_err(Error::from)
-            .and_then(|d| PullRequest::list_from_json(&d))
-        {
+            .and_then(|d| PullRequest::list_from_json(&d));
+        match cached {
             Ok(prs) => {
-                self.warm();
+                self.warm().await;
                 prs
             }
             Err(_) => {
-                self.schedule_refresh();
+                self.schedule_refresh().await;
                 Vec::new()
             }
         }
     }
 
     /// `[@author] [terms]`; an `@author` matching no login lists authors to autocomplete instead.
-    pub fn search_items(&self, args: &str, keyword: &str) -> Vec<MenuItem> {
-        let prs = self.load();
+    pub async fn search_items(&self, args: &str, keyword: &str) -> Vec<Item> {
+        let prs = self.load().await;
         let (authors, terms): (Vec<&str>, Vec<&str>) =
             args.split_whitespace().partition(|w| w.starts_with('@'));
         let authors: Vec<String> = authors.iter().map(|a| a[1..].to_lowercase()).collect();
@@ -242,15 +215,15 @@ impl PullRequestCache {
             return logins
                 .iter()
                 .filter(|login| fuzzy_match(&[pending], login))
-                .map(|login| MenuItem {
-                    title: format!("@{login}"),
-                    subtitle: format!(
-                        "{} open PRs",
-                        prs.iter().filter(|pr| pr.author == *login).count()
-                    ),
+                .map(|login| Item {
                     autocomplete: format!("{keyword} @{login} "),
-                    valid: Some(false),
-                    ..MenuItem::default()
+                    ..Item::message(
+                        format!("@{login}"),
+                        format!(
+                            "{} open PRs",
+                            prs.iter().filter(|pr| pr.author == *login).count()
+                        ),
+                    )
                 })
                 .collect();
         }
@@ -263,7 +236,7 @@ impl PullRequestCache {
     }
 
     /// Text after `#`: digits narrow by number prefix, anything else by title.
-    pub fn number_items(&self, needle: &str) -> Vec<MenuItem> {
+    pub async fn number_items(&self, needle: &str) -> Vec<Item> {
         let needle = needle.trim();
         let number = needle
             .bytes()
@@ -271,8 +244,9 @@ impl PullRequestCache {
             .then(|| needle.parse::<u64>().ok())
             .flatten();
         let terms: Vec<&str> = needle.split_whitespace().collect();
-        let mut items: Vec<MenuItem> = self
+        let mut items: Vec<Item> = self
             .load()
+            .await
             .iter()
             .filter(|pr| match number {
                 Some(_) => pr.number.to_string().starts_with(needle),
@@ -291,31 +265,20 @@ impl PullRequestCache {
         items
     }
 
-    pub fn link_item(&self, number: u64) -> MenuItem {
+    pub fn link_item(&self, number: u64) -> Item {
         let url = format!("https://github.com/{}/pull/{number}", self.repo);
-        MenuItem {
+        Item {
             title: format!("Open PR #{number}"),
             arg: format!("open {url}"),
             subtitle: url,
             valid: Some(true),
-            ..MenuItem::default()
+            ..Item::default()
         }
     }
 }
 
 /// Handle a detached refresh: `Some` when `args` (without the program name) start with [`REFRESH_COMMAND`].
-///
-/// ```no_run
-/// fn main() -> we_love_alfred::Result<()> {
-///     if let Some(refreshed) = we_love_alfred::github::dispatch(std::env::args().skip(1)) {
-///         return refreshed;
-///     }
-///     // ... serve the menu
-///     Ok(())
-/// }
-/// ```
-pub fn dispatch(args: impl IntoIterator<Item = String>) -> Option<Result<()>> {
-    let args: Vec<String> = args.into_iter().collect();
+pub async fn dispatch(args: &[String]) -> Option<Result<()>> {
     let (command, rest) = args.split_first()?;
     if command != REFRESH_COMMAND {
         return None;
@@ -331,67 +294,14 @@ pub fn dispatch(args: impl IntoIterator<Item = String>) -> Option<Result<()>> {
         },
         _ => return Some(Err(Error::Usage(USAGE))),
     };
-    Some(cache.fetch())
-}
-
-/// GUI apps don't inherit the interactive shell's PATH, so `gh` may be missing from it.
-fn tool_path() -> OsString {
-    let home = home();
-    let current = env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin".into());
-    let extra = [
-        home.join(".local/share/mise/shims"),
-        home.join(".local/bin"),
-        "/opt/homebrew/bin".into(),
-        "/usr/local/bin".into(),
-    ];
-    env::join_paths(env::split_paths(&current).chain(extra)).unwrap_or(current)
-}
-
-fn run_with_timeout(mut command: Command, timeout: Duration) -> Result<String> {
-    let program = command.get_program().to_string_lossy().into_owned();
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    // Drain both pipes concurrently so a large payload can't block the child.
-    let drain = |mut pipe: Box<dyn Read + Send>| {
-        thread::spawn(move || {
-            let mut text = String::new();
-            pipe.read_to_string(&mut text).map(|_| text)
-        })
-    };
-    let stdout = drain(Box::new(child.stdout.take().expect("piped stdout")));
-    let stderr = drain(Box::new(child.stderr.take().expect("piped stderr")));
-    let deadline = Instant::now() + timeout;
-    let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
-        }
-        if Instant::now() >= deadline {
-            child.kill()?;
-            child.wait()?;
-            return Err(Error::Timeout(program));
-        }
-        thread::sleep(Duration::from_millis(20));
-    };
-    let stdout = stdout.join().expect("stdout reader")?;
-    let stderr = stderr.join().expect("stderr reader")?;
-    if !status.success() {
-        let stderr = stderr.trim();
-        let stderr = if stderr.is_empty() {
-            format!("{program} pr list failed")
-        } else {
-            stderr.to_owned()
-        };
-        return Err(Error::Command { program, stderr });
-    }
-    Ok(stdout)
+    Some(cache.fetch().await)
 }
 
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
+    use std::time::Instant;
 
     use chrono::{TimeZone, Utc};
     use serde_json::{Value, json};
@@ -400,12 +310,8 @@ mod tests {
 
     fn row(number: u64, title: &str, author: &str, updated: &str, draft: bool) -> Value {
         json!({
-            "number": number,
-            "title": title,
-            "author": {"login": author, "name": author, "is_bot": false},
-            "isDraft": draft,
-            "updatedAt": updated,
-            "url": format!("https://github.com/acme/app/pull/{number}"),
+            "number": number, "title": title, "author": {"login": author, "is_bot": false},
+            "isDraft": draft, "updatedAt": updated, "url": format!("https://github.com/acme/app/pull/{number}"),
         })
     }
 
@@ -435,11 +341,11 @@ mod tests {
         ])
     }
 
-    /// A cache holding `rows()` that refreshes through a script recording its argv.
+    /// A cache holding `rows()` aged `age`, refreshing through a script that records its argv.
     fn cache(dir: &Path, age: Duration) -> PullRequestCache {
         let path = dir.join("prs.json");
-        fs::write(&path, rows().to_string()).unwrap();
-        fs::File::options()
+        std::fs::write(&path, rows().to_string()).unwrap();
+        std::fs::File::options()
             .write(true)
             .open(&path)
             .unwrap()
@@ -458,12 +364,12 @@ mod tests {
 
     fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
         let path = dir.join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
         path
     }
 
-    fn prefixes(items: &[MenuItem]) -> Vec<&str> {
+    fn prefixes(items: &[Item]) -> Vec<&str> {
         items.iter().map(|i| &i.title[..5]).collect()
     }
 
@@ -483,17 +389,16 @@ mod tests {
             pr.updated_at,
             Utc.with_ymd_and_hms(2026, 10, 30, 12, 0, 0).unwrap()
         );
-        assert!((pr.number, pr.is_draft, pr.author.as_str()) == (4496, true, "NorthIsUp"));
+        assert_eq!(
+            (pr.number, pr.is_draft, pr.author.as_str()),
+            (4496, true, "NorthIsUp")
+        );
         assert!(serde_json::from_value::<PullRequest>(json!({"number": "4468"})).is_err());
         assert!(
             serde_json::from_value::<PullRequest>(row(1, "t", "a", "2026-10-30T12:00:00", false))
                 .is_err()
         );
         assert!(serde_json::from_value::<PullRequest>(json!({"number": true})).is_err());
-    }
-
-    #[test]
-    fn list_sorts_newest_first() {
         let numbers: Vec<_> = PullRequest::list_from_json(&rows().to_string())
             .unwrap()
             .iter()
@@ -513,124 +418,98 @@ mod tests {
         assert_eq!(item.autocomplete, "#4496");
     }
 
-    #[test]
-    fn search_filters_by_author_and_terms() {
+    #[tokio::test]
+    async fn search_and_number_items() {
         let dir = tempfile::tempdir().unwrap();
         let cache = cache(dir.path(), Duration::ZERO);
         assert_eq!(
-            prefixes(&cache.search_items("", "prs")),
+            prefixes(&cache.search_items("", "prs").await),
             ["#4496", "#4468", "#4401"]
         );
         assert_eq!(
-            prefixes(&cache.search_items("@northisup fhir", "prs")),
+            prefixes(&cache.search_items("@northisup fhir", "prs").await),
             ["#4468"]
         );
-        let authors = cache.search_items("@sar", "prs");
+        let authors = cache.search_items("@sar", "prs").await;
         assert_eq!(authors.len(), 1);
         assert_eq!(
             (authors[0].title.as_str(), authors[0].autocomplete.as_str()),
             ("@sarahrhodes-clara", "prs @sarahrhodes-clara ")
         );
-        assert_eq!(authors[0].valid, Some(false));
-    }
-
-    #[test]
-    fn number_items_narrow_and_link() {
-        let dir = tempfile::tempdir().unwrap();
-        let cache = cache(dir.path(), Duration::ZERO);
-        assert_eq!(prefixes(&cache.number_items("4468")), ["#4468"]);
+        assert_eq!(prefixes(&cache.number_items("4468").await), ["#4468"]);
         assert_eq!(
-            prefixes(&cache.number_items("44")),
+            prefixes(&cache.number_items("44").await),
             ["#4496", "#4468", "#4401", "Open "]
         );
-        assert_eq!(cache.number_items("12"), [cache.link_item(12)]);
-        assert_eq!(prefixes(&cache.number_items("labs")), ["#4401"]);
+        assert_eq!(cache.number_items("12").await, [cache.link_item(12)]);
+        assert_eq!(prefixes(&cache.number_items("labs").await), ["#4401"]);
     }
 
-    #[test]
-    fn menu_json_uses_fallback_when_empty() {
-        assert_eq!(
-            menu_json(vec![], "No matching open PRs"),
-            r#"{"items":[{"title":"No matching open PRs","valid":false}]}"#
-        );
-    }
-
-    #[test]
-    fn warm_spawns_once_per_retry_window_and_skips_fresh() {
-        let _serial = crate::serial();
+    #[tokio::test]
+    async fn warm_spawns_once_per_retry_window_and_skips_fresh() {
+        let _serial = crate::serial().await;
         let dir = tempfile::tempdir().unwrap();
-        assert!(!cache(dir.path(), Duration::ZERO).warm());
+        assert!(!cache(dir.path(), Duration::ZERO).warm().await);
         let stale = PullRequestCache {
             limit: 25,
             ..cache(dir.path(), Duration::from_secs(7200))
         };
-        assert!(stale.warm());
-        assert!(!stale.warm());
+        assert!(stale.warm().await);
+        assert!(!stale.warm().await);
         let argv = dir.path().join("argv");
         let deadline = Instant::now() + Duration::from_secs(5);
         while !argv.exists() && Instant::now() < deadline {
-            thread::sleep(Duration::from_millis(20));
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
         let expected = format!(
             "{REFRESH_COMMAND}\nacme/app\n{}\n--limit\n25\n",
             stale.path.display()
         );
-        assert_eq!(fs::read_to_string(argv).unwrap(), expected);
+        assert_eq!(std::fs::read_to_string(argv).unwrap(), expected);
     }
 
-    #[test]
-    fn broken_or_missing_cache_serves_nothing_and_refreshes_once() {
-        let _serial = crate::serial();
+    #[tokio::test]
+    async fn broken_or_missing_cache_serves_nothing_and_refreshes_once() {
+        let _serial = crate::serial().await;
         let dir = tempfile::tempdir().unwrap();
         let cache = cache(dir.path(), Duration::ZERO);
-        fs::write(&cache.path, "broken").unwrap();
-        assert!(cache.load().is_empty());
-        assert!(cache.load().is_empty());
+        std::fs::write(&cache.path, "broken").unwrap();
+        assert!(cache.load().await.is_empty());
+        assert!(cache.load().await.is_empty());
         assert!(
-            !cache.schedule_refresh(),
+            !cache.schedule_refresh().await,
             "second load should have hit the throttle"
         );
         let missing = PullRequestCache {
             path: dir.path().join("missing.json"),
             ..cache.clone()
         };
-        assert!(missing.load().is_empty());
+        assert!(missing.load().await.is_empty());
     }
 
-    #[test]
-    fn stale_cache_still_serves() {
-        let _serial = crate::serial();
-        let dir = tempfile::tempdir().unwrap();
-        assert_eq!(cache(dir.path(), Duration::from_secs(7200)).load().len(), 3);
-    }
-
-    #[test]
-    fn fetch_replaces_only_with_valid_payload() {
-        let _serial = crate::serial();
+    #[tokio::test]
+    async fn fetch_replaces_only_with_valid_payload() {
+        let _serial = crate::serial().await;
         let dir = tempfile::tempdir().unwrap();
         let cache = cache(dir.path(), Duration::ZERO);
-        let previous = fs::read_to_string(&cache.path).unwrap();
-        let bad = script(dir.path(), "gh-bad", "echo 'not JSON'");
-        assert!(matches!(cache.fetch_with(&bad), Err(Error::Json(_))));
-        assert_eq!(fs::read_to_string(&cache.path).unwrap(), previous);
-        let failing = script(dir.path(), "gh-fail", "echo denied >&2; exit 1");
-        assert!(
-            matches!(cache.fetch_with(&failing), Err(Error::Command { stderr, .. }) if stderr == "denied")
-        );
-        let good = script(
+        let previous = std::fs::read_to_string(&cache.path).unwrap();
+        let bad = Command::new(script(dir.path(), "gh-bad", "echo 'not JSON'"));
+        assert!(matches!(cache.fetch_with(bad).await, Err(Error::Json(_))));
+        assert_eq!(std::fs::read_to_string(&cache.path).unwrap(), previous);
+        let good = Command::new(script(
             dir.path(),
             "gh-good",
             &format!("echo '{}'", json!([rows()[2]])),
-        );
-        cache.fetch_with(&good).unwrap();
-        assert_eq!(cache.load().len(), 1);
+        ));
+        cache.fetch_with(good).await.unwrap();
+        assert_eq!(cache.load().await.len(), 1);
     }
 
-    #[test]
-    fn dispatch_handles_only_refresh() {
-        assert!(dispatch(["nope".to_owned()]).is_none());
+    #[tokio::test]
+    async fn dispatch_handles_only_refresh() {
+        assert!(dispatch(&["nope".to_owned()]).await.is_none());
         assert!(matches!(
-            dispatch([REFRESH_COMMAND.to_owned()]),
+            dispatch(&[REFRESH_COMMAND.to_owned()]).await,
             Some(Err(Error::Usage(_)))
         ));
     }

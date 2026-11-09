@@ -8,13 +8,19 @@ rust-version.workspace = true
 
 [dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["std", "clock", "serde"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 glob = "0.3.4"
 log = "0.4.35"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "form"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
-tempfile = "3.27.0"
 thiserror = "2.0.21"
 tl = "0.7.8"
-ureq = { version = "3.5.1", features = ["json"] }
-url = "2.5.8"
+tokio = { version = "1.54.1", features = ["fs", "process", "time", "sync", "io-util"] }
+toml = { version = "1.2.1", features = ["preserve_order"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["macros", "rt", "rt-multi-thread"] }

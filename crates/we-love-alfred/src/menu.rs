@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -6,7 +9,13 @@ use serde_json::{Map, Value};
 pub struct Menu {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache: Option<MenuCache>,
-    pub items: Vec<MenuItem>,
+    /// Seconds until Alfred reruns the Script Filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rerun: Option<f64>,
+    /// Session variables Alfred passes back on reruns.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub variables: BTreeMap<String, String>,
+    pub items: Vec<Item>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -29,7 +38,7 @@ impl Default for MenuCache {
 
 /// One Script Filter row. Empty strings and `None`s are omitted; unknown keys are preserved.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct MenuItem {
+pub struct Item {
     pub title: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub subtitle: String,
@@ -45,14 +54,25 @@ pub struct MenuItem {
     pub valid: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<Icon>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alt: Option<Modifier>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cmd: Option<Modifier>,
+    /// Overrides while a modifier is held, keyed `alt`, `cmd`, `ctrl`, `shift`, `fn` or a combo like `cmd+alt`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub mods: BTreeMap<String, Modifier>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<Text>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+impl Item {
+    /// A row that can't be actioned, for messages and empty results.
+    pub fn message(title: impl Into<String>, subtitle: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            subtitle: subtitle.into(),
+            valid: Some(false),
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +123,22 @@ pub struct Text {
     pub largetype: String,
 }
 
+impl FromIterator<Item> for Menu {
+    fn from_iter<I: IntoIterator<Item = Item>>(items: I) -> Self {
+        Self {
+            items: items.into_iter().collect(),
+            ..Self::default()
+        }
+    }
+}
+
+impl fmt::Display for Menu {
+    /// The Script Filter JSON.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&serde_json::to_string(self).map_err(|_| fmt::Error)?)
+    }
+}
+
 impl Menu {
     /// Keep items whose `match` (or `title`) contains every query token as a
     /// case-insensitive subsequence, best matches first.
@@ -110,10 +146,10 @@ impl Menu {
     /// Drops `cache` so Alfred never reuses one query's results for another.
     ///
     /// ```
-    /// use we_love_alfred::{Menu, MenuItem};
+    /// use we_love_alfred::{Item, Menu};
     ///
-    /// let item = |title: &str| MenuItem { title: title.into(), ..Default::default() };
-    /// let menu = Menu { items: vec![item("Hello"), item("Other")], ..Default::default() };
+    /// let item = |title: &str| Item { title: title.into(), ..Item::default() };
+    /// let menu = Menu::from_iter([item("Hello"), item("Other")]);
     /// assert_eq!(menu.filter("hello").items, [item("Hello")]);
     /// ```
     #[must_use]
@@ -123,7 +159,7 @@ impl Menu {
             .split_whitespace()
             .map(str::to_owned)
             .collect();
-        let mut ranked: Vec<(u32, MenuItem)> = self
+        let mut ranked: Vec<(u32, Item)> = self
             .items
             .into_iter()
             .filter_map(|item| {
@@ -144,6 +180,15 @@ impl Menu {
         ranked.sort_by_key(|(total, _)| *total);
         self.items = ranked.into_iter().map(|(_, item)| item).collect();
         self.cache = None;
+        self
+    }
+
+    /// Show a non-actionable `title` row instead of an empty menu.
+    #[must_use]
+    pub fn or_message(mut self, title: &str) -> Self {
+        if self.items.is_empty() {
+            self.items.push(Item::message(title, ""));
+        }
         self
     }
 }
@@ -171,11 +216,11 @@ pub(crate) fn is_subsequence(needle: &str, haystack: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn item(title: &str, match_text: &str) -> MenuItem {
-        MenuItem {
+    fn item(title: &str, match_text: &str) -> Item {
+        Item {
             title: title.into(),
             match_text: match_text.into(),
-            ..Default::default()
+            ..Item::default()
         }
     }
 
@@ -187,7 +232,7 @@ mod tests {
                 item("Production deploy", "production deploy"),
                 item("Open dashboard", ""),
             ],
-            ..Default::default()
+            ..Menu::default()
         };
         let filtered = menu.clone().filter("prd dpl");
         assert_eq!(
@@ -200,18 +245,15 @@ mod tests {
 
     #[test]
     fn ranks_title_matches_above_scattered_letters() {
-        let menu = Menu {
-            items: vec![
-                item(
-                    "user.workflow.A59C",
-                    "code /tmp/a1-m2-p3-l4-i5-t6-u7-d8-e9/workspace",
-                ),
-                item("Experiments + Feature Flags", "experiments amplitude flags"),
-                item("Clamp utility", ""),
-                item("Amplitude", ""),
-            ],
-            ..Default::default()
-        };
+        let menu = Menu::from_iter([
+            item(
+                "user.workflow.A59C",
+                "code /tmp/a1-m2-p3-l4-i5-t6-u7-d8-e9/workspace",
+            ),
+            item("Experiments + Feature Flags", "experiments amplitude flags"),
+            item("Clamp utility", ""),
+            item("Amplitude", ""),
+        ]);
         let titles: Vec<_> = menu
             .filter("amplitude")
             .items
@@ -229,12 +271,18 @@ mod tests {
     }
 
     #[test]
-    fn unknown_keys_round_trip() {
-        let raw = r#"{"rerun":1.0,"items":[{"title":"A","quicklookurl":"x"}]}"#;
+    fn serializes_mods_variables_and_unknown_keys() {
+        let raw = r#"{"rerun":0.1,"variables":{"a":"1"},"items":[{"title":"A","mods":{"alt":{"subtitle":"x"}},"quicklookurl":"q"}],"skipknowledge":true}"#;
         let menu: Menu = serde_json::from_str(raw).unwrap();
+        assert_eq!(menu.items[0].mods["alt"].subtitle, "x");
+        assert_eq!(menu.to_string(), raw);
+    }
+
+    #[test]
+    fn empty_menu_shows_message() {
         assert_eq!(
-            serde_json::to_string(&menu).unwrap(),
-            r#"{"items":[{"title":"A","quicklookurl":"x"}],"rerun":1.0}"#
+            Menu::default().or_message("Nothing").to_string(),
+            r#"{"items":[{"title":"Nothing","valid":false}]}"#
         );
     }
 }
