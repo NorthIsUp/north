@@ -7,6 +7,7 @@ hk         = "latest"
 ruff       = "latest"
 prettier   = "latest"
 node       = "latest"
+rust       = { version = "latest", components = "clippy,rustfmt" }
 [settings]
 experimental = true
 
@@ -19,7 +20,7 @@ run = "uv sync --all-packages"
 
 [tasks.test]
 description = "Run ALL tests (including broken ones)"
-run         = "uv run --all-packages pytest"
+run         = ["uv run --all-packages pytest", "cargo test --workspace --locked"]
 
 [tasks.test-package]
 description = "Run tests for a specific package (e.g., mise run test-package we-love-matchbox)"
@@ -187,5 +188,5 @@ description = "Sync changes to the shared development environment"
 run = "uv sync --all-packages"
 
 [tasks.check]
-description = "Check every Python source, script, test, and example"
+description = "Check every Python and Rust source, script, test, and example"
 run = "hk check"
