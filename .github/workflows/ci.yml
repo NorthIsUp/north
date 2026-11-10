@@ -33,6 +33,7 @@ jobs:
       - run: uv sync --all-packages --frozen
       - run: hk check
       - run: uv run --all-packages --frozen pytest
+      - run: cargo test --workspace --locked
 
   test:
     needs: discover

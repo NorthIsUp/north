@@ -7,7 +7,7 @@ hk         = "latest"
 ruff       = "latest"
 prettier   = "latest"
 node       = "latest"
-rust       = "latest"
+rust       = { version = "latest", components = "clippy,rustfmt" }
 [settings]
 experimental = true
 
