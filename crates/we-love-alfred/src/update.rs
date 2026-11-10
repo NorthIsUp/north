@@ -364,22 +364,15 @@ impl Feature for Updater {
     }
 }
 
-/// Twenty cells of 5% each, the filled run tapering at its leading edge:
-/// `[▆▆▆▆▆▆▄▄▃▂          ] 50%`. Cells round down; a finished bar is solid.
+/// Fifty cells of 2% each: `▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱…▱ 37%`. There is no partial ▰, so cells round down.
 fn progress_bar(percent: u8) -> String {
-    const TAPER: [char; 4] = ['▄', '▄', '▃', '▂'];
     let percent = percent.min(100);
-    let filled = usize::from(percent / 5);
-    let taper = if percent == 100 {
-        0
-    } else {
-        filled.min(TAPER.len())
-    };
-    let cells: String = std::iter::repeat_n('▆', filled - taper)
-        .chain(TAPER[TAPER.len() - taper..].iter().copied())
-        .chain(std::iter::repeat_n(' ', 20 - filled))
-        .collect();
-    format!("[{cells}] {percent}%")
+    let filled = usize::from(percent / 2);
+    format!(
+        "{}{} {percent}%",
+        "▰".repeat(filled),
+        "▱".repeat(50 - filled)
+    )
 }
 
 /// `v1.10.2` → `[1, 10, 2]`; non-numeric parts count as 0.
@@ -427,15 +420,18 @@ mod tests {
     }
 
     #[test]
-    fn progress_bar_has_twenty_five_percent_cells() {
-        assert_eq!(progress_bar(0), format!("[{}] 0%", " ".repeat(20)));
-        assert_eq!(progress_bar(10), format!("[▃▂{}] 10%", " ".repeat(18)));
+    fn progress_bar_has_fifty_two_percent_cells() {
+        assert_eq!(progress_bar(0), format!("{} 0%", "▱".repeat(50)));
+        assert_eq!(
+            progress_bar(37),
+            format!("{}{} 37%", "▰".repeat(18), "▱".repeat(32))
+        );
         assert_eq!(
             progress_bar(50),
-            format!("[▆▆▆▆▆▆▄▄▃▂{}] 50%", " ".repeat(10))
+            format!("{}{} 50%", "▰".repeat(25), "▱".repeat(25))
         );
-        assert_eq!(progress_bar(37), format!("[▆▆▆▄▄▃▂{}] 37%", " ".repeat(13)));
-        assert_eq!(progress_bar(100), format!("[{}] 100%", "▆".repeat(20)));
+        assert_eq!(progress_bar(100), format!("{} 100%", "▰".repeat(50)));
+        assert_eq!(progress_bar(250), progress_bar(100));
     }
 
     #[test]
