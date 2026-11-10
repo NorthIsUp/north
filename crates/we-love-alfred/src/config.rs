@@ -14,6 +14,7 @@ use crate::cache::{cache_dir, expand_home};
 use crate::editor::Editor;
 use crate::github::PullRequestCache;
 use crate::okta::Okta;
+use crate::query::{Params, QueryPlan};
 use crate::shell::join;
 use crate::tailscale::Tailscale;
 use crate::template::{Scope, product};
@@ -58,6 +59,10 @@ pub struct ItemConfig {
     #[serde(rename = "match")]
     pub match_text: Option<String>,
     pub autocomplete: Option<String>,
+    /// Text for ⌘C.
+    pub copy: Option<String>,
+    /// Text for ⌘L; defaults to nothing.
+    pub largetype: Option<String>,
     /// Subtitles per modifier: `mods = { alt = "…" }`.
     #[serde(default)]
     pub mods: BTreeMap<String, String>,
@@ -99,6 +104,16 @@ pub struct Route {
     pub env: BTreeMap<String, String>,
     #[serde(default, rename = "item")]
     pub items: Vec<ItemConfig>,
+    /// SQLite database `sql` reads, relative to the workflow folder; opened read-only.
+    pub db: Option<String>,
+    /// Rendered with `[vars]`, `{keyword}` and `{value}` only; the query text is bound as `:query`,
+    /// `:fts`, `:words` and `:first`. Each row renders the `[[route.item]]`s with its columns.
+    pub sql: Option<String>,
+    /// Run instead of `sql` when the query has no words, e.g. to list everything.
+    pub empty_sql: Option<String>,
+    /// Query a copy in the cache dir, refreshed when `db` changes.
+    #[serde(default)]
+    pub cache_copy: bool,
 }
 
 /// What a matched route does.
@@ -109,6 +124,7 @@ pub enum RouteAction {
         env: BTreeMap<String, String>,
     },
     Items(Vec<ItemBuilder>),
+    Query(Box<QueryPlan>),
 }
 
 /// `[github]`: open PRs via `gh`, searched with `<keyword> [@author] [terms]`, `#<number|text>` or a bare number.
@@ -163,6 +179,13 @@ impl FromStr for Config {
                     "a route needs exactly one of keywords, pattern".into(),
                 ));
             }
+            if route.sql.is_some() != route.db.is_some()
+                || (route.sql.is_some() && (!route.exec.is_empty() || route.items.is_empty()))
+            {
+                return Err(Error::Config(
+                    "a query route needs db, sql and [[route.item]]s, and no exec".into(),
+                ));
+            }
         }
         Ok(config)
     }
@@ -197,32 +220,68 @@ impl Config {
     ///
     /// [`Error::Regex`] for an invalid pattern, and template errors from rendering the route's items or command.
     pub fn route(&self, query: &str) -> Result<Option<RouteAction>> {
+        let none = BTreeMap::new();
         for route in &self.routes {
-            if let Some(bindings) = route.matches(query)? {
-                let scope = Scope {
+            let Some(captured) = route.matches(query)? else {
+                continue;
+            };
+            let scope = Scope {
+                vars: &self.vars,
+                bindings: &none,
+                literals: &captured,
+            };
+            if let (Some(db), Some(sql)) = (&route.db, &route.sql) {
+                let params = Params::new(
+                    captured
+                        .get("rest")
+                        .and_then(Value::as_str)
+                        .unwrap_or(query),
+                );
+                let sql = route
+                    .empty_sql
+                    .as_ref()
+                    .filter(|_| params.is_empty())
+                    .unwrap_or(sql);
+                // SQL sees config values only: never the query text or regex captures.
+                let trusted: BTreeMap<String, Value> = captured
+                    .iter()
+                    .filter(|(k, _)| matches!(k.as_str(), "keyword" | "value"))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                let sql_scope = Scope {
                     vars: &self.vars,
-                    bindings: &bindings,
+                    bindings: &none,
+                    literals: &trusted,
                 };
-                return Ok(Some(if route.exec.is_empty() {
-                    let mut items = Vec::new();
-                    for item in &route.items {
-                        items.extend(item.expand(&self.vars, &bindings)?);
-                    }
-                    RouteAction::Items(items)
-                } else {
-                    let argv = route
-                        .exec
-                        .iter()
-                        .map(|arg| scope.render(arg))
-                        .collect::<Result<_>>()?;
-                    let env = route
-                        .env
-                        .iter()
-                        .map(|(k, v)| Ok((k.clone(), scope.render(v)?)))
-                        .collect::<Result<_>>()?;
-                    RouteAction::Exec { argv, env }
-                }));
+                return Ok(Some(RouteAction::Query(Box::new(QueryPlan {
+                    db: expand_home(&scope.render(db)?),
+                    sql: sql_scope.render(sql)?,
+                    params,
+                    cache_copy: route.cache_copy,
+                    items: route.items.clone(),
+                    vars: self.vars.clone(),
+                    literals: captured,
+                }))));
             }
+            return Ok(Some(if route.exec.is_empty() {
+                let mut items = Vec::new();
+                for item in &route.items {
+                    items.extend(item.expand(&self.vars, &captured)?);
+                }
+                RouteAction::Items(items)
+            } else {
+                let argv = route
+                    .exec
+                    .iter()
+                    .map(|arg| scope.render(arg))
+                    .collect::<Result<_>>()?;
+                let env = route
+                    .env
+                    .iter()
+                    .map(|(k, v)| Ok((k.clone(), scope.render(v)?)))
+                    .collect::<Result<_>>()?;
+                RouteAction::Exec { argv, env }
+            }));
         }
         Ok(None)
     }
@@ -236,9 +295,11 @@ impl Config {
         let Some(sources) = &self.sources else {
             return Ok(Vec::new());
         };
+        let none = BTreeMap::new();
         let scope = Scope {
             vars: &self.vars,
-            bindings: &BTreeMap::new(),
+            bindings: &none,
+            literals: &none,
         };
         let patterns: Vec<String> = sources
             .paths
@@ -318,16 +379,19 @@ impl Route {
 }
 
 impl ItemConfig {
-    fn expand(&self, vars: &Table, outer: &BTreeMap<String, Value>) -> Result<Vec<ItemBuilder>> {
+    /// One item per `each` combination; `literals` are runtime values bound verbatim.
+    pub(crate) fn expand(
+        &self,
+        vars: &Table,
+        literals: &BTreeMap<String, Value>,
+    ) -> Result<Vec<ItemBuilder>> {
         product(&self.each)
-            .into_iter()
-            .map(|mut bindings| {
-                for (k, v) in outer {
-                    bindings.entry(k.clone()).or_insert_with(|| v.clone());
-                }
+            .iter()
+            .map(|bindings| {
                 self.build(Scope {
                     vars,
-                    bindings: &bindings,
+                    bindings,
+                    literals,
                 })
             })
             .collect()
@@ -374,6 +438,10 @@ impl ItemConfig {
         if let Some(autocomplete) = &self.autocomplete {
             item = item.autocomplete(r(autocomplete)?);
         }
+        if self.copy.is_some() || self.largetype.is_some() {
+            let text = |t: &Option<String>| t.as_deref().map_or(Ok(String::new()), r);
+            item = item.text(text(&self.copy)?, text(&self.largetype)?);
+        }
         for (modifier, subtitle) in &self.mods {
             item = item.modifier(modifier, r(subtitle)?);
         }
@@ -383,8 +451,10 @@ impl ItemConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use super::*;
-    use crate::{Icons, Menu};
+    use crate::{Icons, Item, Menu};
 
     const EXAMPLE: &str = r#"
         cache = "example"
@@ -486,6 +556,128 @@ mod tests {
                 .items(),
             Err(Error::Template { .. })
         ));
+    }
+
+    /// A clara-style FTS5 code table in a temp dir.
+    fn codes_db(dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        let db = rusqlite::Connection::open(&path).unwrap();
+        db.execute_batch(
+            r#"create virtual table snomed using fts5(title, subtitle unindexed, code unindexed, aliases, tokenize="unicode61 tokenchars '.-'", prefix='1 2 3');
+               insert into snomed values ('Heart attack (22298006)', 'Disorder', '22298006', 'MI | myocardial infarction');
+               insert into snomed values ('Heart failure (84114007)', 'Disorder', '84114007', '');
+               insert into snomed values ('Attack of {braces} (1)', 'Odd', '1', '');"#,
+        )
+        .unwrap();
+        path
+    }
+
+    fn query_config(db: &Path, cache_copy: bool) -> Config {
+        format!(
+            r#"
+            [[route]]
+            keywords = {{ snomed = "snomed", sct = "snomed" }}
+            db = "{db}"
+            cache_copy = {cache_copy}
+            sql = "select title, subtitle, code from {{value}} where {{value}} match :fts order by lower(title) not like :words || ' (%', rank limit 50"
+            empty_sql = "select title, subtitle, code from {{value}} limit 2"
+            [[route.item]]
+            title = "{{title}}"
+            subtitle = "{{subtitle}} · {{keyword}}"
+            arg = "copy:{{code}}"
+            copy = "{{code}}"
+            uid = ""
+            "#,
+            db = db.display()
+        )
+        .parse()
+        .unwrap()
+    }
+
+    async fn query(config: &Config, text: &str) -> Result<Vec<Item>> {
+        let Some(RouteAction::Query(plan)) = config.route(text)? else {
+            panic!("not a query route: {text}")
+        };
+        let icons = Icons::new("/nonexistent");
+        Ok(Menu::build(plan.run().await?, &icons).await.items)
+    }
+
+    #[tokio::test]
+    async fn sqlite_routes_bind_the_query_and_render_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = query_config(&codes_db(dir.path(), "codes.db"), false);
+        let items = query(&config, "snomed heart attack").await.unwrap();
+        assert_eq!(items.len(), 1);
+        let item = &items[0];
+        assert_eq!(
+            (
+                item.title.as_str(),
+                item.arg.as_str(),
+                item.subtitle.as_str()
+            ),
+            (
+                "Heart attack (22298006)",
+                "copy:22298006",
+                "Disorder · snomed"
+            )
+        );
+        assert_eq!(
+            serde_json::to_value(item).unwrap()["text"],
+            serde_json::json!({"copy": "22298006"})
+        );
+        assert_eq!(
+            item.uid, "",
+            "uid = \"\" keeps Alfred from reordering results"
+        );
+
+        let titles = |items: Vec<Item>| items.into_iter().map(|i| i.title).collect::<Vec<_>>();
+        let mut heart = titles(query(&config, "SCT heart").await.unwrap());
+        heart.sort();
+        assert_eq!(
+            heart,
+            ["Heart attack (22298006)", "Heart failure (84114007)"],
+            "alias keywords share a route"
+        );
+        assert_eq!(
+            titles(query(&config, "snomed attack {braces}").await.unwrap()),
+            ["Attack of {braces} (1)"],
+            "row and query braces stay text"
+        );
+        assert_eq!(
+            query(&config, "snomed ').drop table snomed;--")
+                .await
+                .unwrap()
+                .len(),
+            0,
+            "the query is only ever bound"
+        );
+        assert_eq!(
+            query(&config, "snomed").await.unwrap().len(),
+            2,
+            "no words runs empty_sql"
+        );
+    }
+
+    #[tokio::test]
+    async fn sqlite_routes_report_bad_databases_and_copy_into_the_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = query_config(&dir.path().join("missing.db"), false);
+        assert!(matches!(
+            query(&missing, "snomed x").await,
+            Err(Error::Sqlite(_))
+        ));
+        let name = format!("we-love-test-{}.db", std::process::id());
+        let copied = query_config(&codes_db(dir.path(), &name), true);
+        assert_eq!(query(&copied, "snomed heart").await.unwrap().len(), 2);
+        let local = cache_dir().join("db").join(&name);
+        assert!(local.exists());
+        std::fs::remove_file(local).unwrap();
+        assert!(
+            "[[route]]\nkeywords = { a = '' }\nsql = 'select 1'"
+                .parse::<Config>()
+                .is_err(),
+            "sql needs db and items"
+        );
     }
 
     #[test]

@@ -13,6 +13,8 @@ pub enum Error {
     Regex(#[from] regex::Error),
     #[error(transparent)]
     Http(#[from] reqwest::Error),
+    #[error(transparent)]
+    Sqlite(#[from] rusqlite::Error),
     #[error("invalid config: {0}")]
     Config(String),
     #[error("template {template:?}: unknown variable {name:?}")]

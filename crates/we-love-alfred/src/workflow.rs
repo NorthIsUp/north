@@ -10,7 +10,7 @@ use regex::Regex;
 use tokio::process::Command;
 
 use crate::config::RouteAction;
-use crate::{Cache, Config, Error, Icons, ItemBuilder, Menu, Result, github, okta, update};
+use crate::{Cache, Config, Error, Icons, Item, ItemBuilder, Menu, Result, github, okta, update};
 
 /// A bare PR number, optionally after `pr`.
 static PR_NUMBER: LazyLock<Regex> =
@@ -177,6 +177,14 @@ impl Workflow {
         Ok(())
     }
 
+    /// A live answer: it depends on the query, so Alfred must not cache it.
+    async fn live(&self, items: Vec<ItemBuilder>) -> Menu {
+        Menu {
+            cache: None,
+            ..Menu::build(items, &self.icons).await
+        }
+    }
+
     /// Routes, keyword handlers, the update view and PR searches; `None` falls through to the menu.
     async fn answer_live(&self, query: &str) -> Result<Option<Menu>> {
         match self.config.route(query)? {
@@ -190,12 +198,11 @@ impl Workflow {
                     .exec()
                     .into());
             }
-            Some(RouteAction::Items(items)) => {
-                // Live answers depend on the query, so Alfred must not cache them.
-                let menu = Menu::build(items, &self.icons).await;
-                return Ok(Some(Menu {
-                    cache: None,
-                    ..menu
+            Some(RouteAction::Items(items)) => return Ok(Some(self.live(items).await)),
+            Some(RouteAction::Query(plan)) => {
+                return Ok(Some(match plan.run().await {
+                    Ok(items) => self.live(items).await.or_message("No matches"),
+                    Err(e) => Menu::from_iter([Item::message("Query failed", e.to_string())]),
                 }));
             }
             None => {}

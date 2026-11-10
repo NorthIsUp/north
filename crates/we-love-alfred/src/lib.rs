@@ -11,6 +11,7 @@ mod item;
 mod menu;
 pub mod okta;
 mod pack;
+mod query;
 pub mod shell;
 pub mod tailscale;
 mod template;
@@ -23,6 +24,7 @@ pub use error::{Error, Result};
 pub use icons::{IconPack, IconSource, Icons};
 pub use item::ItemBuilder;
 pub use menu::{Icon, IconType, Item, Menu, MenuCache, Modifier, Text};
+pub use query::QueryPlan;
 pub use workflow::{Provider, Workflow};
 
 /// Serializes tests that spawn processes: a child forked by another test thread

@@ -81,6 +81,21 @@ pattern = '(?i)^mrn-?(\d{10})$'
 title = "Open MRN-{1}"
 url = "https://ehr.example.com/patients/MRN-{1}"
 
+# ...or query SQLite: each row renders the items, its columns bound as {column}.
+[[route]]
+keywords = { icd10 = "icd10", snomed = "snomed" }
+db = "codes.db"                # relative to the workflow folder, opened read-only
+cache_copy = true              # query a cache copy: iCloud may evict synced workflow files
+# Templates here see [vars], {keyword} and {value} only. The query text is bound, never
+# spliced: :query (raw), :fts ("heart"* "attack"*), :words (lowercased), :first.
+sql = "select title, code from {value} where {value} match :fts order by rank limit 50"
+empty_sql = "select title, code from {value} limit 50"   # when the query has no words
+[[route.item]]
+title = "{title}"
+arg = "copy:{code}"
+copy = "{code}"
+uid = ""                       # no uid: Alfred won't reorder results by past picks
+
 [github]                       # `prs [@author] [terms]`, `#<number|text>`, a bare number
 repo = "owner/app"
 
