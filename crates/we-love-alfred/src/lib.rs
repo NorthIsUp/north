@@ -19,7 +19,7 @@ mod workflow;
 pub use cache::{Cache, cache_dir};
 pub use config::Config;
 pub use error::{Error, Result};
-pub use icons::{IconSource, Icons};
+pub use icons::{IconPack, IconSource, Icons};
 pub use item::ItemBuilder;
 pub use menu::{Icon, IconType, Item, Menu, MenuCache, Modifier, Text};
 pub use workflow::{Provider, Workflow};

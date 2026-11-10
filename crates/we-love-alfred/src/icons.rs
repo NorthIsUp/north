@@ -14,7 +14,7 @@ use tokio::process::Command;
 use tokio::sync::OnceCell;
 
 use crate::cache::{expand_home, home};
-use crate::{Icon, IconType};
+use crate::{Error, Icon, IconType, Result};
 
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -23,7 +23,7 @@ const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleW
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum IconSource {
-    /// A file path; with `*`, the first case-insensitive match in that directory.
+    /// An existing file; with `*`, the first case-insensitive match in that directory.
     Path(String),
     /// A name from [`Icons::glyphs`] rendered from SF Pro, or a path to an existing image.
     Glyph(String),
@@ -61,6 +61,25 @@ impl IconSource {
             }
         })
     }
+}
+
+/// A ZIP of icons downloaded once into the icon cache; see [`Icons::ensure_pack`].
+///
+/// ```toml
+/// [icon_packs.gcp]
+/// url = "https://services.google.com/fh/files/misc/google-cloud-legacy-icons.zip"
+/// include = "*.png"     # glob over paths inside the archive; matches are extracted flat
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IconPack {
+    pub url: String,
+    #[serde(default = "default_include")]
+    pub include: String,
+}
+
+fn default_include() -> String {
+    "*.png".into()
 }
 
 /// Icon cache and fetch settings, shared by every item in a build.
@@ -154,7 +173,14 @@ impl Icons {
                     let name = pattern.file_name()?.to_string_lossy();
                     found(&std::path::absolute(find_case_insensitive(dir, &name).await?).ok()?)
                 }
-                IconSource::Path(path) => found(&expand_home(path)),
+                IconSource::Path(path) => {
+                    let path = expand_home(path);
+                    if fs::try_exists(&path).await.unwrap_or(false) {
+                        found(&path)
+                    } else {
+                        None
+                    }
+                }
                 IconSource::Glyph(name) => match self.glyphs.get(name) {
                     Some(symbol) => found(&self.sfsymbol(symbol).await?),
                     None if fs::try_exists(name).await.unwrap_or(false) => Some(Icon::path(name)),
@@ -202,6 +228,43 @@ impl Icons {
             }
         }
         .boxed()
+    }
+
+    /// Where pack `name` is extracted.
+    pub fn pack_dir(&self, name: &str) -> PathBuf {
+        self.dir.join("packs").join(name)
+    }
+
+    /// Download and extract `pack` unless the same URL is already extracted.
+    pub async fn ensure_pack(&self, name: &str, pack: &IconPack) -> Result<()> {
+        let dir = self.pack_dir(name);
+        let marker = dir.join(".source");
+        if fs::read_to_string(&marker)
+            .await
+            .is_ok_and(|url| url == pack.url)
+        {
+            return Ok(());
+        }
+        let bytes = self
+            .client
+            .get(&pack.url)
+            .timeout(Duration::from_secs(300))
+            .send()
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?;
+        let staging = dir.with_extension(format!("tmp-{}", std::process::id()));
+        let include = Pattern::new(&pack.include)
+            .map_err(|e| Error::Config(format!("icon pack {name}: {e}")))?;
+        let target = staging.clone();
+        tokio::task::spawn_blocking(move || extract(&bytes, &include, &target))
+            .await
+            .map_err(|e| Error::Config(format!("icon pack {name}: {e}")))??;
+        fs::write(staging.join(".source"), &pack.url).await?;
+        let _ = fs::remove_dir_all(&dir).await;
+        fs::rename(&staging, &dir).await?;
+        Ok(())
     }
 
     async fn app_icon(&self, app: &str) -> Option<PathBuf> {
@@ -327,6 +390,27 @@ impl Icons {
     }
 }
 
+/// Extract archive entries matching `include` into `target`, flattened to their file names.
+/// Runs on a blocking thread: the zip crate is synchronous.
+fn extract(bytes: &[u8], include: &Pattern, target: &Path) -> Result<()> {
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))?;
+    std::fs::create_dir_all(target)?;
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        let path = entry.name()?.into_owned();
+        // macOS-made archives carry resource forks under __MACOSX/.
+        if entry.is_dir() || path.starts_with("__MACOSX/") || !include.matches(&path) {
+            continue;
+        }
+        let Some(name) = Path::new(&path).file_name() else {
+            continue;
+        };
+        let mut out = std::fs::File::create(target.join(name))?;
+        std::io::copy(&mut entry, &mut out)?;
+    }
+    Ok(())
+}
+
 fn quiet(command: &mut Command) -> &mut Command {
     command
         .stdin(Stdio::null())
@@ -399,6 +483,39 @@ mod tests {
         ]);
         let icon = icons.resolve(&source).await.unwrap();
         assert!(icon.path.ends_with("Arch_Amazon-S3.PNG"), "{}", icon.path);
+    }
+
+    #[test]
+    fn extracts_matching_entries_flat() {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for name in [
+            "Pack/Arch_DB/64/Arch_Amazon-RDS_64.png",
+            "Pack/Arch_DB/32/Arch_Amazon-RDS_32.png",
+            "__MACOSX/Pack/Arch_DB/64/._Arch_Amazon-RDS_64.png",
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"png").unwrap();
+        }
+        let bytes = zip.finish().unwrap().into_inner();
+        let dir = tempfile::tempdir().unwrap();
+        extract(&bytes, &Pattern::new("*/64/*.png").unwrap(), dir.path()).unwrap();
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["Arch_Amazon-RDS_64.png"]);
+    }
+
+    #[tokio::test]
+    async fn missing_paths_fall_through() {
+        let icons = Icons::new("/nonexistent");
+        let source = IconSource::FirstOf(vec![
+            IconSource::Path("/nonexistent/a.png".into()),
+            IconSource::FileType("public.folder".into()),
+        ]);
+        assert_eq!(icons.resolve(&source).await.unwrap().path, "public.folder");
     }
 
     #[tokio::test]

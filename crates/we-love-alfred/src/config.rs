@@ -18,7 +18,7 @@ use crate::shell::join;
 use crate::tailscale::Tailscale;
 use crate::template::{Scope, product};
 use crate::update::Updater;
-use crate::{Error, IconSource, Item, ItemBuilder, Result};
+use crate::{Error, IconPack, IconSource, Item, ItemBuilder, Result};
 
 /// A workflow described in TOML. See the crate README for the full format.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -38,6 +38,9 @@ pub struct Config {
     pub okta: Option<Okta>,
     pub tailscale: Option<Tailscale>,
     pub sources: Option<Sources>,
+    /// Icon archives fetched into the icon cache; `{packs.<name>}` is each one's folder.
+    #[serde(default)]
+    pub icon_packs: BTreeMap<String, IconPack>,
 }
 
 /// One `[[item]]`; exactly one of `url`, `exec`, `arg`. Every string is a template.
@@ -478,8 +481,13 @@ mod tests {
             .split("```")
             .next()
             .unwrap();
-        let config: Config = toml.parse().unwrap();
-        assert_eq!(config.items().unwrap().len(), 5);
+        let mut config: Config = toml.parse().unwrap();
+        // Workflow binds `packs`; Config alone doesn't know the icon cache.
+        config.vars.insert(
+            "packs".into(),
+            Value::Table(toml::toml! { gcp = "/icons/gcp" }),
+        );
+        assert_eq!(config.items().unwrap().len(), 6);
         assert!(
             config.github.is_some()
                 && config.update.is_some()

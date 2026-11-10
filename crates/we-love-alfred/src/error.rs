@@ -13,6 +13,8 @@ pub enum Error {
     Regex(#[from] regex::Error),
     #[error(transparent)]
     Http(#[from] reqwest::Error),
+    #[error(transparent)]
+    Zip(#[from] zip::result::ZipError),
     #[error("invalid config: {0}")]
     Config(String),
     #[error("template {template:?}: unknown variable {name:?}")]

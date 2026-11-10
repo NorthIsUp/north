@@ -98,6 +98,16 @@ routes = true
 
 [sources]                      # one item per path and installed editor
 paths = ["~/src/app", "~/src/libs/*"]
+
+# Official icon archives, downloaded once into the icon cache; `{packs.gcp}` is the folder.
+[icon_packs.gcp]
+url = "https://services.google.com/fh/files/misc/google-cloud-legacy-icons.zip"
+include = "*.png"              # glob over archive paths; matches are extracted flat
+
+[[item]]
+title = "BigQuery"
+url = "https://console.cloud.google.com/bigquery"
+icon = [{ path = "{packs.gcp}/bigquery.png" }, { clearbit = "cloud.google.com" }]
 ```
 
 Icon sources:
