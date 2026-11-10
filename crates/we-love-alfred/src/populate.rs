@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use futures_util::future::BoxFuture;
+use futures_util::future::{self, BoxFuture};
 use jaq_core::load::{Arena, File, Loader};
 use jaq_core::{Compiler, Ctx, Vars, data, unwrap_valr};
 use reqwest::Client;
@@ -21,12 +21,15 @@ use crate::{Error, Result};
 /// A Rust function that writes a database at the path it's given.
 pub type Populator = Box<dyn Fn(PathBuf) -> BoxFuture<'static, Result<()>> + Send + Sync>;
 
-/// A route's `populate`: a function name, or a data source table.
+/// A route's `populate`: a function name, a data source, or a list of sources.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub enum Populate {
     Function(String),
     Data(DataSource),
+    /// Fetched concurrently; rows for the same table are appended together. A failing source is
+    /// skipped, so one missing tool doesn't empty the database, unless every source fails.
+    Sources(Vec<DataSource>),
 }
 
 /// JSON from a `file`, `url` or `command`, filtered by `jq` into row objects, loaded into `table`.
@@ -106,13 +109,49 @@ pub(crate) async fn build(
                     .ok_or_else(|| Error::Config(format!("no populate function named {name:?}")))?;
                 function(temporary).await
             }
-            Populate::Data(source) => from_data(source, &temporary).await,
+            Populate::Data(source) => from_sources(std::slice::from_ref(source), &temporary).await,
+            Populate::Sources(sources) => from_sources(sources, &temporary).await,
         }
     })
     .await
 }
 
-async fn from_data(source: &DataSource, db: &Path) -> Result<()> {
+async fn from_sources(sources: &[DataSource], db: &Path) -> Result<()> {
+    let fetched = future::join_all(
+        sources
+            .iter()
+            .map(|source| async move { Ok::<_, Error>((source, rows(source).await?)) }),
+    )
+    .await;
+    let mut tables: BTreeMap<String, (bool, Vec<Map<String, Value>>)> = BTreeMap::new();
+    let mut first_error = None;
+    for result in fetched {
+        match result {
+            Ok((source, rows)) => {
+                let (fts, table) = tables.entry(source.table.clone()).or_default();
+                *fts |= source.fts;
+                table.extend(rows);
+            }
+            Err(e) => {
+                log::warn!("populate source failed: {e}");
+                first_error.get_or_insert(e);
+            }
+        }
+    }
+    if tables.is_empty() {
+        return Err(first_error.unwrap_or_else(|| Error::Config("populate has no sources".into())));
+    }
+    let db = db.to_owned();
+    tokio::task::spawn_blocking(move || {
+        tables
+            .iter()
+            .try_for_each(|(table, (fts, rows))| write_table(&db, table, *fts, rows))
+    })
+    .await?
+}
+
+/// A source's rows: its JSON through its jq filter.
+async fn rows(source: &DataSource) -> Result<Vec<Map<String, Value>>> {
     let json = match &source.from {
         Origin::File(file) => fs::read(expand_home(file)).await?,
         Origin::Url(url) => {
@@ -137,9 +176,7 @@ async fn from_data(source: &DataSource, db: &Path) -> Result<()> {
                 .into_bytes()
         }
     };
-    let rows = jq(&source.jq, &json)?;
-    let (db, table, fts) = (db.to_owned(), source.table.clone(), source.fts);
-    tokio::task::spawn_blocking(move || write_table(&db, &table, fts, &rows)).await?
+    jq(&source.jq, &json)
 }
 
 /// Run `filter` over `input`; every output must be an object.
@@ -251,6 +288,60 @@ mod tests {
         {"name": "Heart attack", "id": 22298006, "tags": ["cardiac"]},
         {"name": "Odd \"column\"", "id": 1, "weird key\"": true}
     ]}"#;
+
+    #[tokio::test]
+    async fn appends_sources_into_one_table_and_skips_failures() {
+        let _serial = crate::serial().await;
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("a.json"),
+            r#"[{"tool": "a", "code": "A1"}]"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("b.json"),
+            r#"[{"tool": "b", "code": "B1", "url": "u"}]"#,
+        )
+        .unwrap();
+        let populate: Populate = toml::from_str::<toml::Table>(&format!(
+            r#"populate = [
+                {{ file = "{dir}/a.json", table = "rules", fts = true }},
+                {{ command = ["cat", "{dir}/b.json"], table = "rules" }},
+                {{ file = "{dir}/missing.json", table = "rules" }},
+            ]"#,
+            dir = dir.path().display()
+        ))
+        .unwrap()["populate"]
+            .clone()
+            .try_into()
+            .unwrap();
+        let db = dir.path().join("all.db");
+        build(&populate, &db, &BTreeMap::new()).await.unwrap();
+        let connection = Connection::open(&db).unwrap();
+        let tools: Vec<String> = connection
+            .prepare("select tool || code || coalesce(url, '') from rules order by tool")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            tools,
+            ["aA1", "bB1u"],
+            "columns are the union; the missing file is skipped"
+        );
+        let all_missing = Populate::Sources(vec![DataSource {
+            from: Origin::File("/nonexistent.json".into()),
+            jq: ".[]".into(),
+            table: "t".into(),
+            fts: false,
+        }]);
+        assert!(
+            build(&all_missing, &dir.path().join("none.db"), &BTreeMap::new())
+                .await
+                .is_err()
+        );
+    }
 
     #[tokio::test]
     async fn builds_from_a_command() {
