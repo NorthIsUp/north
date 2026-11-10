@@ -1,20 +1,29 @@
 //! Run a Script Filter: route the query, serve the cache, rebuild in the background.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::os::unix::process::CommandExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+use std::time::SystemTime;
 
 use futures_util::future::{self, BoxFuture, FutureExt};
 use regex::Regex;
 use tokio::process::Command;
 
+use crate::cache::{spawn_throttled, with_suffix};
 use crate::config::RouteAction;
-use crate::{Cache, Config, Error, Icons, Item, ItemBuilder, Menu, Result, github, okta, update};
+use crate::populate::{self, Populator};
+use crate::{
+    Cache, Config, Error, Icons, Item, ItemBuilder, Menu, QueryPlan, Result, github, okta, update,
+};
 
 /// A bare PR number, optionally after `pr`.
 static PR_NUMBER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
+
+/// Rebuilds a query route's database: `db-populate <route index> <db>`.
+pub const POPULATE_COMMAND: &str = "db-populate";
 
 /// Skips the cache and rebuilds; passed to background refreshes.
 pub const NO_CACHE: &str = "--no-cache";
@@ -57,6 +66,7 @@ pub struct Workflow {
     icons: Icons,
     providers: Vec<Box<dyn Provider>>,
     keywords: Vec<(String, Handler)>,
+    populators: BTreeMap<String, Populator>,
 }
 
 impl Workflow {
@@ -77,6 +87,7 @@ impl Workflow {
             icons,
             providers: Vec::new(),
             keywords: Vec::new(),
+            populators: BTreeMap::new(),
         })
     }
 
@@ -120,6 +131,19 @@ impl Workflow {
         self
     }
 
+    /// Register `function` under `name` for query routes with `populate = "<name>"`: it gets a
+    /// path and must write the complete database there.
+    #[must_use]
+    pub fn populate<F, Fut>(mut self, name: impl Into<String>, function: F) -> Self
+    where
+        F: Fn(PathBuf) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
+        self.populators
+            .insert(name.into(), Box::new(move |db| function(db).boxed()));
+        self
+    }
+
     /// Handle one Script Filter invocation; `args` excludes the program name.
     ///
     /// # Errors
@@ -149,6 +173,18 @@ impl Workflow {
                     .await?;
                 rebuild = true;
             }
+            Some(POPULATE_COMMAND) => {
+                let [_, route, db] = args.as_slice() else {
+                    return Err(Error::Usage("db-populate <route> <db>"));
+                };
+                let populate = route
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|i| self.config.routes.get(i))
+                    .and_then(|r| r.populate.as_ref())
+                    .ok_or(Error::Usage("db-populate <route> <db>"))?;
+                return populate::build(populate, Path::new(db), &self.populators).await;
+            }
             Some(NO_CACHE) => rebuild = true,
             _ => {}
         }
@@ -177,6 +213,32 @@ impl Workflow {
         Ok(())
     }
 
+    /// Build a missing database now; rebuild a stale one in the background.
+    async fn prepare_db(&self, plan: &QueryPlan) -> Result<()> {
+        let Some(populate) = &plan.populate else {
+            return Ok(());
+        };
+        let Ok(meta) = tokio::fs::metadata(&plan.db).await else {
+            return populate::build(populate, &plan.db, &self.populators).await;
+        };
+        let age = meta
+            .modified()
+            .ok()
+            .and_then(|m| SystemTime::now().duration_since(m).ok())
+            .unwrap_or_default();
+        if let Some(every) = plan.refresh_every
+            && age >= every
+        {
+            let mut command = Command::new(env::current_exe()?);
+            command
+                .arg(POPULATE_COMMAND)
+                .arg(plan.route.to_string())
+                .arg(&plan.db);
+            spawn_throttled(&mut command, &with_suffix(&plan.db, ".populate.pid"), every).await;
+        }
+        Ok(())
+    }
+
     /// A live answer: it depends on the query, so Alfred must not cache it.
     async fn live(&self, items: Vec<ItemBuilder>) -> Menu {
         Menu {
@@ -200,9 +262,14 @@ impl Workflow {
             }
             Some(RouteAction::Items(items)) => return Ok(Some(self.live(items).await)),
             Some(RouteAction::Query(plan)) => {
-                return Ok(Some(match plan.run().await {
+                let title = plan.error.clone().unwrap_or_else(|| "Query failed".into());
+                let ran = match self.prepare_db(&plan).await {
+                    Ok(()) => plan.run().await,
+                    Err(e) => Err(e),
+                };
+                return Ok(Some(match ran {
                     Ok(items) => self.live(items).await.or_message("No matches"),
-                    Err(e) => Menu::from_iter([Item::message("Query failed", e.to_string())]),
+                    Err(e) => Menu::from_iter([Item::message(title, e.to_string())]),
                 }));
             }
             None => {}
@@ -302,6 +369,98 @@ mod tests {
             .map(|i| i.title)
             .collect();
         assert_eq!(titles, ["Static", "Dynamic", "clear cache"]);
+    }
+
+    #[tokio::test]
+    async fn query_routes_populate_missing_databases() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("people.json"),
+            r#"{"people": [{"name": "Ada", "role": "eng"}, {"name": "Grace", "role": "admiral"}]}"#,
+        )
+        .unwrap();
+        let config: Config = format!(
+            r#"
+            cache = "test"
+            [[route]]
+            keywords = {{ who = "" }}
+            db = "{dir}/people.db"
+            sql = "select name, role from people where people match :fts"
+            error = "People search failed"
+            populate = {{ file = "{dir}/people.json", jq = ".people[]", table = "people", fts = true }}
+            [[route.item]]
+            title = "{{name}}"
+            subtitle = "{{role}}"
+            arg = "{{name}}"
+
+            [[route]]
+            keywords = {{ fn = "" }}
+            db = "{dir}/fn.db"
+            sql = "select x from t"
+            populate = "numbers"
+            [[route.item]]
+            title = "{{x}}"
+            arg = "{{x}}"
+
+            [[route]]
+            keywords = {{ broken = "" }}
+            db = "{dir}/broken.db"
+            sql = "select 1"
+            error = "Broken search failed"
+            populate = "missing-function"
+            [[route.item]]
+            title = "x"
+            arg = "x"
+            "#,
+            dir = dir.path().display()
+        )
+        .parse()
+        .unwrap();
+        let workflow = Workflow::new(config)
+            .unwrap()
+            .icons(Icons::new("/nonexistent"))
+            .populate("numbers", |db: PathBuf| async move {
+                rusqlite::Connection::open(db)?
+                    .execute_batch("create table t(x); insert into t values (42);")?;
+                Ok(())
+            });
+        let titles = |menu: Option<Menu>| {
+            menu.unwrap()
+                .items
+                .into_iter()
+                .map(|i| i.title)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            titles(workflow.answer_live("who grace").await.unwrap()),
+            ["Grace"]
+        );
+        assert!(
+            dir.path().join("people.db").exists(),
+            "built from file + jq"
+        );
+        assert_eq!(titles(workflow.answer_live("fn").await.unwrap()), ["42"]);
+        let broken = workflow.answer_live("broken").await.unwrap().unwrap();
+        assert_eq!(broken.items[0].title, "Broken search failed");
+        assert!(
+            broken.items[0].subtitle.contains("missing-function"),
+            "{}",
+            broken.items[0].subtitle
+        );
+        assert!(
+            workflow
+                .run([
+                    "db-populate".to_owned(),
+                    "1".to_owned(),
+                    dir.path().join("again.db").display().to_string()
+                ])
+                .await
+                .is_ok()
+        );
+        assert!(
+            dir.path().join("again.db").exists(),
+            "the background rebuild command"
+        );
     }
 
     #[tokio::test]

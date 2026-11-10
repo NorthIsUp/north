@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::time::Duration;
 
 use futures_util::future;
 use regex::Regex;
@@ -14,6 +15,7 @@ use crate::cache::{cache_dir, expand_home};
 use crate::editor::Editor;
 use crate::github::PullRequestCache;
 use crate::okta::Okta;
+use crate::populate::Populate;
 use crate::query::{Params, QueryPlan};
 use crate::shell::join;
 use crate::tailscale::Tailscale;
@@ -114,6 +116,20 @@ pub struct Route {
     /// Query a copy in the cache dir, refreshed when `db` changes.
     #[serde(default)]
     pub cache_copy: bool,
+    /// How to build `db` when it's missing: the name of a function registered with
+    /// [`crate::Workflow::populate`], or a JSON `file`/`url` piped through a `jq` filter.
+    pub populate: Option<Populate>,
+    /// Rebuild `db` with `populate` in the background once it's older than this many seconds.
+    #[serde(default, deserialize_with = "optional_seconds")]
+    pub refresh_every: Option<Duration>,
+    /// Title of the row shown when the query fails; its subtitle is the error.
+    pub error: Option<String>,
+}
+
+fn optional_seconds<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Option<Duration>, D::Error> {
+    Option::<u64>::deserialize(d).map(|s| s.map(Duration::from_secs))
 }
 
 /// What a matched route does.
@@ -186,6 +202,25 @@ impl FromStr for Config {
                     "a query route needs db, sql and [[route.item]]s, and no exec".into(),
                 ));
             }
+            if route.sql.is_none()
+                && (route.populate.is_some()
+                    || route.refresh_every.is_some()
+                    || route.error.is_some())
+            {
+                return Err(Error::Config(
+                    "populate, refresh_every and error need a query route (db and sql)".into(),
+                ));
+            }
+            if route.refresh_every.is_some() && route.populate.is_none() {
+                return Err(Error::Config("refresh_every needs populate".into()));
+            }
+            if let Some(Populate::Data(source)) = &route.populate
+                && source.file.is_some() == source.url.is_some()
+            {
+                return Err(Error::Config(
+                    "populate needs exactly one of file, url".into(),
+                ));
+            }
         }
         Ok(config)
     }
@@ -221,7 +256,7 @@ impl Config {
     /// [`Error::Regex`] for an invalid pattern, and template errors from rendering the route's items or command.
     pub fn route(&self, query: &str) -> Result<Option<RouteAction>> {
         let none = BTreeMap::new();
-        for route in &self.routes {
+        for (index, route) in self.routes.iter().enumerate() {
             let Some(captured) = route.matches(query)? else {
                 continue;
             };
@@ -258,6 +293,10 @@ impl Config {
                     sql: sql_scope.render(sql)?,
                     params,
                     cache_copy: route.cache_copy,
+                    route: index,
+                    populate: route.populate.clone(),
+                    refresh_every: route.refresh_every,
+                    error: route.error.clone(),
                     items: route.items.clone(),
                     vars: self.vars.clone(),
                     literals: captured,

@@ -96,6 +96,19 @@ arg = "copy:{code}"
 copy = "{code}"
 uid = ""                       # no uid: Alfred won't reorder results by past picks
 
+# Build a query route's database when it's missing, and optionally rebuild it in the background:
+[[route]]
+keywords = { who = "" }
+db = "~/.cache/alfred/people.db"
+sql = "select name, role from people where people match :fts"
+error = "People search failed"     # title of the row shown when the query fails
+refresh_every = 86400              # seconds; rebuilt in the background once older
+populate = { url = "https://example.com/people.json", jq = ".people[]", table = "people", fts = true }
+# or: populate = "people", a Rust function: Workflow::populate("people", |db| async { … })
+[[route.item]]
+title = "{name}"
+arg = "{name}"
+
 [github]                       # `prs [@author] [terms]`, `#<number|text>`, a bare number
 repo = "owner/app"
 
