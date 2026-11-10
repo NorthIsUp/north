@@ -109,6 +109,7 @@ sql = "select name, role from people where people match :fts"
 error = "People search failed"     # title of the row shown when the query fails
 refresh_every = 86400              # seconds; rebuilt in the background once older
 populate = { url = "https://example.com/people.json", jq = ".people[]", table = "people", fts = true }
+# or: populate = { command = ["ruff", "rule", "--all", "--output-format", "json"], table = "rules", fts = true }
 # or: populate = "people", a Rust function: Workflow::populate("people", |db| async { … })
 [[route.item]]
 title = "{name}"
