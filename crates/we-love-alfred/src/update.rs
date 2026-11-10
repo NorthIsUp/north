@@ -75,6 +75,9 @@ fn default_api() -> String {
 pub struct Status {
     pub running: bool,
     pub message: String,
+    /// Download percentage, shown as a bar in the live view's subtitle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress: Option<u8>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -109,12 +112,17 @@ impl Updater {
     }
 
     async fn report(&self, running: bool, message: impl Into<String>) -> Result<()> {
-        let status = Status {
+        self.write_status(&Status {
             running,
             message: message.into(),
-        };
+            progress: None,
+        })
+        .await
+    }
+
+    async fn write_status(&self, status: &Status) -> Result<()> {
         // Atomic: the live view reads it ten times a second.
-        atomic_write(&self.state_path("status"), &serde_json::to_vec(&status)?).await
+        atomic_write(&self.state_path("status"), &serde_json::to_vec(status)?).await
     }
 
     pub async fn status(&self) -> Option<Status> {
@@ -152,7 +160,11 @@ impl Updater {
         let status = self.status().await.unwrap_or(Status {
             running: true,
             message: "Starting".into(),
+            progress: None,
         });
+        let subtitle = status
+            .progress
+            .map_or_else(|| "Workflow update".to_owned(), progress_bar);
         let title = if status.running {
             let tick = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -170,7 +182,7 @@ impl Updater {
         Ok(Menu {
             rerun: status.running.then_some(0.1),
             variables: [(STARTED_VARIABLE.to_owned(), "1".to_owned())].into(),
-            ..Menu::from_iter([Item::message(title, "Workflow update")])
+            ..Menu::from_iter([Item::message(title, subtitle)])
         })
     }
 
@@ -266,14 +278,13 @@ impl Updater {
         while let Some(chunk) = response.chunk().await? {
             out.write_all(&chunk).await?;
             done += chunk.len() as u64;
-            let percent = (done * 100)
-                .checked_div(total)
-                .map(|p| format!(" {p}%"))
-                .unwrap_or_default();
-            self.report(
-                true,
-                format!("Downloading {tag}{percent} ({} MB)", done >> 20),
-            )
+            let progress = (done * 100).checked_div(total).map(|p| p.min(100) as u8);
+            let message = format!("Downloading {tag} ({} MB)", done >> 20);
+            self.write_status(&Status {
+                running: true,
+                message,
+                progress,
+            })
             .await?;
         }
         out.flush().await?;
@@ -310,6 +321,24 @@ impl Updater {
             .ok()?;
         Some(token.trim().to_owned()).filter(|t| !t.is_empty())
     }
+}
+
+/// Twenty cells of 5% each, the filled run tapering at its leading edge:
+/// `[▆▆▆▆▆▆▄▄▃▂          ] 50%`. Cells round down; a finished bar is solid.
+fn progress_bar(percent: u8) -> String {
+    const TAPER: [char; 4] = ['▄', '▄', '▃', '▂'];
+    let percent = percent.min(100);
+    let filled = usize::from(percent / 5);
+    let taper = if percent == 100 {
+        0
+    } else {
+        filled.min(TAPER.len())
+    };
+    let cells: String = std::iter::repeat_n('▆', filled - taper)
+        .chain(TAPER[TAPER.len() - taper..].iter().copied())
+        .chain(std::iter::repeat_n(' ', 20 - filled))
+        .collect();
+    format!("[{cells}] {percent}%")
 }
 
 /// `v1.10.2` → `[1, 10, 2]`; non-numeric parts count as 0.
@@ -357,6 +386,18 @@ mod tests {
     }
 
     #[test]
+    fn progress_bar_has_twenty_five_percent_cells() {
+        assert_eq!(progress_bar(0), format!("[{}] 0%", " ".repeat(20)));
+        assert_eq!(progress_bar(10), format!("[▃▂{}] 10%", " ".repeat(18)));
+        assert_eq!(
+            progress_bar(50),
+            format!("[▆▆▆▆▆▆▄▄▃▂{}] 50%", " ".repeat(10))
+        );
+        assert_eq!(progress_bar(37), format!("[▆▆▆▄▄▃▂{}] 37%", " ".repeat(13)));
+        assert_eq!(progress_bar(100), format!("[{}] 100%", "▆".repeat(20)));
+    }
+
+    #[test]
     fn versions_compare_numerically() {
         assert!(version_key("v1.10.0") > version_key("1.9.9"));
         assert_eq!(version_key("v2.0"), [2, 0]);
@@ -375,7 +416,8 @@ mod tests {
             up_to_date.status().await.unwrap(),
             Status {
                 running: false,
-                message: "1.2.0 is up to date".into()
+                message: "1.2.0 is up to date".into(),
+                progress: None
             }
         );
 
@@ -400,6 +442,15 @@ mod tests {
         let view = updater.view_with(true).await.unwrap();
         assert_eq!(view.rerun, Some(0.1));
         assert!(view.items[0].title.ends_with("Downloading"));
+        assert_eq!(view.items[0].subtitle, "Workflow update");
+        let downloading = Status {
+            running: true,
+            message: "Downloading v2 (3 MB)".into(),
+            progress: Some(50),
+        };
+        updater.write_status(&downloading).await.unwrap();
+        let view = updater.view_with(true).await.unwrap();
+        assert_eq!(view.items[0].subtitle, progress_bar(50));
         updater.report(false, "Done").await.unwrap();
         let view = updater.view_with(true).await.unwrap();
         assert_eq!((view.rerun, view.items[0].title.as_str()), (None, "Done"));
