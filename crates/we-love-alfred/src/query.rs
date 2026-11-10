@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
@@ -11,6 +11,7 @@ use toml::{Table, Value};
 
 use crate::cache::{cache_dir, with_suffix};
 use crate::config::ItemConfig;
+use crate::populate::Populate;
 use crate::{Error, ItemBuilder, Result};
 
 /// The query text as SQL parameters. It only ever reaches SQLite bound, never spliced into SQL.
@@ -66,6 +67,11 @@ pub struct QueryPlan {
     pub(crate) sql: String,
     pub(crate) params: Params,
     pub(crate) cache_copy: bool,
+    /// Index of the route in the config, for the background rebuild command.
+    pub(crate) route: usize,
+    pub(crate) populate: Option<Populate>,
+    pub(crate) refresh_every: Option<Duration>,
+    pub(crate) error: Option<String>,
     pub(crate) items: Vec<ItemConfig>,
     pub(crate) vars: Table,
     pub(crate) literals: BTreeMap<String, Value>,

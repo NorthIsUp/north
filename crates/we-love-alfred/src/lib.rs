@@ -11,6 +11,7 @@ mod item;
 mod menu;
 pub mod okta;
 mod pack;
+mod populate;
 mod query;
 pub mod shell;
 pub mod tailscale;
@@ -24,6 +25,7 @@ pub use error::{Error, Result};
 pub use icons::{IconPack, IconSource, Icons};
 pub use item::ItemBuilder;
 pub use menu::{Icon, IconType, Item, Menu, MenuCache, Modifier, Text};
+pub use populate::{DataSource, Populate, Populator};
 pub use query::QueryPlan;
 pub use workflow::{Provider, Workflow};
 
