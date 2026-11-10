@@ -41,6 +41,10 @@ pub struct Cache {
 
 impl Cache {
     /// `<name>.json` in [`cache_dir`]; `name` must be a plain filename stem.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidCacheName`] when `name` is empty, `.`/`..`, or has characters other than letters, digits, `_`, `.` and `-`.
     pub fn named(name: &str) -> Result<Self> {
         Ok(Self::at(
             cache_dir().join(format!("{}.json", validate_name(name)?)),
@@ -48,6 +52,10 @@ impl Cache {
     }
 
     /// Named after `$alfred_workflow_bundleid`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidCacheName`] when the variable is unset (outside Alfred) or not a plain filename.
     pub fn for_workflow() -> Result<Self> {
         Self::named(&env::var("alfred_workflow_bundleid").unwrap_or_default())
     }
@@ -56,6 +64,7 @@ impl Cache {
         Self { path: path.into() }
     }
 
+    #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -66,6 +75,10 @@ impl Cache {
     }
 
     /// Atomically replace the cache.
+    ///
+    /// # Errors
+    ///
+    /// I/O errors creating the directory or writing and renaming the file.
     pub async fn write(&self, menu: &Menu) -> Result<()> {
         atomic_write(&self.path, &serde_json::to_vec(menu)?).await
     }
@@ -78,6 +91,7 @@ impl Cache {
     }
 
     /// `<cache>.refresh.pid`: the throttle marker, holding the refresh's PID.
+    #[must_use]
     pub fn refresh_marker(&self) -> PathBuf {
         with_suffix(&self.path, ".refresh.pid")
     }
@@ -97,6 +111,7 @@ impl Cache {
 }
 
 /// `$XDG_CACHE_HOME/alfred`, else `~/.cache/alfred` when `~/.cache` exists, else `/tmp/alfred`.
+#[must_use]
 pub fn cache_dir() -> PathBuf {
     let home_cache = home().join(".cache");
     let root = match env::var_os("XDG_CACHE_HOME").filter(|x| !x.is_empty()) {

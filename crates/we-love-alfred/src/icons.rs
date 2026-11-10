@@ -134,6 +134,11 @@ impl Default for Icons {
 }
 
 impl Icons {
+    /// Icons cached under `dir`, with no glyphs or packs.
+    ///
+    /// # Panics
+    ///
+    /// Never in practice: only if the TLS backend can't initialise the HTTP client.
     pub fn new(dir: impl Into<PathBuf>) -> Self {
         let client = Client::builder()
             .user_agent(USER_AGENT)

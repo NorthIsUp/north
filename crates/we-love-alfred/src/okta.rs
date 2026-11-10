@@ -114,6 +114,7 @@ pub struct OktaAppsCache {
 }
 
 impl OktaAppsCache {
+    #[must_use]
     pub fn new(links: Vec<OktaAppLink>) -> Self {
         Self {
             v: 1,
@@ -128,12 +129,18 @@ impl OktaAppsCache {
         (cache.v == 1).then_some(cache)
     }
 
+    #[must_use]
     pub fn is_fresh(&self, ttl: Duration) -> bool {
         (Utc::now() - self.fetched_at)
             .to_std()
             .is_ok_and(|age| age < ttl)
     }
 
+    /// Atomically write the cache to `path`.
+    ///
+    /// # Errors
+    ///
+    /// I/O errors creating the directory or writing the file.
     pub async fn save(&self, path: &Path) -> Result<()> {
         atomic_write(path, &serde_json::to_vec(self)?).await
     }
@@ -141,7 +148,8 @@ impl OktaAppsCache {
 
 #[derive(Deserialize)]
 struct DeviceCode {
-    device_code: String,
+    #[serde(rename = "device_code")]
+    code: String,
     verification_uri_complete: String,
     expires_in: u64,
     #[serde(default = "default_interval")]
@@ -279,6 +287,10 @@ impl<K: Keychain> Okta<K> {
     }
 
     /// Device authorization grant: open Okta's approval page, keep the refresh token, then cache the apps.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OktaNotConfigured`] without an org and client ID, [`Error::Http`] or [`Error::OktaOAuth`] from Okta, [`Error::Open`] if the browser won't open, [`Error::Timeout`] when the code expires, and [`Error::Keychain`] if the token can't be saved.
     pub async fn login(&self) -> Result<()> {
         let client_id = self
             .client_id()
@@ -318,7 +330,7 @@ impl<K: Keychain> Okta<K> {
             let form = [
                 ("client_id", client_id.as_str()),
                 ("grant_type", DEVICE_GRANT),
-                ("device_code", &device.device_code),
+                ("device_code", &device.code),
             ];
             let response = client
                 .post(self.url("/oauth2/v1/token"))
@@ -340,6 +352,10 @@ impl<K: Keychain> Okta<K> {
     }
 
     /// Exchange the Keychain refresh token and cache the visible app tiles; `None` when not connected.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Http`] for transport failures and error statuses other than a rejected token, [`Error::Keychain`] if the rotated token can't be saved, and I/O errors writing the cache.
     pub async fn fetch_apps(&self, client_id: &str) -> Result<Option<OktaAppsCache>> {
         let Some(refresh_token) = self.keychain.find(&self.keychain_service, &self.org).await
         else {
@@ -385,6 +401,10 @@ impl<K: Keychain> Okta<K> {
     /// App tiles from the cache, refetched once older than `apps_ttl`; a connect item until connected.
     ///
     /// An Okta outage keeps serving the stale tiles.
+    ///
+    /// # Errors
+    ///
+    /// Non-HTTP errors from [`Okta::fetch_apps`], such as a failed Keychain write.
     pub async fn items(&self) -> Result<Vec<ItemBuilder>> {
         if self.org.is_empty() {
             return Ok(Vec::new());
@@ -460,16 +480,18 @@ mod tests {
     }
 
     impl Keychain for FakeKeychain {
-        async fn find(&self, _: &str, _: &str) -> Option<String> {
-            self.token.clone()
+        fn find(&self, _: &str, _: &str) -> impl Future<Output = Option<String>> + Send {
+            std::future::ready(self.token.clone())
         }
 
-        async fn store(&self, _: &str, _: &str, secret: &str) -> Result<()> {
-            if self.fail_writes {
-                return Err(Error::Keychain);
-            }
-            self.writes.lock().unwrap().push(secret.to_owned());
-            Ok(())
+        fn store(&self, _: &str, _: &str, secret: &str) -> impl Future<Output = Result<()>> + Send {
+            let stored = if self.fail_writes {
+                Err(Error::Keychain)
+            } else {
+                self.writes.lock().unwrap().push(secret.to_owned());
+                Ok(())
+            };
+            std::future::ready(stored)
         }
     }
 
@@ -601,7 +623,7 @@ mod tests {
     #[tokio::test]
     async fn unconfigured_org_adds_nothing() {
         let f = fixture("", FakeKeychain::default(), None);
-        assert!(titles(&f.okta).await.is_empty());
+        assert_eq!(titles(&f.okta).await, Vec::<String>::new());
     }
 
     #[tokio::test]

@@ -12,6 +12,10 @@ use tokio::process::Command;
 use crate::config::RouteAction;
 use crate::{Cache, Config, Error, Icons, ItemBuilder, Menu, Result, github, okta, update};
 
+/// A bare PR number, optionally after `pr`.
+static PR_NUMBER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
+
 /// Skips the cache and rebuilds; passed to background refreshes.
 pub const NO_CACHE: &str = "--no-cache";
 
@@ -56,6 +60,11 @@ pub struct Workflow {
 }
 
 impl Workflow {
+    /// A workflow for `config`, caching under its `cache` name or the bundle ID.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::InvalidCacheName`] when neither gives a valid cache name.
     pub fn new(config: Config) -> Result<Self> {
         let cache = match &config.cache {
             Some(name) => Cache::named(name)?,
@@ -71,6 +80,11 @@ impl Workflow {
         })
     }
 
+    /// [`Workflow::new`] for the config at `path`.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Config::load`] and [`Workflow::new`].
     pub async fn load(path: impl AsRef<Path>) -> Result<Self> {
         Self::new(Config::load(path).await?)
     }
@@ -107,6 +121,10 @@ impl Workflow {
     }
 
     /// Handle one Script Filter invocation; `args` excludes the program name.
+    ///
+    /// # Errors
+    ///
+    /// Config and template errors, a failing internal command (`github-refresh`, `okta-login`, `self-update`), a route whose `exec` can't start, and I/O errors writing the cache.
     pub async fn run(&self, args: impl IntoIterator<Item = String>) -> Result<()> {
         let mut args: Vec<String> = args.into_iter().collect();
         if let Some(result) = github::dispatch(&args).await {
@@ -216,8 +234,6 @@ impl Workflow {
             ));
         }
         prs.warm().await;
-        static PR_NUMBER: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
         if let Some(number) = PR_NUMBER.captures(query).and_then(|c| c[1].parse().ok()) {
             return Ok(Some(Menu::from_iter([prs.link_item(number)])));
         }
@@ -227,6 +243,10 @@ impl Workflow {
     /// The full menu: config items, built-in sections and providers, gathered concurrently.
     ///
     /// A failing provider is logged and skipped, so one outage can't blank the menu.
+    ///
+    /// # Errors
+    ///
+    /// Template or config errors in the `[[item]]`s.
     pub async fn build(&self) -> Result<Menu> {
         let config = &self.config;
         let mut sources: Vec<BoxFuture<'_, Result<Vec<ItemBuilder>>>> =

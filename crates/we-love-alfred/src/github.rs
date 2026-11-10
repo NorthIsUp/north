@@ -79,6 +79,10 @@ impl TryFrom<Row> for PullRequest {
 
 impl PullRequest {
     /// All rows, most recently updated first.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Json`] when `data` isn't a list of `gh pr list` rows with timezone-aware `updatedAt`.
     pub fn list_from_json(data: &str) -> Result<Vec<Self>> {
         let mut prs: Vec<Self> = serde_json::from_str(data)?;
         prs.sort_by_key(|pr| std::cmp::Reverse(pr.updated_at));
@@ -89,6 +93,7 @@ impl PullRequest {
         fuzzy_match(terms, &format!("{} {}", self.number, self.title))
     }
 
+    #[must_use]
     pub fn item(&self) -> Item {
         let draft = if self.is_draft { " · draft" } else { "" };
         Item {
@@ -136,11 +141,16 @@ impl PullRequestCache {
     }
 
     /// Left in place after a refresh, so a failing `gh` is retried at most once per `retry_every`.
+    #[must_use]
     pub fn warming_path(&self) -> PathBuf {
         with_suffix(&self.path, ".warming")
     }
 
     /// Run `gh` now and atomically replace the cache; a payload that won't parse is never written.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Command`] or [`Error::Timeout`] from `gh`, [`Error::Json`] for an unparseable payload, and I/O errors writing the cache.
     pub async fn fetch(&self) -> Result<()> {
         self.fetch_with(tool("gh")).await
     }
@@ -182,15 +192,12 @@ impl PullRequestCache {
             .await
             .map_err(Error::from)
             .and_then(|d| PullRequest::list_from_json(&d));
-        match cached {
-            Ok(prs) => {
-                self.warm().await;
-                prs
-            }
-            Err(_) => {
-                self.schedule_refresh().await;
-                Vec::new()
-            }
+        if let Ok(prs) = cached {
+            self.warm().await;
+            prs
+        } else {
+            self.schedule_refresh().await;
+            Vec::new()
         }
     }
 
@@ -265,6 +272,7 @@ impl PullRequestCache {
         items
     }
 
+    #[must_use]
     pub fn link_item(&self, number: u64) -> Item {
         let url = format!("https://github.com/{}/pull/{number}", self.repo);
         Item {
@@ -474,8 +482,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cache = cache(dir.path(), Duration::ZERO);
         std::fs::write(&cache.path, "broken").unwrap();
-        assert!(cache.load().await.is_empty());
-        assert!(cache.load().await.is_empty());
+        assert_eq!(cache.load().await, Vec::<PullRequest>::new());
+        assert_eq!(cache.load().await, Vec::<PullRequest>::new());
         assert!(
             !cache.schedule_refresh().await,
             "second load should have hit the throttle"
@@ -484,7 +492,7 @@ mod tests {
             path: dir.path().join("missing.json"),
             ..cache.clone()
         };
-        assert!(missing.load().await.is_empty());
+        assert_eq!(missing.load().await, Vec::<PullRequest>::new());
     }
 
     #[tokio::test]

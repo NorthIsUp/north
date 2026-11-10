@@ -141,6 +141,10 @@ impl Updater {
     }
 
     /// The live view: starts a forced update once per Alfred session, then redraws its progress.
+    ///
+    /// # Errors
+    ///
+    /// I/O errors writing the status file or finding the current executable.
     pub async fn view(&self) -> Result<Menu> {
         self.view_with(std::env::var_os(STARTED_VARIABLE).is_some())
             .await
@@ -187,6 +191,10 @@ impl Updater {
     }
 
     /// Check for a newer release than `$alfred_workflow_version`, download it and open it.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Http`] from GitHub, [`Error::Open`] if the installer won't open, and I/O errors; each is also reported in the live view.
     pub async fn run(&self, force: bool) -> Result<()> {
         let current = std::env::var("alfred_workflow_version")
             .ok()

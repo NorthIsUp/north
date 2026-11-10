@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use futures_util::future;
 use sha2::{Digest, Sha256};
 
@@ -154,8 +156,10 @@ impl Menu {
 fn uid_for(title: &str, subtitle: &str, arg: &str) -> String {
     Sha256::digest(format!("{title} {subtitle} {arg}"))
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+        .fold(String::new(), |mut hex, byte| {
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        })
 }
 
 #[cfg(test)]

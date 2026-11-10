@@ -114,7 +114,7 @@ Icon sources:
 | key | resolves to |
 | --- | --- |
 | `path` | a file; with `*`, the first case-insensitive match |
-| `glyph` | an SF Pro glyph rendered with ImageMagick |
+| `glyph` | an SF Pro glyph rendered with `ImageMagick` |
 | `app` | an app's icon, converted with `sips` |
 | `clearbit` | a domain's Clearbit logo |
 | `url` | a downloaded image |

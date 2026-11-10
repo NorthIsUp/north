@@ -58,6 +58,10 @@ impl Peer {
 
 impl Tailscale {
     /// Items for peers from `tailscale status`, probed concurrently; nothing when tailscale isn't running.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Http`] only if the probe client can't be built.
     pub async fn items(&self) -> Result<Vec<ItemBuilder>> {
         let Ok(status) = output(
             tool("tailscale").args(["status", "--json"]),
