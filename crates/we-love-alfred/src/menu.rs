@@ -117,9 +117,11 @@ impl From<String> for Modifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Text {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub copy: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub largetype: String,
 }
 

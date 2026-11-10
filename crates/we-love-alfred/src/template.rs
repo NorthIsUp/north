@@ -14,6 +14,9 @@ use crate::{Error, Result};
 pub(crate) struct Scope<'a> {
     pub vars: &'a Table,
     pub bindings: &'a BTreeMap<String, Value>,
+    /// Runtime values (query text, regex captures, database rows), inserted verbatim: braces in
+    /// them are text, never templates.
+    pub literals: &'a BTreeMap<String, Value>,
 }
 
 const MAX_DEPTH: usize = 8;
@@ -63,15 +66,16 @@ impl Scope<'_> {
         if root == "env" {
             return env::var(path.next().ok_or_else(missing)?).map_err(|_| missing());
         }
-        let mut value = self
-            .bindings
-            .get(root)
+        let literal = self.literals.get(root);
+        let mut value = literal
+            .or_else(|| self.bindings.get(root))
             .or_else(|| self.vars.get(root))
             .ok_or_else(missing)?;
         for key in path {
             value = value.get(key).ok_or_else(missing)?;
         }
         match value {
+            Value::String(s) if literal.is_some() => Ok(s.clone()),
             // Variables may reference other variables.
             Value::String(s) if depth < MAX_DEPTH => self.render_at(s, depth + 1),
             Value::String(s) => Ok(s.clone()),
@@ -123,9 +127,11 @@ mod tests {
         );
         let bindings =
             BTreeMap::from([("svc".to_owned(), Value::Table(table(r#"path = "logs""#)))]);
+        let literals = BTreeMap::from([("typed".to_owned(), Value::from("{not a var}"))]);
         let scope = Scope {
             vars: &vars,
             bindings: &bindings,
+            literals: &literals,
         };
         assert_eq!(
             scope.render("{base}:{port}/{svc.path} {{x}}").unwrap(),
@@ -136,6 +142,11 @@ mod tests {
             Err(Error::Template { .. })
         ));
         assert!(matches!(scope.render("{open"), Err(Error::Config(_))));
+        assert_eq!(
+            scope.render("[{typed}]").unwrap(),
+            "[{not a var}]",
+            "literals are never templates"
+        );
         assert_eq!(
             scope.render("{env.HOME}").unwrap(),
             env::var("HOME").unwrap()

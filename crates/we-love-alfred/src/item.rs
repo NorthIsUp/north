@@ -3,7 +3,7 @@ use std::fmt::Write;
 use futures_util::future;
 use sha2::{Digest, Sha256};
 
-use crate::{IconSource, Icons, Item, Menu, MenuCache, Modifier};
+use crate::{IconSource, Icons, Item, Menu, MenuCache, Modifier, Text};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Action {
@@ -25,6 +25,7 @@ pub struct ItemBuilder {
     match_text: Option<String>,
     autocomplete: Option<String>,
     mods: Vec<(String, String)>,
+    text: Option<Text>,
 }
 
 impl Item {
@@ -58,6 +59,7 @@ impl ItemBuilder {
             match_text: None,
             autocomplete: None,
             mods: Vec::new(),
+            text: None,
         }
     }
 
@@ -93,6 +95,15 @@ impl ItemBuilder {
         self
     }
 
+    /// Text for ⌘C (`copy`) and ⌘L (`largetype`); an empty string leaves that one unset.
+    pub fn text(mut self, copy: impl Into<String>, largetype: impl Into<String>) -> Self {
+        self.text = Some(Text {
+            copy: copy.into(),
+            largetype: largetype.into(),
+        });
+        self
+    }
+
     /// Resolve the icon and fill in defaults.
     pub async fn build(self, icons: &Icons) -> Item {
         let Self {
@@ -104,6 +115,7 @@ impl ItemBuilder {
             match_text,
             autocomplete,
             mods,
+            text,
         } = self;
         let (subtitle, arg, default_icon) = match action {
             Action::Arg(arg) => (subtitle.unwrap_or_default(), arg, None),
@@ -131,6 +143,7 @@ impl ItemBuilder {
                 .into_iter()
                 .map(|(key, subtitle)| (key, Modifier::from(subtitle)))
                 .collect(),
+            text,
             title,
             subtitle,
             arg,
