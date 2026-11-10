@@ -15,6 +15,7 @@ use serde_json::{Map, Value};
 use tokio::fs;
 
 use crate::cache::{expand_home, replace};
+use crate::shell::{output, tool};
 use crate::{Error, Result};
 
 /// A Rust function that writes a database at the path it's given.
@@ -28,7 +29,7 @@ pub enum Populate {
     Data(DataSource),
 }
 
-/// JSON from a `file` or `url`, filtered by `jq` into row objects, loaded into `table`.
+/// JSON from a `file`, `url` or `command`, filtered by `jq` into row objects, loaded into `table`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(try_from = "RawDataSource")]
 pub struct DataSource {
@@ -45,6 +46,8 @@ pub struct DataSource {
 pub enum Origin {
     File(String),
     Url(String),
+    /// An argv whose stdout is the JSON, run with Alfred's tool PATH.
+    Command(Vec<String>),
 }
 
 #[derive(Deserialize)]
@@ -52,6 +55,7 @@ pub enum Origin {
 struct RawDataSource {
     file: Option<String>,
     url: Option<String>,
+    command: Option<Vec<String>>,
     #[serde(default = "every_element")]
     jq: String,
     table: String,
@@ -63,10 +67,15 @@ impl TryFrom<RawDataSource> for DataSource {
     type Error = String;
 
     fn try_from(raw: RawDataSource) -> Result<Self, String> {
-        let from = match (raw.file, raw.url) {
-            (Some(file), None) => Origin::File(file),
-            (None, Some(url)) => Origin::Url(url),
-            _ => return Err("populate needs exactly one of file, url".into()),
+        let from = match (raw.file, raw.url, raw.command) {
+            (Some(file), None, None) => Origin::File(file),
+            (None, Some(url), None) => Origin::Url(url),
+            (None, None, Some(command)) if !command.is_empty() => Origin::Command(command),
+            _ => {
+                return Err(
+                    "populate needs exactly one of file, url, command (a non-empty argv)".into(),
+                );
+            }
         };
         Ok(Self {
             from,
@@ -76,6 +85,8 @@ impl TryFrom<RawDataSource> for DataSource {
         })
     }
 }
+
+const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
 
 fn every_element() -> String {
     ".[]".into()
@@ -116,6 +127,14 @@ async fn from_data(source: &DataSource, db: &Path) -> Result<()> {
                 .bytes()
                 .await?
                 .to_vec()
+        }
+        Origin::Command(command) => {
+            let (program, rest) = command
+                .split_first()
+                .ok_or_else(|| Error::Config("empty populate command".into()))?;
+            output(tool(program).args(rest), COMMAND_TIMEOUT)
+                .await?
+                .into_bytes()
         }
     };
     let rows = jq(&source.jq, &json)?;
@@ -232,6 +251,30 @@ mod tests {
         {"name": "Heart attack", "id": 22298006, "tags": ["cardiac"]},
         {"name": "Odd \"column\"", "id": 1, "weird key\"": true}
     ]}"#;
+
+    #[tokio::test]
+    async fn builds_from_a_command() {
+        let _serial = crate::serial().await;
+        let dir = tempfile::tempdir().unwrap();
+        let source: DataSource = toml::from_str(
+            r#"command = ["/bin/sh", "-c", "printf '[{\"code\": \"TID251\", \"name\": \"banned-api\"}]'"]
+               table = "rules""#,
+        )
+        .unwrap();
+        let db = dir.path().join("rules.db");
+        build(&Populate::Data(source), &db, &BTreeMap::new())
+            .await
+            .unwrap();
+        let name: String = Connection::open(&db)
+            .unwrap()
+            .query_row("select name from rules where code = 'TID251'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(name, "banned-api");
+        assert!(toml::from_str::<DataSource>("command = []\ntable = 't'").is_err());
+        assert!(toml::from_str::<DataSource>("file = 'a'\ncommand = ['x']\ntable = 't'").is_err());
+    }
 
     #[test]
     fn jq_turns_json_into_rows() {
