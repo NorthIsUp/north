@@ -99,15 +99,14 @@ routes = true
 [sources]                      # one item per path and installed editor
 paths = ["~/src/app", "~/src/libs/*"]
 
-# Official icon archives, downloaded once into the icon cache; `{packs.gcp}` is the folder.
+# Remote icon archives, read lazily: the index once, then only the icons used.
 [icon_packs.gcp]
 url = "https://services.google.com/fh/files/misc/google-cloud-legacy-icons.zip"
-include = "*.png"              # glob over archive paths; matches are extracted flat
 
 [[item]]
 title = "BigQuery"
 url = "https://console.cloud.google.com/bigquery"
-icon = [{ path = "{packs.gcp}/bigquery.png" }, { clearbit = "cloud.google.com" }]
+icon = [{ pack = "gcp/bigquery.png" }, { clearbit = "cloud.google.com" }]   # <pack>/<file glob>
 ```
 
 Icon sources:
@@ -122,6 +121,7 @@ Icon sources:
 | `favicon` | the page's favicon |
 | `filetype` | the icon for a UTI |
 | `fileicon` | the icon of a file |
+| `pack` | `<pack>/<file glob>` from an `[icon_packs]` archive, fetched by HTTP range |
 
 URL items default to `favicon`, and exec items to the `terminal` glyph.
 

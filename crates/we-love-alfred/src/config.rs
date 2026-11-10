@@ -38,7 +38,7 @@ pub struct Config {
     pub okta: Option<Okta>,
     pub tailscale: Option<Tailscale>,
     pub sources: Option<Sources>,
-    /// Icon archives fetched into the icon cache; `{packs.<name>}` is each one's folder.
+    /// Remote icon archives that `icon = { pack = "<name>/<file>" }` reads from lazily.
     #[serde(default)]
     pub icon_packs: BTreeMap<String, IconPack>,
 }
@@ -481,12 +481,7 @@ mod tests {
             .split("```")
             .next()
             .unwrap();
-        let mut config: Config = toml.parse().unwrap();
-        // Workflow binds `packs`; Config alone doesn't know the icon cache.
-        config.vars.insert(
-            "packs".into(),
-            Value::Table(toml::toml! { gcp = "/icons/gcp" }),
-        );
+        let config: Config = toml.parse().unwrap();
         assert_eq!(config.items().unwrap().len(), 6);
         assert!(
             config.github.is_some()

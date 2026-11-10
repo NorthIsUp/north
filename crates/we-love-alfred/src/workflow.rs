@@ -61,33 +61,14 @@ impl Workflow {
             Some(name) => Cache::named(name)?,
             None => Cache::for_workflow()?,
         };
-        let workflow = Self {
+        let icons = Icons::default().with_packs(config.icon_packs.clone());
+        Ok(Self {
             config,
             cache,
-            icons: Icons::default(),
+            icons,
             providers: Vec::new(),
             keywords: Vec::new(),
-        };
-        Ok(workflow.bind_packs())
-    }
-
-    /// Expose each icon pack's folder to templates as `{packs.<name>}`.
-    fn bind_packs(mut self) -> Self {
-        let packs: toml::Table = self
-            .config
-            .icon_packs
-            .keys()
-            .map(|name| {
-                (
-                    name.clone(),
-                    toml::Value::from(self.icons.pack_dir(name).display().to_string()),
-                )
-            })
-            .collect();
-        self.config
-            .vars
-            .insert("packs".into(), toml::Value::Table(packs));
-        self
+        })
     }
 
     pub async fn load(path: impl AsRef<Path>) -> Result<Self> {
@@ -96,8 +77,8 @@ impl Workflow {
 
     #[must_use]
     pub fn icons(mut self, icons: Icons) -> Self {
-        self.icons = icons;
-        self.bind_packs()
+        self.icons = icons.with_packs(self.config.icon_packs.clone());
+        self
     }
 
     #[must_use]
@@ -258,13 +239,7 @@ impl Workflow {
         }
         sources.extend(self.providers.iter().map(|p| p.items()));
         let mut items = config.items()?;
-        // Packs download alongside the providers; icons resolve after both.
-        let packs = future::join_all(config.icon_packs.iter().map(|(name, pack)| async move {
-            if let Err(e) = self.icons.ensure_pack(name, pack).await {
-                log::warn!("icon pack {name} failed: {e}");
-            }
-        }));
-        let (results, _) = future::join(future::join_all(sources), packs).await;
+        let results = future::join_all(sources).await;
         for result in results {
             match result {
                 Ok(more) => items.extend(more),
