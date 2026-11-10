@@ -11,6 +11,7 @@ use crate::cache::home;
 use crate::{Error, Result};
 
 /// Same rules as Python's `shlex.quote`: safe strings pass through unquoted.
+#[must_use]
 pub fn quote(s: &str) -> String {
     let safe = |c: char| c.is_ascii_alphanumeric() || "@%+=:,./_-".contains(c);
     if !s.is_empty() && s.chars().all(safe) {
@@ -29,6 +30,7 @@ pub fn join<S: AsRef<str>>(parts: impl IntoIterator<Item = S>) -> String {
 }
 
 /// `$PATH` plus mise, Homebrew and `~/.local/bin`: Alfred doesn't inherit the login shell's PATH.
+#[must_use]
 pub fn tool_path() -> OsString {
     let home = home();
     let current = env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin".into());
@@ -49,6 +51,10 @@ pub fn tool(program: impl AsRef<std::ffi::OsStr>) -> Command {
 }
 
 /// Stdout of `command`; a nonzero exit is an error carrying stderr. Killed after `timeout`.
+///
+/// # Errors
+///
+/// [`Error::Io`] if it can't start, [`Error::Timeout`] after `timeout`, and [`Error::Command`] for a nonzero exit.
 pub async fn output(command: &mut Command, timeout: Duration) -> Result<String> {
     let program = command
         .as_std()

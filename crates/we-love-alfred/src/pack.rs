@@ -63,7 +63,7 @@ pub(crate) async fn fetch(client: &Client, url: &str, entry: &Entry) -> Result<V
             flate2::read::DeflateDecoder::new(data.as_slice()).read_to_end(&mut out)?;
             Ok(out)
         }
-        method => Err(zip_error(format!(
+        method => Err(zip_error(&format!(
             "{}: unsupported compression method {method}",
             entry.name
         ))),
@@ -82,7 +82,7 @@ async fn range(client: &Client, url: &str, range: &str) -> Result<Vec<u8>> {
     if response.status() != StatusCode::PARTIAL_CONTENT
         || !response.headers().contains_key(CONTENT_RANGE)
     {
-        return Err(zip_error(format!("{url} does not support range requests")));
+        return Err(zip_error(&format!("{url} does not support range requests")));
     }
     Ok(response.bytes().await?.to_vec())
 }
@@ -92,7 +92,7 @@ fn end_of_directory(tail: &[u8]) -> Result<(u64, u64)> {
     let at = tail
         .windows(4)
         .rposition(|w| w == [0x50, 0x4b, 0x05, 0x06])
-        .ok_or_else(|| zip_error("no end of central directory".into()))?;
+        .ok_or_else(|| zip_error("no end of central directory"))?;
     let (entries, size, offset) = (
         le16(tail, at + 10)?,
         le32(tail, at + 12)?,
@@ -100,7 +100,7 @@ fn end_of_directory(tail: &[u8]) -> Result<(u64, u64)> {
     );
     // shortcut: no ZIP64, so archives must stay under 4 GB and 65,535 entries; add the ZIP64 locator if a pack outgrows that.
     if entries == u16::MAX || offset == u32::MAX {
-        return Err(zip_error("ZIP64 archives are not supported".into()));
+        return Err(zip_error("ZIP64 archives are not supported"));
     }
     Ok((u64::from(offset), u64::from(size)))
 }
@@ -114,7 +114,7 @@ fn central_directory(bytes: &[u8]) -> Result<Vec<Entry>> {
             name_len + usize::from(le16(bytes, at + 30)?) + usize::from(le16(bytes, at + 32)?);
         let name = bytes
             .get(at + 46..at + 46 + name_len)
-            .ok_or_else(|| zip_error("truncated entry name".into()))?;
+            .ok_or_else(|| zip_error("truncated entry name"))?;
         entries.push(Entry {
             name: String::from_utf8_lossy(name).into_owned(),
             method: le16(bytes, at + 10)?,
@@ -129,18 +129,18 @@ fn central_directory(bytes: &[u8]) -> Result<Vec<Entry>> {
 fn le16(bytes: &[u8], at: usize) -> Result<u16> {
     let raw = bytes
         .get(at..at + 2)
-        .ok_or_else(|| zip_error("truncated header".into()))?;
+        .ok_or_else(|| zip_error("truncated header"))?;
     Ok(u16::from_le_bytes([raw[0], raw[1]]))
 }
 
 fn le32(bytes: &[u8], at: usize) -> Result<u32> {
     let raw = bytes
         .get(at..at + 4)
-        .ok_or_else(|| zip_error("truncated header".into()))?;
+        .ok_or_else(|| zip_error("truncated header"))?;
     Ok(u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]))
 }
 
-fn zip_error(message: String) -> Error {
+fn zip_error(message: &str) -> Error {
     Error::Config(format!("icon pack: {message}"))
 }
 

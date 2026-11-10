@@ -169,11 +169,20 @@ impl FromStr for Config {
 }
 
 impl Config {
+    /// Read and validate a config file.
+    ///
+    /// # Errors
+    ///
+    /// I/O errors reading `path`, and the same errors as parsing with [`str::parse`].
     pub async fn load(path: impl AsRef<Path>) -> Result<Self> {
         fs::read_to_string(path).await?.parse()
     }
 
     /// The `[[item]]`s with templates rendered and loops expanded.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Template`] for an unknown variable, and [`Error::Config`] for an item without exactly one of `url`, `exec`, `arg`.
     pub fn items(&self) -> Result<Vec<ItemBuilder>> {
         let mut items = Vec::new();
         for item in &self.items {
@@ -183,6 +192,10 @@ impl Config {
     }
 
     /// The first route matching `query`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Regex`] for an invalid pattern, and template errors from rendering the route's items or command.
     pub fn route(&self, query: &str) -> Result<Option<RouteAction>> {
         for route in &self.routes {
             if let Some(bindings) = route.matches(query)? {
@@ -215,6 +228,10 @@ impl Config {
     }
 
     /// `[sources]` items, checking paths concurrently.
+    ///
+    /// # Errors
+    ///
+    /// Template errors in `paths`, or [`Error::Config`] if the glob task panics.
     pub async fn source_items(&self) -> Result<Vec<ItemBuilder>> {
         let Some(sources) = &self.sources else {
             return Ok(Vec::new());

@@ -32,6 +32,7 @@ impl Editor {
         }
     }
 
+    #[must_use]
     pub fn open_cmd(&self, path: &Path) -> String {
         format!(
             "open -a {} {}",

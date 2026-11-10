@@ -168,7 +168,7 @@ mod tests {
                 "{}",
                 String::from_utf8_lossy(&out.stderr)
             );
-            assert!(out.stdout.is_empty());
+            assert_eq!(out.stdout, b"");
             for file in &doomed {
                 assert!(!file.exists(), "{} survived", file.display());
             }
