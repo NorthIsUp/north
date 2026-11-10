@@ -3,10 +3,11 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use futures_util::future;
+use futures_util::future::{self, BoxFuture, FutureExt};
 use reqwest::Client;
 use serde::Deserialize;
 
+use crate::feature::{Context, Feature};
 use crate::shell::{output, tool};
 use crate::{Item, ItemBuilder, Result};
 
@@ -116,6 +117,12 @@ impl Tailscale {
             }
         }
         Ok(items)
+    }
+}
+
+impl Feature for Tailscale {
+    fn items<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, Result<Vec<ItemBuilder>>> {
+        Tailscale::items(self).boxed()
     }
 }
 

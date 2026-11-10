@@ -2,16 +2,15 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OpenFlags};
 use tokio::fs;
 use toml::{Table, Value};
 
-use crate::cache::{cache_dir, with_suffix};
-use crate::config::ItemConfig;
-use crate::populate::Populate;
+use crate::cache::{cache_dir, replace};
+use crate::route::{QuerySpec, expand};
 use crate::{Error, ItemBuilder, Result};
 
 /// The query text as SQL parameters. It only ever reaches SQLite bound, never spliced into SQL.
@@ -60,46 +59,33 @@ impl Params {
     }
 }
 
-/// A matched query route, ready to run.
+/// A matched query route, rendered for one query.
 #[derive(Debug)]
-pub struct QueryPlan {
-    pub(crate) db: PathBuf,
-    pub(crate) sql: String,
-    pub(crate) params: Params,
-    pub(crate) cache_copy: bool,
-    /// Index of the route in the config, for the background rebuild command.
-    pub(crate) route: usize,
-    pub(crate) populate: Option<Populate>,
-    pub(crate) refresh_every: Option<Duration>,
-    pub(crate) error: Option<String>,
-    pub(crate) items: Vec<ItemConfig>,
-    pub(crate) vars: Table,
-    pub(crate) literals: BTreeMap<String, Value>,
+pub(crate) struct QueryPlan<'a> {
+    pub spec: &'a QuerySpec,
+    pub vars: &'a Table,
+    pub db: PathBuf,
+    pub sql: String,
+    /// Index of the route, for the background rebuild command.
+    pub route: usize,
+    pub params: Params,
+    pub literals: BTreeMap<String, Value>,
 }
 
-impl QueryPlan {
+impl QueryPlan<'_> {
     /// Run the query and render the route's items once per row, with columns bound as `{column}`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Sqlite`] when the database can't be opened or the SQL fails, I/O errors copying it
-    /// into the cache, and template errors rendering the items.
     pub async fn run(self) -> Result<Vec<ItemBuilder>> {
-        let db = if self.cache_copy {
+        let db = if self.spec.cache_copy {
             local_copy(&self.db).await?
         } else {
             self.db.clone()
         };
-        let (sql, params) = (self.sql.clone(), self.params.clone());
-        let read =
-            tokio::task::spawn_blocking(move || rows(&db, &sql, &params).map_err(|e| (e, db)))
-                .await
-                .map_err(|e| Error::Config(format!("query task failed: {e}")))?;
-        let rows = match read {
+        let (path, sql, params) = (db.clone(), self.sql.clone(), self.params.clone());
+        let rows = match tokio::task::spawn_blocking(move || rows(&path, &sql, &params)).await? {
             Ok(rows) => rows,
-            Err((e, db)) => {
+            Err(e) => {
                 // A copy torn by a killed run stays malformed; the next keystroke copies afresh.
-                if self.cache_copy {
+                if self.spec.cache_copy {
                     let _ = fs::remove_file(db).await;
                 }
                 return Err(e);
@@ -109,9 +95,7 @@ impl QueryPlan {
         for row in rows {
             let mut literals = self.literals.clone();
             literals.extend(row);
-            for item in &self.items {
-                items.extend(item.expand(&self.vars, &literals)?);
-            }
+            items.extend(expand(&self.spec.items, self.vars, &literals)?);
         }
         Ok(items)
     }
@@ -163,11 +147,10 @@ async fn local_copy(db: &Path) -> Result<PathBuf> {
     if !fs::try_exists(&local).await.unwrap_or(false)
         || modified(fs::metadata(db).await) > modified(fs::metadata(&local).await)
     {
-        fs::create_dir_all(local.parent().unwrap_or(Path::new("."))).await?;
-        // Copy then rename: a run killed mid-copy must not leave a half-written database behind.
-        let partial = with_suffix(&local, &format!(".{}.partial", std::process::id()));
-        fs::copy(db, &partial).await?;
-        fs::rename(&partial, &local).await?;
+        replace(&local, |temporary| async move {
+            Ok(fs::copy(db, temporary).await.map(drop)?)
+        })
+        .await?;
     }
     Ok(local)
 }

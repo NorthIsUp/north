@@ -83,11 +83,14 @@ impl Cache {
         atomic_write(&self.path, &serde_json::to_vec(menu)?).await
     }
 
-    /// Launch `command` detached unless a refresh started within [`REFRESH_INTERVAL`].
-    ///
-    /// Returns whether it launched.
-    pub async fn refresh(&self, command: &mut Command) -> bool {
-        spawn_throttled(command, &self.refresh_marker(), REFRESH_INTERVAL).await
+    /// Re-run this binary detached with `args` (usually a flag that skips the cache) unless a
+    /// refresh started within [`REFRESH_INTERVAL`]. Returns whether it launched.
+    pub async fn refresh<I, S>(&self, args: I) -> bool
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        spawn_self(args, &self.refresh_marker(), REFRESH_INTERVAL).await
     }
 
     /// `<cache>.refresh.pid`: the throttle marker, holding the refresh's PID.
@@ -149,27 +152,52 @@ pub(crate) fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     name.into()
 }
 
-/// Write to a uniquely named sibling, then rename it over `path`.
-pub(crate) async fn atomic_write(path: &Path, payload: &[u8]) -> Result<()> {
+/// Build `path` atomically: `write` fills a uniquely named sibling, renamed over `path` only on
+/// success and removed on failure, so readers never see a partial file.
+pub(crate) async fn replace<T, F, Fut>(path: &Path, write: F) -> Result<T>
+where
+    F: FnOnce(PathBuf) -> Fut,
+    Fut: Future<Output = Result<T>>,
+{
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let parent = path.parent().unwrap_or(Path::new("."));
     fs::create_dir_all(parent).await?;
     let name = path.file_name().unwrap_or_default().to_string_lossy();
-    let unique = format!(
+    let temporary = parent.join(format!(
         ".{name}.{}.{}.tmp",
         std::process::id(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
-    );
-    let temporary = parent.join(unique);
-    let written = async {
-        fs::write(&temporary, payload).await?;
-        fs::rename(&temporary, path).await
-    }
-    .await;
+    ));
+    let written = match write(temporary.clone()).await {
+        Ok(value) => fs::rename(&temporary, path)
+            .await
+            .map(|()| value)
+            .map_err(Error::from),
+        Err(e) => Err(e),
+    };
     if written.is_err() {
         let _ = fs::remove_file(&temporary).await;
     }
-    Ok(written?)
+    written
+}
+
+pub(crate) async fn atomic_write(path: &Path, payload: &[u8]) -> Result<()> {
+    replace(path, |temporary| async move {
+        Ok(fs::write(temporary, payload).await?)
+    })
+    .await
+}
+
+/// Re-run this binary detached with `args`, throttled by `marker` (see [`spawn_throttled`]).
+pub(crate) async fn spawn_self<I, S>(args: I, marker: &Path, interval: Duration) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let Ok(exe) = env::current_exe() else {
+        return false;
+    };
+    spawn_throttled(Command::new(exe).args(args), marker, interval).await
 }
 
 /// Spawn `command` detached, at most once per `interval` per `marker`, counting failed spawns.
@@ -280,8 +308,22 @@ mod tests {
         let _serial = crate::serial().await;
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::at(dir.path().join("menu.json"));
-        assert!(cache.refresh(&mut Command::new("true")).await);
-        assert!(!cache.refresh(&mut Command::new("true")).await);
+        assert!(
+            spawn_throttled(
+                &mut Command::new("true"),
+                &cache.refresh_marker(),
+                REFRESH_INTERVAL
+            )
+            .await
+        );
+        assert!(
+            !spawn_throttled(
+                &mut Command::new("true"),
+                &cache.refresh_marker(),
+                REFRESH_INTERVAL
+            )
+            .await
+        );
         assert!(
             fs::read_to_string(cache.refresh_marker())
                 .await
@@ -305,14 +347,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cache = Cache::at(dir.path().join("menu.json"));
         assert!(
-            !cache
-                .refresh(&mut Command::new(dir.path().join("missing")))
-                .await
+            !spawn_throttled(
+                &mut Command::new(dir.path().join("missing")),
+                &cache.refresh_marker(),
+                REFRESH_INTERVAL
+            )
+            .await
         );
         assert_eq!(
             fs::read_to_string(cache.refresh_marker()).await.unwrap(),
             "pending"
         );
-        assert!(!cache.refresh(&mut Command::new("true")).await);
+        assert!(
+            !spawn_throttled(
+                &mut Command::new("true"),
+                &cache.refresh_marker(),
+                REFRESH_INTERVAL
+            )
+            .await
+        );
     }
 }

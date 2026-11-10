@@ -3,21 +3,26 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::LazyLock;
 use std::time::Duration;
 
-use futures_util::future::{self, BoxFuture, FutureExt};
+use futures_util::future::{BoxFuture, FutureExt};
 use glob::{MatchOptions, Pattern};
-use regex::Regex;
 use reqwest::{Client, Url};
 use serde::Deserialize;
 use tokio::fs;
 use tokio::process::Command;
 use tokio::sync::OnceCell;
 
-use crate::cache::{atomic_write, expand_home, home};
-use crate::pack::{self, Entry};
+use crate::cache::{expand_home, home};
 use crate::{Icon, IconType};
+
+mod favicon;
+mod glyph;
+mod pack;
+mod zip;
+
+pub use pack::IconPack;
+use pack::Pack;
 
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
@@ -66,30 +71,6 @@ impl IconSource {
                 Self::FirstOf(all.iter().map(|s| s.try_map(f)).collect::<Result<_, _>>()?)
             }
         })
-    }
-}
-
-/// A remote ZIP of icons, read lazily: [`IconSource::Pack`] fetches the archive's index once,
-/// then only the bytes of each icon used. The host must support HTTP range requests.
-///
-/// ```toml
-/// [icon_packs.gcp]
-/// url = "https://services.google.com/fh/files/misc/google-cloud-legacy-icons.zip"
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct IconPack {
-    pub url: String,
-}
-
-struct Pack {
-    url: String,
-    index: OnceCell<Option<Vec<Entry>>>,
-}
-
-impl std::fmt::Debug for Pack {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.url)
     }
 }
 
@@ -248,87 +229,6 @@ impl Icons {
         .boxed()
     }
 
-    /// Icon packs [`IconSource::Pack`] can name.
-    #[must_use]
-    pub fn with_packs(mut self, packs: impl IntoIterator<Item = (String, IconPack)>) -> Self {
-        self.packs.extend(packs.into_iter().map(|(name, pack)| {
-            (
-                name,
-                Pack {
-                    url: pack.url,
-                    index: OnceCell::new(),
-                },
-            )
-        }));
-        self
-    }
-
-    /// `<pack>/<file glob>`: a cached copy, else the first matching archive entry, fetched alone.
-    async fn pack_icon(&self, spec: &str) -> Option<PathBuf> {
-        let (name, file) = spec.split_once('/')?;
-        let dir = self.dir.join("packs").join(name);
-        if let Some(cached) = find_case_insensitive(&dir, file).await {
-            return Some(cached);
-        }
-        let pack = self.packs.get(name).or_else(|| {
-            log::warn!("icon pack {name:?} is not configured");
-            None
-        })?;
-        let entries = pack
-            .index
-            .get_or_init(|| self.pack_index(name, &pack.url))
-            .await
-            .as_ref()?;
-        let pattern = Pattern::new(file).ok()?;
-        let options = MatchOptions {
-            case_sensitive: false,
-            ..MatchOptions::new()
-        };
-        // macOS-made archives carry resource forks under __MACOSX/.
-        let entry = entries
-            .iter()
-            .filter(|e| !e.name.starts_with("__MACOSX/"))
-            .find(|e| {
-                let base = e.name.rsplit('/').next().unwrap_or(&e.name);
-                pattern.matches_with(base, options)
-            })?;
-        let bytes = pack::fetch(&self.client, &pack.url, entry)
-            .await
-            .map_err(|e| log::warn!("icon pack {name}: {e}"))
-            .ok()?;
-        let path = dir.join(entry.name.rsplit('/').next()?);
-        atomic_write(&path, &bytes).await.ok()?;
-        Some(path)
-    }
-
-    /// The pack's index from disk when it's for the same URL, else from the archive.
-    async fn pack_index(&self, name: &str, url: &str) -> Option<Vec<Entry>> {
-        #[derive(serde::Serialize, Deserialize)]
-        struct Cached {
-            url: String,
-            entries: Vec<Entry>,
-        }
-        let path = self.dir.join("packs").join(format!("{name}.index.json"));
-        if let Ok(raw) = fs::read(&path).await
-            && let Ok(cached) = serde_json::from_slice::<Cached>(&raw)
-            && cached.url == url
-        {
-            return Some(cached.entries);
-        }
-        let entries = pack::index(&self.client, url)
-            .await
-            .map_err(|e| log::warn!("icon pack {name}: {e}"))
-            .ok()?;
-        let cached = Cached {
-            url: url.to_owned(),
-            entries,
-        };
-        if let Ok(json) = serde_json::to_vec(&cached) {
-            let _ = atomic_write(&path, &json).await;
-        }
-        Some(cached.entries)
-    }
-
     async fn app_icon(&self, app: &str) -> Option<PathBuf> {
         let (icns, png) = match app.strip_suffix(".icns") {
             Some(_) => {
@@ -362,45 +262,6 @@ impl Icons {
         converted.then_some(png)
     }
 
-    /// Render `symbol` from SF Pro to dark and light PNGs concurrently; the dark one is returned.
-    async fn sfsymbol(&self, symbol: &str) -> Option<PathBuf> {
-        let variant = |mode: &str| self.glyph_dir.join(format!("sf-pro-{symbol}-{mode}.png"));
-        let dark = variant("dark");
-        if !fs::try_exists(&dark).await.unwrap_or(false) {
-            if !self.has_magick().await {
-                return None;
-            }
-            fs::create_dir_all(&self.glyph_dir).await.ok()?;
-            let render = |fill: &'static str, out: PathBuf| {
-                let mut command = Command::new("magick");
-                command
-                    .args(["-background", "none", "-fill", fill, "-font"])
-                    .arg(&self.font)
-                    .args(["-pointsize", "300", &format!("label:{symbol}")])
-                    .arg(out);
-                async move { quiet(&mut command).status().await }
-            };
-            let _ = future::join(
-                render("black", dark.clone()),
-                render("white", variant("light")),
-            )
-            .await;
-        }
-        fs::try_exists(&dark).await.unwrap_or(false).then_some(dark)
-    }
-
-    async fn has_magick(&self) -> bool {
-        *self
-            .magick
-            .get_or_init(|| async {
-                quiet(Command::new("which").arg("magick"))
-                    .status()
-                    .await
-                    .is_ok_and(|s| s.success())
-            })
-            .await
-    }
-
     async fn download(&self, url: &str, path: &Path) -> Option<Icon> {
         if !is_usable(path).await {
             let fetch = async {
@@ -424,43 +285,6 @@ impl Icons {
             }
         }
         Some(Icon::path(path.display().to_string()))
-    }
-
-    /// The largest icon the page (or its site root) declares that downloads, else `/favicon.ico`
-    /// on the host the page redirected to.
-    async fn favicon(&self, page: Url, dir: &Path) -> Option<Icon> {
-        let mut base = page.clone();
-        for candidate in [page.clone(), page.join("/").ok()?] {
-            let response = self
-                .client
-                .get(candidate)
-                .send()
-                .await
-                .ok()
-                .and_then(|r| r.error_for_status().ok());
-            let Some(response) = response else { continue };
-            base = response.url().clone();
-            let Ok(html) = response.text().await else {
-                continue;
-            };
-            for href in icon_links(&html) {
-                let Ok(url) = base.join(&href) else { continue };
-                let ext = Path::new(url.path())
-                    .extension()
-                    .map_or("ico".into(), |e| e.to_string_lossy().to_lowercase());
-                if let Some(icon) = self
-                    .download(url.as_str(), &dir.join(format!("favicon.{ext}")))
-                    .await
-                {
-                    return Some(icon);
-                }
-            }
-        }
-        self.download(
-            base.join("/favicon.ico").ok()?.as_str(),
-            &dir.join("favicon.ico"),
-        )
-        .await
     }
 }
 
@@ -497,84 +321,18 @@ async fn is_usable(path: &Path) -> bool {
     fs::metadata(path).await.is_ok_and(|m| m.len() > 20)
 }
 
-/// Icon hrefs a page declares, largest first: `<link rel>` icons and `msapplication-TileImage`
-/// by their `sizes` or a `WxH` in the filename, then `og:image` (usually a banner, not an icon).
-/// Skips `mask-icon` (a one-colour Safari SVG) and inline `data:` images.
-fn icon_links(html: &str) -> Vec<String> {
-    const RELS: [&str; 3] = ["icon", "apple-touch-icon", "apple-touch-icon-precomposed"];
-    let Ok(dom) = tl::parse(html, tl::ParserOptions::default()) else {
-        return Vec::new();
-    };
-    // HTML attribute names are case-insensitive; `Attributes::get` is not.
-    let attr = |tag: &tl::HTMLTag, name: &str| {
-        tag.attributes()
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .and_then(|(_, value)| value)
-            .map(|value| value.trim().to_owned())
-            .unwrap_or_default()
-    };
-    let mut found: Vec<(bool, u32, String)> = dom
-        .nodes()
-        .iter()
-        .filter_map(|node| node.as_tag())
-        .filter_map(|tag| {
-            let (banner, href) = match tag.name().as_utf8_str().to_lowercase().as_str() {
-                "link"
-                    if attr(tag, "rel")
-                        .to_lowercase()
-                        .split_whitespace()
-                        .any(|r| RELS.contains(&r)) =>
-                {
-                    (false, attr(tag, "href"))
-                }
-                "meta" => match attr(tag, "name").to_lowercase().as_str() {
-                    "msapplication-tileimage" => (false, attr(tag, "content")),
-                    _ if attr(tag, "property").eq_ignore_ascii_case("og:image") => {
-                        (true, attr(tag, "content"))
-                    }
-                    _ => return None,
-                },
-                _ => return None,
-            };
-            if href.is_empty() || href.to_lowercase().starts_with("data:") {
-                return None;
-            }
-            Some((banner, icon_size(&attr(tag, "sizes"), &href), href))
-        })
-        .collect();
-    found.sort_by_key(|(banner, size, _)| (*banner, std::cmp::Reverse(*size)));
-    found.into_iter().map(|(_, _, href)| href).collect()
-}
-
-/// The largest side named by `sizes` (`16x16 32x32`, `192×192`, sloppy `192x192+`), else by a
-/// `WxH` in the filename; 0 when unknown, including `sizes="any"`.
-fn icon_size(sizes: &str, href: &str) -> u32 {
-    static IN_NAME: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(?i)(\d{2,4})[x×](\d{2,4})").expect("valid regex"));
-    let side = |n: &str| {
-        n.chars()
-            .filter(char::is_ascii_digit)
-            .collect::<String>()
-            .parse::<u32>()
-            .unwrap_or(0)
-    };
-    let declared = sizes
-        .split_whitespace()
-        .filter_map(|size| {
-            size.to_lowercase()
-                .split_once(['x', '×'])
-                .map(|(w, h)| side(w).max(side(h)))
-        })
-        .max();
-    declared
-        .or_else(|| IN_NAME.captures(href).map(|c| side(&c[1]).max(side(&c[2]))))
-        .unwrap_or(0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clearbit_takes_the_bare_host() {
+        assert_eq!(
+            clearbit_domain("https://user.example.com:8443/path"),
+            "user.example.com"
+        );
+        assert_eq!(clearbit_domain("example.com"), "example.com");
+    }
 
     #[tokio::test]
     async fn first_of_falls_through_to_a_match() {
@@ -588,55 +346,6 @@ mod tests {
         ]);
         let icon = icons.resolve(&source).await.unwrap();
         assert!(icon.path.ends_with("Arch_Amazon-S3.PNG"), "{}", icon.path);
-    }
-
-    #[tokio::test]
-    async fn pack_icons_fetch_one_entry_and_cache_it() {
-        let (url, ranges) = crate::pack::tests::range_server(crate::pack::tests::archive());
-        let dir = tempfile::tempdir().unwrap();
-        let icons = Icons::new(dir.path()).with_packs([("aws".to_owned(), IconPack { url })]);
-        let source = IconSource::Pack("aws/arch_amazon-rds_64.png".into());
-        let icon = icons.resolve(&source).await.unwrap();
-        assert!(
-            icon.path.ends_with("packs/aws/Arch_Amazon-RDS_64.png"),
-            "{}",
-            icon.path
-        );
-        assert_eq!(std::fs::read(&icon.path).unwrap(), b"rds rds rds rds rds");
-        let requests = ranges.lock().unwrap().len();
-        assert_eq!(
-            icons.resolve(&source).await,
-            Some(icon),
-            "served from the cache"
-        );
-        assert_eq!(ranges.lock().unwrap().len(), requests, "no new requests");
-        let fresh = Icons::new(dir.path()).with_packs([(
-            "aws".to_owned(),
-            IconPack {
-                url: "http://127.0.0.1:9/x.zip".into(),
-            },
-        )]);
-        assert!(
-            fresh
-                .resolve(&IconSource::Pack("aws/bigquery.png".into()))
-                .await
-                .is_none(),
-            "index cached per URL"
-        );
-        assert!(
-            icons
-                .resolve(&IconSource::Pack("aws/bigquery.png".into()))
-                .await
-                .is_some(),
-            "index reused from disk"
-        );
-        assert!(
-            icons
-                .resolve(&IconSource::Pack("gcp/x.png".into()))
-                .await
-                .is_none(),
-            "unknown pack"
-        );
     }
 
     #[tokio::test]
@@ -661,37 +370,6 @@ mod tests {
                 kind: Some(IconType::Filetype),
                 path: "public.folder".into()
             })
-        );
-    }
-
-    #[test]
-    fn parses_icon_links_and_domains() {
-        let html = r#"
-            <link rel="stylesheet" href="a.css">
-            <link rel="mask-icon" href="/pinned.svg">
-            <link rel="icon" href="data:image/png;base64,AAAA">
-            <meta property="og:image" content="/social-1200x630.png">
-            <LINK REL="Shortcut Icon" href=" /favicon-16x16.png ">
-            <link rel="apple-touch-icon" sizes="192x192+" href="/touch.png">
-            <link rel="icon" sizes="16x16 32x32" href="/multi.ico">
-            <meta name="msapplication-TileImage" content="/tile-144x144.png">
-            <link rel="icon" sizes="any" href="/icon.svg">"#;
-        assert_eq!(
-            icon_links(html),
-            [
-                "/touch.png",
-                "/tile-144x144.png",
-                "/multi.ico",
-                "/favicon-16x16.png",
-                "/icon.svg",
-                "/social-1200x630.png"
-            ]
-        );
-        assert_eq!(icon_size("180×180", "x"), 180);
-        assert_eq!(icon_size("", "apple-touch-icon-57x57.png"), 57);
-        assert_eq!(
-            clearbit_domain("https://user.example.com:8443/path"),
-            "user.example.com"
         );
     }
 }

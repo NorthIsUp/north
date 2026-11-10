@@ -1,23 +1,18 @@
-//! Declarative menus: static items, loops, keyword routes and built-in providers from TOML.
+//! Declarative workflows: the TOML schema, `[vars]` templates and `[[item]]`s.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
-use std::time::Duration;
 
-use futures_util::future;
-use regex::Regex;
 use serde::Deserialize;
 use tokio::fs;
 use toml::{Table, Value};
 
-use crate::cache::{cache_dir, expand_home};
-use crate::editor::Editor;
-use crate::github::PullRequestCache;
+use crate::github::Github;
 use crate::okta::Okta;
-use crate::populate::Populate;
-use crate::query::{Params, QueryPlan};
+use crate::route::{Route, expand};
 use crate::shell::join;
+use crate::sources::Sources;
 use crate::tailscale::Tailscale;
 use crate::template::{Scope, product};
 use crate::update::Updater;
@@ -36,7 +31,7 @@ pub struct Config {
     pub items: Vec<ItemConfig>,
     #[serde(default, rename = "route")]
     pub routes: Vec<Route>,
-    pub github: Option<GithubConfig>,
+    pub github: Option<Github>,
     pub update: Option<Updater>,
     pub okta: Option<Okta>,
     pub tailscale: Option<Tailscale>,
@@ -46,19 +41,15 @@ pub struct Config {
     pub icon_packs: BTreeMap<String, IconPack>,
 }
 
-/// One `[[item]]`; exactly one of `url`, `exec`, `arg`. Every string is a template.
+/// One `[[item]]`. Every string is a template.
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawItem")]
 pub struct ItemConfig {
     pub title: String,
-    pub url: Option<String>,
-    /// A zsh command, or an argv list that gets shell-quoted.
-    pub exec: Option<Exec>,
-    pub arg: Option<String>,
+    pub action: ItemAction,
     pub subtitle: Option<String>,
     pub icon: Option<IconSpec>,
     pub uid: Option<String>,
-    #[serde(rename = "match")]
     pub match_text: Option<String>,
     pub autocomplete: Option<String>,
     /// Text for ⌘C.
@@ -66,17 +57,25 @@ pub struct ItemConfig {
     /// Text for ⌘L; defaults to nothing.
     pub largetype: Option<String>,
     /// Subtitles per modifier: `mods = { alt = "…" }`.
-    #[serde(default)]
     pub mods: BTreeMap<String, String>,
     /// Repeat the item for every combination of these lists, binding each value to its name.
-    #[serde(default)]
     pub each: BTreeMap<String, Vec<Value>>,
+}
+
+/// What an item does: exactly one of `url`, `exec` or `arg` in TOML.
+#[derive(Debug, Clone)]
+pub enum ItemAction {
+    Url(String),
+    Exec(Exec),
+    Arg(String),
 }
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum Exec {
+    /// A zsh command.
     Shell(String),
+    /// An argv list, shell-quoted into a command.
     Argv(Vec<String>),
 }
 
@@ -88,141 +87,63 @@ pub enum IconSpec {
     FirstOf(Vec<IconSource>),
 }
 
-/// A `[[route]]`: queries it matches skip the cached menu.
-///
-/// Matches either the first word against `keywords` (binding `{keyword}`,
-/// `{value}` and `{rest}`), or the whole query against `pattern` (binding
-/// `{0}`, `{1}`, … and named groups). `{query}` is always bound. Then it
-/// either replaces the process with `exec`, or shows its `[[route.item]]`s.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Route {
+struct RawItem {
+    title: String,
+    url: Option<String>,
+    exec: Option<Exec>,
+    arg: Option<String>,
+    subtitle: Option<String>,
+    icon: Option<IconSpec>,
+    uid: Option<String>,
+    #[serde(rename = "match")]
+    match_text: Option<String>,
+    autocomplete: Option<String>,
+    copy: Option<String>,
+    largetype: Option<String>,
     #[serde(default)]
-    pub keywords: BTreeMap<String, String>,
-    pub pattern: Option<String>,
+    mods: BTreeMap<String, String>,
     #[serde(default)]
-    pub exec: Vec<String>,
-    #[serde(default)]
-    pub env: BTreeMap<String, String>,
-    #[serde(default, rename = "item")]
-    pub items: Vec<ItemConfig>,
-    /// SQLite database `sql` reads, relative to the workflow folder; opened read-only.
-    pub db: Option<String>,
-    /// Rendered with `[vars]`, `{keyword}` and `{value}` only; the query text is bound as `:query`,
-    /// `:fts`, `:words` and `:first`. Each row renders the `[[route.item]]`s with its columns.
-    pub sql: Option<String>,
-    /// Run instead of `sql` when the query has no words, e.g. to list everything.
-    pub empty_sql: Option<String>,
-    /// Query a copy in the cache dir, refreshed when `db` changes.
-    #[serde(default)]
-    pub cache_copy: bool,
-    /// How to build `db` when it's missing: the name of a function registered with
-    /// [`crate::Workflow::populate`], or a JSON `file`/`url` piped through a `jq` filter.
-    pub populate: Option<Populate>,
-    /// Rebuild `db` with `populate` in the background once it's older than this many seconds.
-    #[serde(default, deserialize_with = "optional_seconds")]
-    pub refresh_every: Option<Duration>,
-    /// Title of the row shown when the query fails; its subtitle is the error.
-    pub error: Option<String>,
+    each: BTreeMap<String, Vec<Value>>,
 }
 
-fn optional_seconds<'de, D: serde::Deserializer<'de>>(
-    d: D,
-) -> std::result::Result<Option<Duration>, D::Error> {
-    Option::<u64>::deserialize(d).map(|s| s.map(Duration::from_secs))
-}
+impl TryFrom<RawItem> for ItemConfig {
+    type Error = String;
 
-/// What a matched route does.
-#[derive(Debug)]
-pub enum RouteAction {
-    Exec {
-        argv: Vec<String>,
-        env: BTreeMap<String, String>,
-    },
-    Items(Vec<ItemBuilder>),
-    Query(Box<QueryPlan>),
-}
-
-/// `[github]`: open PRs via `gh`, searched with `<keyword> [@author] [terms]`, `#<number|text>` or a bare number.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct GithubConfig {
-    pub repo: String,
-    #[serde(default = "default_pr_keyword")]
-    pub keyword: String,
-    #[serde(default = "default_limit")]
-    pub limit: u32,
-}
-
-fn default_pr_keyword() -> String {
-    "prs".into()
-}
-
-fn default_limit() -> u32 {
-    1000
-}
-
-impl GithubConfig {
-    pub fn cache(&self) -> PullRequestCache {
-        let path = cache_dir().join(format!("{}-prs.json", self.repo.replace('/', "-")));
-        PullRequestCache {
-            limit: self.limit,
-            ..PullRequestCache::new(&self.repo, path)
-        }
+    fn try_from(raw: RawItem) -> Result<Self, String> {
+        let action = match (raw.url, raw.exec, raw.arg) {
+            (Some(url), None, None) => ItemAction::Url(url),
+            (None, Some(exec), None) => ItemAction::Exec(exec),
+            (None, None, Some(arg)) => ItemAction::Arg(arg),
+            _ => {
+                return Err(format!(
+                    "item {:?} needs exactly one of url, exec, arg",
+                    raw.title
+                ));
+            }
+        };
+        Ok(Self {
+            title: raw.title,
+            action,
+            subtitle: raw.subtitle,
+            icon: raw.icon,
+            uid: raw.uid,
+            match_text: raw.match_text,
+            autocomplete: raw.autocomplete,
+            copy: raw.copy,
+            largetype: raw.largetype,
+            mods: raw.mods,
+            each: raw.each,
+        })
     }
-}
-
-/// `[sources]`: one item per path and installed editor, preferring a `*.code-workspace` inside a directory.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Sources {
-    /// Paths or glob patterns; `~/` and templates allowed. Missing paths are skipped.
-    #[serde(default)]
-    pub paths: Vec<String>,
 }
 
 impl FromStr for Config {
     type Err = Error;
 
     fn from_str(toml: &str) -> Result<Self> {
-        let config: Self = toml::from_str(toml)?;
-        for route in &config.routes {
-            if let Some(pattern) = &route.pattern {
-                Regex::new(pattern)?;
-            }
-            if route.keywords.is_empty() == route.pattern.is_none() {
-                return Err(Error::Config(
-                    "a route needs exactly one of keywords, pattern".into(),
-                ));
-            }
-            if route.sql.is_some() != route.db.is_some()
-                || (route.sql.is_some() && (!route.exec.is_empty() || route.items.is_empty()))
-            {
-                return Err(Error::Config(
-                    "a query route needs db, sql and [[route.item]]s, and no exec".into(),
-                ));
-            }
-            if route.sql.is_none()
-                && (route.populate.is_some()
-                    || route.refresh_every.is_some()
-                    || route.error.is_some())
-            {
-                return Err(Error::Config(
-                    "populate, refresh_every and error need a query route (db and sql)".into(),
-                ));
-            }
-            if route.refresh_every.is_some() && route.populate.is_none() {
-                return Err(Error::Config("refresh_every needs populate".into()));
-            }
-            if let Some(Populate::Data(source)) = &route.populate
-                && source.file.is_some() == source.url.is_some()
-            {
-                return Err(Error::Config(
-                    "populate needs exactly one of file, url".into(),
-                ));
-            }
-        }
-        Ok(config)
+        Ok(toml::from_str(toml)?)
     }
 }
 
@@ -231,7 +152,7 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// I/O errors reading `path`, and the same errors as parsing with [`str::parse`].
+    /// I/O errors reading `path`, and [`Error::Toml`] for invalid TOML or an invalid item or route.
     pub async fn load(path: impl AsRef<Path>) -> Result<Self> {
         fs::read_to_string(path).await?.parse()
     }
@@ -240,180 +161,9 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// [`Error::Template`] for an unknown variable, and [`Error::Config`] for an item without exactly one of `url`, `exec`, `arg`.
+    /// [`Error::Template`] for an unknown variable.
     pub fn items(&self) -> Result<Vec<ItemBuilder>> {
-        let mut items = Vec::new();
-        for item in &self.items {
-            items.extend(item.expand(&self.vars, &BTreeMap::new())?);
-        }
-        Ok(items)
-    }
-
-    /// The first route matching `query`.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Regex`] for an invalid pattern, and template errors from rendering the route's items or command.
-    pub fn route(&self, query: &str) -> Result<Option<RouteAction>> {
-        let none = BTreeMap::new();
-        for (index, route) in self.routes.iter().enumerate() {
-            let Some(captured) = route.matches(query)? else {
-                continue;
-            };
-            let scope = Scope {
-                vars: &self.vars,
-                bindings: &none,
-                literals: &captured,
-            };
-            if let (Some(db), Some(sql)) = (&route.db, &route.sql) {
-                let params = Params::new(
-                    captured
-                        .get("rest")
-                        .and_then(Value::as_str)
-                        .unwrap_or(query),
-                );
-                let sql = route
-                    .empty_sql
-                    .as_ref()
-                    .filter(|_| params.is_empty())
-                    .unwrap_or(sql);
-                // SQL sees config values only: never the query text or regex captures.
-                let trusted: BTreeMap<String, Value> = captured
-                    .iter()
-                    .filter(|(k, _)| matches!(k.as_str(), "keyword" | "value"))
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                let sql_scope = Scope {
-                    vars: &self.vars,
-                    bindings: &none,
-                    literals: &trusted,
-                };
-                return Ok(Some(RouteAction::Query(Box::new(QueryPlan {
-                    db: expand_home(&scope.render(db)?),
-                    sql: sql_scope.render(sql)?,
-                    params,
-                    cache_copy: route.cache_copy,
-                    route: index,
-                    populate: route.populate.clone(),
-                    refresh_every: route.refresh_every,
-                    error: route.error.clone(),
-                    items: route.items.clone(),
-                    vars: self.vars.clone(),
-                    literals: captured,
-                }))));
-            }
-            return Ok(Some(if route.exec.is_empty() {
-                let mut items = Vec::new();
-                for item in &route.items {
-                    items.extend(item.expand(&self.vars, &captured)?);
-                }
-                RouteAction::Items(items)
-            } else {
-                let argv = route
-                    .exec
-                    .iter()
-                    .map(|arg| scope.render(arg))
-                    .collect::<Result<_>>()?;
-                let env = route
-                    .env
-                    .iter()
-                    .map(|(k, v)| Ok((k.clone(), scope.render(v)?)))
-                    .collect::<Result<_>>()?;
-                RouteAction::Exec { argv, env }
-            }));
-        }
-        Ok(None)
-    }
-
-    /// `[sources]` items, checking paths concurrently.
-    ///
-    /// # Errors
-    ///
-    /// Template errors in `paths`, or [`Error::Config`] if the glob task panics.
-    pub async fn source_items(&self) -> Result<Vec<ItemBuilder>> {
-        let Some(sources) = &self.sources else {
-            return Ok(Vec::new());
-        };
-        let none = BTreeMap::new();
-        let scope = Scope {
-            vars: &self.vars,
-            bindings: &none,
-            literals: &none,
-        };
-        let patterns: Vec<String> = sources
-            .paths
-            .iter()
-            .map(|p| scope.render(p))
-            .collect::<Result<_>>()?;
-        let paths = tokio::task::spawn_blocking(move || {
-            patterns
-                .iter()
-                .flat_map(|pattern| {
-                    let pattern = expand_home(pattern).to_string_lossy().into_owned();
-                    glob::glob(&pattern)
-                        .into_iter()
-                        .flatten()
-                        .flatten()
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<PathBuf>>()
-        })
-        .await
-        .map_err(|e| Error::Config(format!("source glob task failed: {e}")))?;
-        let targets = future::join_all(paths.iter().map(|path| workspace_or(path))).await;
-        let editors = Editor::installed().await;
-        Ok(targets
-            .iter()
-            .flat_map(|target| editors.iter().map(move |editor| editor.open(target)))
-            .collect())
-    }
-}
-
-/// The first `*.code-workspace` in a directory, else the path itself.
-async fn workspace_or(path: &Path) -> PathBuf {
-    if let Ok(mut entries) = fs::read_dir(path).await {
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            if entry
-                .path()
-                .extension()
-                .is_some_and(|e| e == "code-workspace")
-            {
-                return entry.path();
-            }
-        }
-    }
-    path.to_owned()
-}
-
-impl Route {
-    fn matches(&self, query: &str) -> Result<Option<BTreeMap<String, Value>>> {
-        let mut bindings = BTreeMap::from([("query".to_owned(), Value::from(query))]);
-        if let Some(pattern) = &self.pattern {
-            let regex = Regex::new(pattern)?;
-            let Some(captures) = regex.captures(query) else {
-                return Ok(None);
-            };
-            for (i, name) in regex.capture_names().enumerate() {
-                let value = captures.get(i).map_or("", |m| m.as_str());
-                bindings.insert(i.to_string(), Value::from(value));
-                if let Some(name) = name {
-                    bindings.insert(name.to_owned(), Value::from(value));
-                }
-            }
-            return Ok(Some(bindings));
-        }
-        let (word, rest) = query.split_once(char::is_whitespace).unwrap_or((query, ""));
-        let Some((keyword, value)) = self
-            .keywords
-            .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(word))
-        else {
-            return Ok(None);
-        };
-        bindings.insert("keyword".into(), Value::from(keyword.as_str()));
-        bindings.insert("value".into(), Value::from(value.as_str()));
-        bindings.insert("rest".into(), Value::from(rest.trim()));
-        Ok(Some(bindings))
+        expand(&self.items, &self.vars, &BTreeMap::new())
     }
 }
 
@@ -439,20 +189,14 @@ impl ItemConfig {
     fn build(&self, scope: Scope<'_>) -> Result<ItemBuilder> {
         let r = |s: &str| scope.render(s);
         let title = r(&self.title)?;
-        let mut item = match (&self.url, &self.exec, &self.arg) {
-            (Some(url), None, None) => Item::url(title, r(url)?),
-            (None, Some(Exec::Shell(command)), None) => Item::exec(title, r(command)?),
-            (None, Some(Exec::Argv(argv)), None) => Item::exec(
+        let mut item = match &self.action {
+            ItemAction::Url(url) => Item::url(title, r(url)?),
+            ItemAction::Exec(Exec::Shell(command)) => Item::exec(title, r(command)?),
+            ItemAction::Exec(Exec::Argv(argv)) => Item::exec(
                 title,
                 join(argv.iter().map(|a| r(a)).collect::<Result<Vec<_>>>()?),
             ),
-            (None, None, Some(arg)) => Item::arg(title, r(arg)?),
-            _ => {
-                return Err(Error::Config(format!(
-                    "item {:?} needs exactly one of url, exec, arg",
-                    self.title
-                )));
-            }
+            ItemAction::Arg(arg) => Item::arg(title, r(arg)?),
         };
         if let Some(subtitle) = &self.subtitle {
             item = item.subtitle(r(subtitle)?);
@@ -490,10 +234,8 @@ impl ItemConfig {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
-
     use super::*;
-    use crate::{Icons, Item, Menu};
+    use crate::{Icons, Menu};
 
     const EXAMPLE: &str = r#"
         cache = "example"
@@ -564,27 +306,14 @@ mod tests {
     }
 
     #[test]
-    fn routes_keywords_and_patterns() {
-        let config: Config = EXAMPLE.parse().unwrap();
-        let Some(RouteAction::Exec { argv, env }) = config.route("RX metformin 500").unwrap()
-        else {
-            panic!()
-        };
-        assert_eq!(&argv[4..], ["rxnorm", "metformin 500"]);
-        assert_eq!(env["prefix"], "copy:");
-        let Some(RouteAction::Items(items)) = config.route("clr1234567890").unwrap() else {
-            panic!()
-        };
-        assert_eq!(items[0].title, "Open CLR-1234567890");
-        assert!(config.route("github").unwrap().is_none());
-    }
-
-    #[test]
     fn rejects_bad_config() {
-        assert!(matches!(
-            "[[item]]\ntitle = 'x'".parse::<Config>().map(|c| c.items()),
-            Ok(Err(Error::Config(_)))
-        ));
+        assert!(
+            "[[item]]
+title = 'x'"
+                .parse::<Config>()
+                .is_err(),
+            "an item needs url, exec or arg"
+        );
         assert!("[[route]]\npattern = '('".parse::<Config>().is_err());
         assert!("[[route]]\nexec = ['x']".parse::<Config>().is_err());
         assert!("typo = 1".parse::<Config>().is_err());
@@ -595,128 +324,6 @@ mod tests {
                 .items(),
             Err(Error::Template { .. })
         ));
-    }
-
-    /// A clara-style FTS5 code table in a temp dir.
-    fn codes_db(dir: &Path, name: &str) -> PathBuf {
-        let path = dir.join(name);
-        let db = rusqlite::Connection::open(&path).unwrap();
-        db.execute_batch(
-            r#"create virtual table snomed using fts5(title, subtitle unindexed, code unindexed, aliases, tokenize="unicode61 tokenchars '.-'", prefix='1 2 3');
-               insert into snomed values ('Heart attack (22298006)', 'Disorder', '22298006', 'MI | myocardial infarction');
-               insert into snomed values ('Heart failure (84114007)', 'Disorder', '84114007', '');
-               insert into snomed values ('Attack of {braces} (1)', 'Odd', '1', '');"#,
-        )
-        .unwrap();
-        path
-    }
-
-    fn query_config(db: &Path, cache_copy: bool) -> Config {
-        format!(
-            r#"
-            [[route]]
-            keywords = {{ snomed = "snomed", sct = "snomed" }}
-            db = "{db}"
-            cache_copy = {cache_copy}
-            sql = "select title, subtitle, code from {{value}} where {{value}} match :fts order by lower(title) not like :words || ' (%', rank limit 50"
-            empty_sql = "select title, subtitle, code from {{value}} limit 2"
-            [[route.item]]
-            title = "{{title}}"
-            subtitle = "{{subtitle}} · {{keyword}}"
-            arg = "copy:{{code}}"
-            copy = "{{code}}"
-            uid = ""
-            "#,
-            db = db.display()
-        )
-        .parse()
-        .unwrap()
-    }
-
-    async fn query(config: &Config, text: &str) -> Result<Vec<Item>> {
-        let Some(RouteAction::Query(plan)) = config.route(text)? else {
-            panic!("not a query route: {text}")
-        };
-        let icons = Icons::new("/nonexistent");
-        Ok(Menu::build(plan.run().await?, &icons).await.items)
-    }
-
-    #[tokio::test]
-    async fn sqlite_routes_bind_the_query_and_render_rows() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = query_config(&codes_db(dir.path(), "codes.db"), false);
-        let items = query(&config, "snomed heart attack").await.unwrap();
-        assert_eq!(items.len(), 1);
-        let item = &items[0];
-        assert_eq!(
-            (
-                item.title.as_str(),
-                item.arg.as_str(),
-                item.subtitle.as_str()
-            ),
-            (
-                "Heart attack (22298006)",
-                "copy:22298006",
-                "Disorder · snomed"
-            )
-        );
-        assert_eq!(
-            serde_json::to_value(item).unwrap()["text"],
-            serde_json::json!({"copy": "22298006"})
-        );
-        assert_eq!(
-            item.uid, "",
-            "uid = \"\" keeps Alfred from reordering results"
-        );
-
-        let titles = |items: Vec<Item>| items.into_iter().map(|i| i.title).collect::<Vec<_>>();
-        let mut heart = titles(query(&config, "SCT heart").await.unwrap());
-        heart.sort();
-        assert_eq!(
-            heart,
-            ["Heart attack (22298006)", "Heart failure (84114007)"],
-            "alias keywords share a route"
-        );
-        assert_eq!(
-            titles(query(&config, "snomed attack {braces}").await.unwrap()),
-            ["Attack of {braces} (1)"],
-            "row and query braces stay text"
-        );
-        assert_eq!(
-            query(&config, "snomed ').drop table snomed;--")
-                .await
-                .unwrap()
-                .len(),
-            0,
-            "the query is only ever bound"
-        );
-        assert_eq!(
-            query(&config, "snomed").await.unwrap().len(),
-            2,
-            "no words runs empty_sql"
-        );
-    }
-
-    #[tokio::test]
-    async fn sqlite_routes_report_bad_databases_and_copy_into_the_cache() {
-        let dir = tempfile::tempdir().unwrap();
-        let missing = query_config(&dir.path().join("missing.db"), false);
-        assert!(matches!(
-            query(&missing, "snomed x").await,
-            Err(Error::Sqlite(_))
-        ));
-        let name = format!("we-love-test-{}.db", std::process::id());
-        let copied = query_config(&codes_db(dir.path(), &name), true);
-        assert_eq!(query(&copied, "snomed heart").await.unwrap().len(), 2);
-        let local = cache_dir().join("db").join(&name);
-        assert!(local.exists());
-        std::fs::remove_file(local).unwrap();
-        assert!(
-            "[[route]]\nkeywords = { a = '' }\nsql = 'select 1'"
-                .parse::<Config>()
-                .is_err(),
-            "sql needs db and items"
-        );
     }
 
     #[test]
@@ -737,25 +344,5 @@ mod tests {
                 && config.okta.is_some()
                 && config.tailscale.is_some()
         );
-    }
-
-    #[tokio::test]
-    async fn sources_glob_and_prefer_workspaces() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("app")).unwrap();
-        std::fs::write(dir.path().join("app/app.code-workspace"), "{}").unwrap();
-        std::fs::create_dir_all(dir.path().join("lib")).unwrap();
-        let config = Config {
-            sources: Some(Sources {
-                paths: vec![format!("{}/*", dir.path().display())],
-            }),
-            ..Config::default()
-        };
-        let installed = Editor::installed().await.len();
-        let items = config.source_items().await.unwrap();
-        assert_eq!(items.len(), 2 * installed);
-        if installed > 0 {
-            assert_eq!(items[0].title, "app.code-workspace");
-        }
     }
 }

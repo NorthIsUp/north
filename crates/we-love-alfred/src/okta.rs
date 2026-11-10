@@ -12,6 +12,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use futures_util::future::{BoxFuture, FutureExt};
 use reqwest::{Client, Response, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -21,6 +22,7 @@ use tokio::process::Command;
 use tokio::time::{Instant, sleep};
 
 use crate::cache::{atomic_write, cache_dir};
+use crate::feature::{After, Context, Feature};
 use crate::shell::{join, output, tool};
 use crate::{Error, IconSource, Item, ItemBuilder, Result};
 
@@ -443,6 +445,26 @@ impl<K: Keychain> Okta<K> {
                 }
             })
             .collect())
+    }
+}
+
+impl<K: Keychain> Feature for Okta<K> {
+    fn command<'a>(
+        &'a self,
+        _ctx: &'a Context,
+        args: &'a [String],
+    ) -> Option<BoxFuture<'a, Result<After>>> {
+        (args.first()? == LOGIN_COMMAND).then(|| {
+            async move {
+                self.login().await?;
+                Ok(After::Rebuild)
+            }
+            .boxed()
+        })
+    }
+
+    fn items<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, Result<Vec<ItemBuilder>>> {
+        Okta::items(self).boxed()
     }
 }
 

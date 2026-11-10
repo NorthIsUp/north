@@ -141,7 +141,7 @@ fn le32(bytes: &[u8], at: usize) -> Result<u32> {
 }
 
 fn zip_error(message: &str) -> Error {
-    Error::Config(format!("icon pack: {message}"))
+    Error::Pack(message.to_owned())
 }
 
 #[cfg(test)]

@@ -22,14 +22,19 @@ async fn main() -> we_love_alfred::Result<()> {
 }
 ```
 
-`run` dispatches one invocation, checking these in order:
+A workflow is a list of [`Feature`]s: the config's routes and items, your
+handlers, then the built-in integrations (sources, Okta, Tailscale, updates,
+GitHub). `run` handles one invocation:
 
-1. Internal commands: `--no-cache` (rebuild), `github-refresh`, `okta-login`,
-   `self-update` and `self-update-now`.
-2. `[[route]]`s, keyword handlers, the update keyword, and PR searches. These
-   are answered live.
-3. Everything else is filtered from the cached menu. A cache miss builds the
-   menu first.
+1. A feature claims an internal command (`github-refresh`, `okta-login`,
+   `self-update`, `db-populate`), or `--no-cache` rebuilds the menu.
+2. Every feature's background upkeep runs, such as refreshing stale PRs.
+3. The first feature that claims the query answers it live.
+4. Everything else is filtered from the cached menu; a cache miss builds it
+   from every feature's items.
+
+Implement `Feature` and add it with `.feature(…)` for anything the config
+can't express.
 
 ## Config
 

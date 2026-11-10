@@ -5,29 +5,33 @@ mod cleanup;
 mod config;
 pub mod editor;
 mod error;
+mod feature;
 pub mod github;
 mod icons;
 mod item;
 mod menu;
 pub mod okta;
-mod pack;
 mod populate;
 mod query;
+mod route;
 pub mod shell;
+mod sources;
 pub mod tailscale;
 mod template;
 pub mod update;
 mod workflow;
 
 pub use cache::{Cache, cache_dir};
-pub use config::Config;
+pub use config::{Config, Exec, IconSpec, ItemAction, ItemConfig};
 pub use error::{Error, Result};
+pub use feature::{After, Context, Feature};
 pub use icons::{IconPack, IconSource, Icons};
 pub use item::ItemBuilder;
 pub use menu::{Icon, IconType, Item, Menu, MenuCache, Modifier, Text};
-pub use populate::{DataSource, Populate, Populator};
-pub use query::QueryPlan;
-pub use workflow::{Provider, Workflow};
+pub use populate::{DataSource, Origin, Populate, Populator};
+pub use route::Route;
+pub use sources::Sources;
+pub use workflow::Workflow;
 
 /// Serializes tests that spawn processes: a child forked by another test thread
 /// briefly inherits open fds, so a held refresh lock looks taken.
