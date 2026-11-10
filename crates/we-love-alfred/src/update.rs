@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use futures_util::future::{BoxFuture, FutureExt};
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,8 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-use crate::cache::{atomic_write, cache_dir, spawn_throttled};
+use crate::cache::{atomic_write, cache_dir, spawn_self};
+use crate::feature::{After, Context, Feature};
 use crate::okta::seconds;
 use crate::shell::{output, tool};
 use crate::{Error, Item, Menu, Result};
@@ -131,20 +133,14 @@ impl Updater {
 
     /// Start a background check unless one started within `check_every`.
     pub async fn check_in_background(&self) -> bool {
-        let exe = std::env::current_exe().unwrap_or_default();
-        spawn_throttled(
-            Command::new(exe).arg(CHECK_COMMAND),
-            &self.state_path("pid"),
-            self.check_every,
-        )
-        .await
+        spawn_self([CHECK_COMMAND], &self.state_path("pid"), self.check_every).await
     }
 
     /// The live view: starts a forced update once per Alfred session, then redraws its progress.
     ///
     /// # Errors
     ///
-    /// I/O errors writing the status file or finding the current executable.
+    /// I/O errors writing the status file.
     pub async fn view(&self) -> Result<Menu> {
         self.view_with(std::env::var_os(STARTED_VARIABLE).is_some())
             .await
@@ -153,9 +149,8 @@ impl Updater {
     async fn view_with(&self, started: bool) -> Result<Menu> {
         if !started {
             self.report(true, "Starting").await?;
-            let exe = std::env::current_exe()?;
-            spawn_throttled(
-                Command::new(exe).arg(FORCE_COMMAND),
+            spawn_self(
+                [FORCE_COMMAND],
                 &self.state_path("view.pid"),
                 Duration::ZERO,
             )
@@ -328,6 +323,44 @@ impl Updater {
             .await
             .ok()?;
         Some(token.trim().to_owned()).filter(|t| !t.is_empty())
+    }
+}
+
+impl Feature for Updater {
+    fn command<'a>(
+        &'a self,
+        _ctx: &'a Context,
+        args: &'a [String],
+    ) -> Option<BoxFuture<'a, Result<After>>> {
+        let force = match args.first()?.as_str() {
+            CHECK_COMMAND => false,
+            FORCE_COMMAND => true,
+            _ => return None,
+        };
+        Some(
+            async move {
+                self.run(force).await?;
+                Ok(After::Exit)
+            }
+            .boxed(),
+        )
+    }
+
+    fn answer<'a>(
+        &'a self,
+        _ctx: &'a Context,
+        query: &'a str,
+    ) -> Option<BoxFuture<'a, Result<Menu>>> {
+        query
+            .eq_ignore_ascii_case(&self.keyword)
+            .then(|| self.view().boxed())
+    }
+
+    fn background<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, ()> {
+        async move {
+            self.check_in_background().await;
+        }
+        .boxed()
     }
 }
 

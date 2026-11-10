@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use tokio::fs;
 
-use crate::cache::{expand_home, with_suffix};
+use crate::cache::{expand_home, replace};
 use crate::{Error, Result};
 
 /// A Rust function that writes a database at the path it's given.
@@ -30,56 +30,81 @@ pub enum Populate {
 
 /// JSON from a `file` or `url`, filtered by `jq` into row objects, loaded into `table`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawDataSource")]
 pub struct DataSource {
-    pub file: Option<String>,
-    pub url: Option<String>,
+    pub from: Origin,
     /// Each output object is one row; its keys become columns, in order of first appearance.
-    #[serde(default = "every_element")]
     pub jq: String,
     pub table: String,
     /// An FTS5 table, so routes can `match` it.
-    #[serde(default)]
     pub fts: bool,
+}
+
+/// Where a [`DataSource`] reads its JSON.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Origin {
+    File(String),
+    Url(String),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDataSource {
+    file: Option<String>,
+    url: Option<String>,
+    #[serde(default = "every_element")]
+    jq: String,
+    table: String,
+    #[serde(default)]
+    fts: bool,
+}
+
+impl TryFrom<RawDataSource> for DataSource {
+    type Error = String;
+
+    fn try_from(raw: RawDataSource) -> Result<Self, String> {
+        let from = match (raw.file, raw.url) {
+            (Some(file), None) => Origin::File(file),
+            (None, Some(url)) => Origin::Url(url),
+            _ => return Err("populate needs exactly one of file, url".into()),
+        };
+        Ok(Self {
+            from,
+            jq: raw.jq,
+            table: raw.table,
+            fts: raw.fts,
+        })
+    }
 }
 
 fn every_element() -> String {
     ".[]".into()
 }
 
-/// Build the database at `db` into a temporary file, renamed into place only once complete.
+/// Build the database at `db` atomically: readers keep the old file until the new one is complete.
 pub(crate) async fn build(
     populate: &Populate,
     db: &Path,
     functions: &BTreeMap<String, Populator>,
 ) -> Result<()> {
-    if let Some(parent) = db.parent() {
-        fs::create_dir_all(parent).await?;
-    }
-    let partial = with_suffix(db, &format!(".{}.partial", std::process::id()));
-    let _ = fs::remove_file(&partial).await;
-    let built = match populate {
-        Populate::Function(name) => match functions.get(name) {
-            Some(function) => function(partial.clone()).await,
-            None => Err(Error::Config(format!(
-                "no populate function named {name:?}"
-            ))),
-        },
-        Populate::Data(source) => from_data(source, &partial).await,
-    };
-    match built {
-        Ok(()) => Ok(fs::rename(&partial, db).await?),
-        Err(e) => {
-            let _ = fs::remove_file(&partial).await;
-            Err(e)
+    replace(db, |temporary| async move {
+        match populate {
+            Populate::Function(name) => {
+                let function = functions
+                    .get(name)
+                    .ok_or_else(|| Error::Config(format!("no populate function named {name:?}")))?;
+                function(temporary).await
+            }
+            Populate::Data(source) => from_data(source, &temporary).await,
         }
-    }
+    })
+    .await
 }
 
 async fn from_data(source: &DataSource, db: &Path) -> Result<()> {
-    let json = match (&source.file, &source.url) {
-        (Some(file), None) => fs::read(expand_home(file)).await?,
-        (None, Some(url)) => {
+    let json = match &source.from {
+        Origin::File(file) => fs::read(expand_home(file)).await?,
+        Origin::Url(url) => {
             let client = Client::builder()
                 .timeout(Duration::from_secs(120))
                 .build()?;
@@ -92,23 +117,15 @@ async fn from_data(source: &DataSource, db: &Path) -> Result<()> {
                 .await?
                 .to_vec()
         }
-        _ => {
-            return Err(Error::Config(
-                "populate needs exactly one of file, url".into(),
-            ));
-        }
     };
     let rows = jq(&source.jq, &json)?;
     let (db, table, fts) = (db.to_owned(), source.table.clone(), source.fts);
-    tokio::task::spawn_blocking(move || write_table(&db, &table, fts, &rows))
-        .await
-        .map_err(|e| Error::Config(format!("populate task failed: {e}")))?
+    tokio::task::spawn_blocking(move || write_table(&db, &table, fts, &rows)).await?
 }
 
 /// Run `filter` over `input`; every output must be an object.
 fn jq(filter: &str, input: &[u8]) -> Result<Vec<Map<String, Value>>> {
-    let jq_error =
-        |what: &str, detail: String| Error::Config(format!("jq {what} {filter:?}: {detail}"));
+    let jq_error = |what: &str, detail: String| Error::Jq(format!("{what} {filter:?}: {detail}"));
     let input =
         jaq_json::read::parse_single(input).map_err(|e| jq_error("input for", e.to_string()))?;
     let defs = jaq_core::defs()
@@ -158,9 +175,7 @@ fn write_table(db: &Path, table: &str, fts: bool, rows: &[Map<String, Value>]) -
         }
     }
     if columns.is_empty() {
-        return Err(Error::Config(format!(
-            "populate for {table:?} produced no columns"
-        )));
+        return Err(Error::Jq(format!("rows for {table:?} have no columns")));
     }
     // Keys come from downloaded data, so every identifier is quoted.
     let list = columns
@@ -238,8 +253,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("data.json"), DATA).unwrap();
         let source = DataSource {
-            file: Some(dir.path().join("data.json").display().to_string()),
-            url: None,
+            from: Origin::File(dir.path().join("data.json").display().to_string()),
             jq: ".results[]".into(),
             table: "codes".into(),
             fts: true,

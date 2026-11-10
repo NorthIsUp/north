@@ -15,8 +15,14 @@ pub enum Error {
     Http(#[from] reqwest::Error),
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
+    #[error(transparent)]
+    Task(#[from] tokio::task::JoinError),
     #[error("invalid config: {0}")]
     Config(String),
+    #[error("jq: {0}")]
+    Jq(String),
+    #[error("icon pack: {0}")]
+    Pack(String),
     #[error("template {template:?}: unknown variable {name:?}")]
     Template { template: String, name: String },
     #[error("cache name must be a filename without directory separators: {0:?}")]

@@ -2,27 +2,34 @@
 //!
 //! `gh pr list` output is cached for `ttl` and refreshed by a detached copy of
 //! the current binary once stale, so only the very first lookup waits on `gh`.
-//! [`crate::Workflow`] handles the refresh command; without it, forward
-//! arguments to [`dispatch`].
+//! [`Github`] is the `[github]` config and the [`Feature`] that answers and refreshes.
 
 use std::collections::BTreeSet;
+use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, FixedOffset};
+use futures_util::future::{BoxFuture, FutureExt};
+use regex::Regex;
 use serde::Deserialize;
 use tokio::fs;
 use tokio::process::Command;
 
-use crate::cache::{atomic_write, spawn_throttled, with_suffix};
+use crate::cache::{atomic_write, cache_dir, spawn_self, with_suffix};
+use crate::feature::{After, Context, Feature, split_word};
 use crate::menu::is_subsequence;
 use crate::shell::{output, tool};
-use crate::{Error, Item, Result, Text};
+use crate::{Error, Item, Menu, Result, Text};
 
-/// First argument of the detached refresh command; see [`dispatch`].
+/// First argument of the detached refresh command.
 pub const REFRESH_COMMAND: &str = "github-refresh";
 const USAGE: &str = "github-refresh <owner/repo> <cache.json> [--limit N]";
 const GH_TIMEOUT: Duration = Duration::from_secs(25);
+/// A bare PR number, optionally after `pr`.
+static PR_NUMBER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
 
 /// Every term's characters appear in order in `text`, case-insensitively.
 pub fn fuzzy_match<S: AsRef<str>>(terms: &[S], text: &str) -> bool {
@@ -124,8 +131,6 @@ pub struct PullRequestCache {
     /// Minimum gap between background refresh attempts, including failed ones.
     pub retry_every: Duration,
     pub limit: u32,
-    /// The binary spawned with [`REFRESH_COMMAND`]; defaults to the current executable.
-    pub refresh_exe: PathBuf,
 }
 
 impl PullRequestCache {
@@ -136,7 +141,6 @@ impl PullRequestCache {
             ttl: Duration::from_secs(3600),
             retry_every: Duration::from_secs(60),
             limit: 1000,
-            refresh_exe: std::env::current_exe().unwrap_or_default(),
         }
     }
 
@@ -177,13 +181,18 @@ impl PullRequestCache {
     }
 
     async fn schedule_refresh(&self) -> bool {
-        let mut command = Command::new(&self.refresh_exe);
-        command
-            .arg(REFRESH_COMMAND)
-            .arg(&self.repo)
-            .arg(&self.path)
-            .args(["--limit", &self.limit.to_string()]);
-        spawn_throttled(&mut command, &self.warming_path(), self.retry_every).await
+        spawn_self(self.refresh_args(), &self.warming_path(), self.retry_every).await
+    }
+
+    /// The detached refresh's arguments, handled by [`Github`]'s command.
+    fn refresh_args(&self) -> Vec<OsString> {
+        let limit = self.limit.to_string();
+        [REFRESH_COMMAND, &self.repo]
+            .map(OsString::from)
+            .into_iter()
+            .chain([self.path.clone().into_os_string()])
+            .chain(["--limit", &limit].map(OsString::from))
+            .collect()
     }
 
     /// Cached PRs, even stale ones; a miss or malformed cache yields none. Never waits on `gh`.
@@ -285,31 +294,107 @@ impl PullRequestCache {
     }
 }
 
-/// Handle a detached refresh: `Some` when `args` (without the program name) start with [`REFRESH_COMMAND`].
-pub async fn dispatch(args: &[String]) -> Option<Result<()>> {
-    let (command, rest) = args.split_first()?;
-    if command != REFRESH_COMMAND {
-        return None;
-    }
-    let cache = match rest {
-        [repo, path] => PullRequestCache::new(repo.as_str(), path),
-        [repo, path, flag, limit] if flag == "--limit" => match limit.parse() {
-            Ok(limit) => PullRequestCache {
+/// The cache a detached refresh's arguments (after [`REFRESH_COMMAND`]) describe.
+fn refresh_target(rest: &[String]) -> Result<PullRequestCache> {
+    match rest {
+        [repo, path] => Ok(PullRequestCache::new(repo.as_str(), path)),
+        [repo, path, flag, limit] if flag == "--limit" => {
+            let limit = limit.parse().map_err(|_| Error::Usage(USAGE))?;
+            Ok(PullRequestCache {
                 limit,
                 ..PullRequestCache::new(repo.as_str(), path)
-            },
-            Err(_) => return Some(Err(Error::Usage(USAGE))),
-        },
-        _ => return Some(Err(Error::Usage(USAGE))),
-    };
-    Some(cache.fetch().await)
+            })
+        }
+        _ => Err(Error::Usage(USAGE)),
+    }
+}
+
+/// `[github]`: open PRs via `gh`, searched with `<keyword> [@author] [terms]`, `#<number|text>` or a bare number.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Github {
+    pub repo: String,
+    #[serde(default = "default_keyword")]
+    pub keyword: String,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+}
+
+fn default_keyword() -> String {
+    "prs".into()
+}
+
+fn default_limit() -> u32 {
+    1000
+}
+
+impl Github {
+    #[must_use]
+    pub fn cache(&self) -> PullRequestCache {
+        let path = cache_dir().join(format!("{}-prs.json", self.repo.replace('/', "-")));
+        PullRequestCache {
+            limit: self.limit,
+            ..PullRequestCache::new(&self.repo, path)
+        }
+    }
+}
+
+impl Feature for Github {
+    fn command<'a>(
+        &'a self,
+        _ctx: &'a Context,
+        args: &'a [String],
+    ) -> Option<BoxFuture<'a, Result<After>>> {
+        let (command, rest) = args.split_first()?;
+        (command == REFRESH_COMMAND).then(|| {
+            async move {
+                refresh_target(rest)?.fetch().await?;
+                Ok(After::Exit)
+            }
+            .boxed()
+        })
+    }
+
+    fn answer<'a>(
+        &'a self,
+        _ctx: &'a Context,
+        query: &'a str,
+    ) -> Option<BoxFuture<'a, Result<Menu>>> {
+        let (word, rest) = split_word(query);
+        let prs = self.cache();
+        let empty = if prs.path.exists() {
+            "No matching open PRs"
+        } else {
+            "Loading open PRs…"
+        };
+        if word.eq_ignore_ascii_case(&self.keyword) {
+            return Some(
+                async move {
+                    Ok(Menu::from_iter(prs.search_items(rest, &self.keyword).await)
+                        .or_message(empty))
+                }
+                .boxed(),
+            );
+        }
+        if let Some(needle) = query.strip_prefix('#') {
+            return Some(async move { Ok(Menu::from_iter(prs.number_items(needle).await).or_message(empty)) }.boxed());
+        }
+        let number = PR_NUMBER.captures(query).and_then(|c| c[1].parse().ok())?;
+        Some(async move { Ok(Menu::from_iter([prs.link_item(number)])) }.boxed())
+    }
+
+    fn background<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, ()> {
+        async move {
+            self.cache().warm().await;
+        }
+        .boxed()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
-    use std::time::Instant;
 
     use chrono::{TimeZone, Utc};
     use serde_json::{Value, json};
@@ -349,7 +434,7 @@ mod tests {
         ])
     }
 
-    /// A cache holding `rows()` aged `age`, refreshing through a script that records its argv.
+    /// A cache holding `rows()` aged `age`.
     fn cache(dir: &Path, age: Duration) -> PullRequestCache {
         let path = dir.join("prs.json");
         std::fs::write(&path, rows().to_string()).unwrap();
@@ -359,15 +444,7 @@ mod tests {
             .unwrap()
             .set_modified(SystemTime::now() - age)
             .unwrap();
-        let refresh_exe = script(
-            dir,
-            "refresh",
-            &format!("printf '%s\\n' \"$@\" > {}", dir.join("argv").display()),
-        );
-        PullRequestCache {
-            refresh_exe,
-            ..PullRequestCache::new("acme/app", path)
-        }
+        PullRequestCache::new("acme/app", path)
     }
 
     fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
@@ -464,16 +541,14 @@ mod tests {
         };
         assert!(stale.warm().await);
         assert!(!stale.warm().await);
-        let argv = dir.path().join("argv");
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while !argv.exists() && Instant::now() < deadline {
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
-        let expected = format!(
-            "{REFRESH_COMMAND}\nacme/app\n{}\n--limit\n25\n",
-            stale.path.display()
-        );
-        assert_eq!(std::fs::read_to_string(argv).unwrap(), expected);
+        let expected = [
+            "github-refresh",
+            "acme/app",
+            &stale.path.display().to_string(),
+            "--limit",
+            "25",
+        ];
+        assert_eq!(stale.refresh_args(), expected.map(OsString::from));
     }
 
     #[tokio::test]
@@ -514,11 +589,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dispatch_handles_only_refresh() {
-        assert!(dispatch(&["nope".to_owned()]).await.is_none());
-        assert!(matches!(
-            dispatch(&[REFRESH_COMMAND.to_owned()]).await,
-            Some(Err(Error::Usage(_)))
-        ));
+    async fn github_handles_only_its_refresh_command() {
+        let github = Github {
+            repo: "acme/app".into(),
+            keyword: "prs".into(),
+            limit: 10,
+        };
+        let ctx = Context {
+            icons: crate::Icons::new("/nonexistent"),
+            populators: std::collections::BTreeMap::new(),
+        };
+        assert!(github.command(&ctx, &["nope".to_owned()]).is_none());
+        let usage = github
+            .command(&ctx, &[REFRESH_COMMAND.to_owned()])
+            .unwrap()
+            .await;
+        assert!(matches!(usage, Err(Error::Usage(_))));
+        assert!(github.answer(&ctx, "hello").is_none());
+        assert!(
+            github.answer(&ctx, "pr 12").is_some()
+                && github.answer(&ctx, "#4").is_some()
+                && github.answer(&ctx, "PRS x").is_some()
+        );
     }
 }

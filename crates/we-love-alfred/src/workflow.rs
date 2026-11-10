@@ -1,51 +1,20 @@
-//! Run a Script Filter: route the query, serve the cache, rebuild in the background.
+//! Run a Script Filter: internal commands, live answers, then the cached menu.
 
 use std::collections::BTreeMap;
-use std::env;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
-use std::time::SystemTime;
 
-use futures_util::future::{self, BoxFuture, FutureExt};
-use regex::Regex;
-use tokio::process::Command;
+use futures_util::future::{self, FutureExt};
 
-use crate::cache::{spawn_throttled, with_suffix};
-use crate::config::RouteAction;
-use crate::populate::{self, Populator};
-use crate::{
-    Cache, Config, Error, Icons, Item, ItemBuilder, Menu, QueryPlan, Result, github, okta, update,
-};
-
-/// A bare PR number, optionally after `pr`.
-static PR_NUMBER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
-
-/// Rebuilds a query route's database: `db-populate <route index> <db>`.
-pub const POPULATE_COMMAND: &str = "db-populate";
+use crate::feature::{After, Context, Feature, Items, Keyword, Provider};
+use crate::route::Routes;
+use crate::{Cache, Config, Icons, ItemBuilder, Menu, Result};
 
 /// Skips the cache and rebuilds; passed to background refreshes.
 pub const NO_CACHE: &str = "--no-cache";
 
-/// Contributes items to the full menu, concurrently with the others.
-pub trait Provider: Send + Sync {
-    fn items(&self) -> BoxFuture<'_, Result<Vec<ItemBuilder>>>;
-}
-
-impl<F, Fut> Provider for F
-where
-    F: Fn() -> Fut + Send + Sync,
-    Fut: Future<Output = Result<Vec<ItemBuilder>>> + Send + 'static,
-{
-    fn items(&self) -> BoxFuture<'_, Result<Vec<ItemBuilder>>> {
-        self().boxed()
-    }
-}
-
-type Handler = Box<dyn Fn(String) -> BoxFuture<'static, Result<Menu>> + Send + Sync>;
-
-/// A Script Filter built from a [`Config`] plus any Rust [`Provider`]s and keyword handlers.
+/// A Script Filter assembled from a [`Config`] and any Rust [`Feature`]s.
+///
+/// Features answer in order: config routes, then yours, then the built-in integrations.
 ///
 /// ```no_run
 /// use we_love_alfred::{Item, Menu, Workflow};
@@ -61,12 +30,13 @@ type Handler = Box<dyn Fn(String) -> BoxFuture<'static, Result<Menu>> + Send + S
 /// }
 /// ```
 pub struct Workflow {
-    config: Config,
     cache: Cache,
-    icons: Icons,
-    providers: Vec<Box<dyn Provider>>,
-    keywords: Vec<(String, Handler)>,
-    populators: BTreeMap<String, Populator>,
+    ctx: Context,
+    packs: BTreeMap<String, crate::IconPack>,
+    /// The config's routes and `[[item]]`s.
+    declared: Vec<Box<dyn Feature>>,
+    custom: Vec<Box<dyn Feature>>,
+    builtin: Vec<Box<dyn Feature>>,
 }
 
 impl Workflow {
@@ -74,20 +44,43 @@ impl Workflow {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidCacheName`] when neither gives a valid cache name.
+    /// [`crate::Error::InvalidCacheName`] when neither gives a valid cache name, and
+    /// [`crate::Error::Template`] for an unknown variable in the `[[item]]`s or `[sources]`.
     pub fn new(config: Config) -> Result<Self> {
         let cache = match &config.cache {
             Some(name) => Cache::named(name)?,
             None => Cache::for_workflow()?,
         };
-        let icons = Icons::default().with_packs(config.icon_packs.clone());
+        let items = config.items()?;
+        let Config {
+            vars,
+            routes,
+            github,
+            update,
+            okta,
+            tailscale,
+            sources,
+            icon_packs,
+            ..
+        } = config;
+        let mut builtin: Vec<Box<dyn Feature>> = Vec::new();
+        if let Some(sources) = sources {
+            builtin.push(Box::new(sources.render(&vars)?));
+        }
+        builtin.extend(okta.map(|f| Box::new(f) as Box<dyn Feature>));
+        builtin.extend(tailscale.map(|f| Box::new(f) as Box<dyn Feature>));
+        builtin.extend(update.map(|f| Box::new(f) as Box<dyn Feature>));
+        builtin.extend(github.map(|f| Box::new(f) as Box<dyn Feature>));
         Ok(Self {
-            config,
             cache,
-            icons,
-            providers: Vec::new(),
-            keywords: Vec::new(),
-            populators: BTreeMap::new(),
+            ctx: Context {
+                icons: Icons::default().with_packs(icon_packs.clone()),
+                populators: BTreeMap::new(),
+            },
+            packs: icon_packs,
+            declared: vec![Box::new(Routes { routes, vars }), Box::new(Items(items))],
+            custom: Vec::new(),
+            builtin,
         })
     }
 
@@ -102,7 +95,7 @@ impl Workflow {
 
     #[must_use]
     pub fn icons(mut self, icons: Icons) -> Self {
-        self.icons = icons.with_packs(self.config.icon_packs.clone());
+        self.ctx.icons = icons.with_packs(self.packs.clone());
         self
     }
 
@@ -112,23 +105,34 @@ impl Workflow {
         self
     }
 
-    /// Add items to the full (cached) menu.
+    /// Add a feature; it answers after the config's routes and before the built-ins.
     #[must_use]
-    pub fn provider(mut self, provider: impl Provider + 'static) -> Self {
-        self.providers.push(Box::new(provider));
+    pub fn feature(mut self, feature: impl Feature + 'static) -> Self {
+        self.custom.push(Box::new(feature));
         self
+    }
+
+    /// Add the items `provider` returns to the full (cached) menu.
+    #[must_use]
+    pub fn provider<F, Fut>(self, provider: F) -> Self
+    where
+        F: Fn() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Vec<ItemBuilder>>> + Send + 'static,
+    {
+        self.feature(Provider(provider))
     }
 
     /// Answer queries starting with `keyword` live, bypassing the cache; the handler gets the rest.
     #[must_use]
-    pub fn keyword<F, Fut>(mut self, keyword: impl Into<String>, handler: F) -> Self
+    pub fn keyword<F, Fut>(self, keyword: impl Into<String>, handler: F) -> Self
     where
         F: Fn(String) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Menu>> + Send + 'static,
     {
-        self.keywords
-            .push((keyword.into(), Box::new(move |rest| handler(rest).boxed())));
-        self
+        self.feature(Keyword {
+            keyword: keyword.into(),
+            handler,
+        })
     }
 
     /// Register `function` under `name` for query routes with `populate = "<name>"`: it gets a
@@ -139,72 +143,50 @@ impl Workflow {
         F: Fn(PathBuf) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        self.populators
+        self.ctx
+            .populators
             .insert(name.into(), Box::new(move |db| function(db).boxed()));
         self
+    }
+
+    fn features(&self) -> impl Iterator<Item = &dyn Feature> {
+        self.declared
+            .iter()
+            .chain(&self.custom)
+            .chain(&self.builtin)
+            .map(AsRef::as_ref)
     }
 
     /// Handle one Script Filter invocation; `args` excludes the program name.
     ///
     /// # Errors
     ///
-    /// Config and template errors, a failing internal command (`github-refresh`, `okta-login`, `self-update`), a route whose `exec` can't start, and I/O errors writing the cache.
+    /// A failing internal command or live answer (including a route whose `exec` can't start),
+    /// and I/O errors writing the cache.
     pub async fn run(&self, args: impl IntoIterator<Item = String>) -> Result<()> {
-        let mut args: Vec<String> = args.into_iter().collect();
-        if let Some(result) = github::dispatch(&args).await {
-            return result;
-        }
-        let mut rebuild = false;
-        match args.first().map(String::as_str) {
-            Some(update::CHECK_COMMAND | update::FORCE_COMMAND) => {
-                let updater = self
-                    .config
-                    .update
-                    .as_ref()
-                    .ok_or(Error::Config("no [update] table".into()))?;
-                return updater.run(args[0] == update::FORCE_COMMAND).await;
+        let args: Vec<String> = args.into_iter().collect();
+        let rebuild = match self.features().find_map(|f| f.command(&self.ctx, &args)) {
+            Some(command) => match command.await? {
+                After::Exit => return Ok(()),
+                After::Rebuild => true,
+            },
+            None => args.first().is_some_and(|a| a == NO_CACHE),
+        };
+        let query = args[usize::from(rebuild)..].join(" ").trim().to_owned();
+        if !rebuild {
+            future::join_all(self.features().map(|f| f.background(&self.ctx))).await;
+            if let Some(answer) = self.features().find_map(|f| f.answer(&self.ctx, &query)) {
+                println!("{}", answer.await?);
+                return Ok(());
             }
-            Some(okta::LOGIN_COMMAND) => {
-                self.config
-                    .okta
-                    .as_ref()
-                    .ok_or(Error::Config("no [okta] table".into()))?
-                    .login()
-                    .await?;
-                rebuild = true;
-            }
-            Some(POPULATE_COMMAND) => {
-                let [_, route, db] = args.as_slice() else {
-                    return Err(Error::Usage("db-populate <route> <db>"));
-                };
-                let populate = route
-                    .parse::<usize>()
-                    .ok()
-                    .and_then(|i| self.config.routes.get(i))
-                    .and_then(|r| r.populate.as_ref())
-                    .ok_or(Error::Usage("db-populate <route> <db>"))?;
-                return populate::build(populate, Path::new(db), &self.populators).await;
-            }
-            Some(NO_CACHE) => rebuild = true,
-            _ => {}
-        }
-        if rebuild {
-            args.remove(0);
-        }
-        let query = args.join(" ").trim().to_owned();
-        if !rebuild && let Some(menu) = self.answer_live(&query).await? {
-            println!("{menu}");
-            return Ok(());
         }
         let menu = match self.cache.read().await {
             Some(menu) if !rebuild => {
-                self.cache
-                    .refresh(Command::new(env::current_exe()?).arg(NO_CACHE))
-                    .await;
+                self.cache.refresh([NO_CACHE]).await;
                 menu
             }
             _ => {
-                let menu = self.build().await?;
+                let menu = self.build().await;
                 self.cache.write(&menu).await?;
                 menu
             }
@@ -213,142 +195,37 @@ impl Workflow {
         Ok(())
     }
 
-    /// Build a missing database now; rebuild a stale one in the background.
-    async fn prepare_db(&self, plan: &QueryPlan) -> Result<()> {
-        let Some(populate) = &plan.populate else {
-            return Ok(());
-        };
-        let Ok(meta) = tokio::fs::metadata(&plan.db).await else {
-            return populate::build(populate, &plan.db, &self.populators).await;
-        };
-        let age = meta
-            .modified()
-            .ok()
-            .and_then(|m| SystemTime::now().duration_since(m).ok())
-            .unwrap_or_default();
-        if let Some(every) = plan.refresh_every
-            && age >= every
-        {
-            let mut command = Command::new(env::current_exe()?);
-            command
-                .arg(POPULATE_COMMAND)
-                .arg(plan.route.to_string())
-                .arg(&plan.db);
-            spawn_throttled(&mut command, &with_suffix(&plan.db, ".populate.pid"), every).await;
-        }
-        Ok(())
-    }
-
-    /// A live answer: it depends on the query, so Alfred must not cache it.
-    async fn live(&self, items: Vec<ItemBuilder>) -> Menu {
-        Menu {
-            cache: None,
-            ..Menu::build(items, &self.icons).await
-        }
-    }
-
-    /// Routes, keyword handlers, the update view and PR searches; `None` falls through to the menu.
-    async fn answer_live(&self, query: &str) -> Result<Option<Menu>> {
-        match self.config.route(query)? {
-            Some(RouteAction::Exec { argv, env }) => {
-                let (program, args) = argv
-                    .split_first()
-                    .ok_or(Error::Config("empty route exec".into()))?;
-                return Err(std::process::Command::new(program)
-                    .args(args)
-                    .envs(env)
-                    .exec()
-                    .into());
-            }
-            Some(RouteAction::Items(items)) => return Ok(Some(self.live(items).await)),
-            Some(RouteAction::Query(plan)) => {
-                let title = plan.error.clone().unwrap_or_else(|| "Query failed".into());
-                let ran = match self.prepare_db(&plan).await {
-                    Ok(()) => plan.run().await,
-                    Err(e) => Err(e),
-                };
-                return Ok(Some(match ran {
-                    Ok(items) => self.live(items).await.or_message("No matches"),
-                    Err(e) => Menu::from_iter([Item::message(title, e.to_string())]),
-                }));
-            }
-            None => {}
-        }
-        let (word, rest) = query.split_once(char::is_whitespace).unwrap_or((query, ""));
-        if let Some((_, handler)) = self
-            .keywords
-            .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case(word))
-        {
-            return handler(rest.trim().to_owned()).await.map(Some);
-        }
-        if let Some(updater) = &self.config.update {
-            if query.eq_ignore_ascii_case(&updater.keyword) {
-                return updater.view().await.map(Some);
-            }
-            updater.check_in_background().await;
-        }
-        let Some(github) = &self.config.github else {
-            return Ok(None);
-        };
-        let prs = github.cache();
-        let empty = if prs.path.exists() {
-            "No matching open PRs"
-        } else {
-            "Loading open PRs…"
-        };
-        if word.eq_ignore_ascii_case(&github.keyword) {
-            return Ok(Some(
-                Menu::from_iter(prs.search_items(rest, &github.keyword).await).or_message(empty),
-            ));
-        }
-        if let Some(needle) = query.strip_prefix('#') {
-            return Ok(Some(
-                Menu::from_iter(prs.number_items(needle).await).or_message(empty),
-            ));
-        }
-        prs.warm().await;
-        if let Some(number) = PR_NUMBER.captures(query).and_then(|c| c[1].parse().ok()) {
-            return Ok(Some(Menu::from_iter([prs.link_item(number)])));
-        }
-        Ok(None)
-    }
-
-    /// The full menu: config items, built-in sections and providers, gathered concurrently.
+    /// The full menu: every feature's items, gathered concurrently, then "clear cache".
     ///
-    /// A failing provider is logged and skipped, so one outage can't blank the menu.
-    ///
-    /// # Errors
-    ///
-    /// Template or config errors in the `[[item]]`s.
-    pub async fn build(&self) -> Result<Menu> {
-        let config = &self.config;
-        let mut sources: Vec<BoxFuture<'_, Result<Vec<ItemBuilder>>>> =
-            vec![config.source_items().boxed()];
-        if let Some(okta) = &config.okta {
-            sources.push(okta.items().boxed());
-        }
-        if let Some(tailscale) = &config.tailscale {
-            sources.push(tailscale.items().boxed());
-        }
-        sources.extend(self.providers.iter().map(|p| p.items()));
-        let mut items = config.items()?;
-        let results = future::join_all(sources).await;
-        for result in results {
+    /// A failing feature is logged and skipped, so one outage can't blank the menu.
+    pub async fn build(&self) -> Menu {
+        let mut items = Vec::new();
+        for result in future::join_all(self.features().map(|f| f.items(&self.ctx))).await {
             match result {
                 Ok(more) => items.extend(more),
-                Err(e) => log::warn!("menu provider failed: {e}"),
+                Err(e) => log::warn!("menu items failed: {e}"),
             }
         }
-        items.push(self.cache.clear_item(&self.icons));
-        Ok(Menu::build(items, &self.icons).await)
+        items.push(self.cache.clear_item(&self.ctx.icons));
+        Menu::build(items, &self.ctx.icons).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Item;
+    use crate::{Error, Item};
+
+    /// The first live answer, as `run` would print it.
+    async fn answer(workflow: &Workflow, query: &str) -> Option<Menu> {
+        Some(
+            workflow
+                .features()
+                .find_map(|f| f.answer(&workflow.ctx, query))?
+                .await
+                .unwrap(),
+        )
+    }
 
     #[tokio::test]
     async fn builds_config_providers_and_clear_item_and_survives_failures() {
@@ -363,7 +240,6 @@ mod tests {
         let titles: Vec<String> = workflow
             .build()
             .await
-            .unwrap()
             .items
             .into_iter()
             .map(|i| i.title)
@@ -431,16 +307,13 @@ mod tests {
                 .map(|i| i.title)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(
-            titles(workflow.answer_live("who grace").await.unwrap()),
-            ["Grace"]
-        );
+        assert_eq!(titles(answer(&workflow, "who grace").await), ["Grace"]);
         assert!(
             dir.path().join("people.db").exists(),
             "built from file + jq"
         );
-        assert_eq!(titles(workflow.answer_live("fn").await.unwrap()), ["42"]);
-        let broken = workflow.answer_live("broken").await.unwrap().unwrap();
+        assert_eq!(titles(answer(&workflow, "fn").await), ["42"]);
+        let broken = answer(&workflow, "broken").await.unwrap();
         assert_eq!(broken.items[0].title, "Broken search failed");
         assert!(
             broken.items[0].subtitle.contains("missing-function"),
@@ -485,19 +358,10 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_eq!(
-            titles(workflow.answer_live("Deploy  main").await.unwrap()),
+            titles(answer(&workflow, "Deploy  main").await),
             ["deploy main"]
         );
-        assert_eq!(
-            titles(workflow.answer_live("go home").await.unwrap()),
-            ["Go home"]
-        );
-        assert!(
-            workflow
-                .answer_live("anything else")
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert_eq!(titles(answer(&workflow, "go home").await), ["Go home"]);
+        assert!(answer(&workflow, "anything else").await.is_none());
     }
 }
