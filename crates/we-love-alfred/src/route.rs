@@ -11,9 +11,10 @@ use regex::Regex;
 use serde::Deserialize;
 use toml::{Table, Value};
 
-use crate::cache::{expand_home, spawn_self, with_suffix};
+use crate::cache::{expand_home, with_suffix};
 use crate::config::ItemConfig;
 use crate::feature::{After, Context, Feature, split_word};
+use crate::job::{Job, Status};
 use crate::populate::{self, Populate};
 use crate::query::{Params, QueryPlan};
 use crate::template::Scope;
@@ -21,6 +22,9 @@ use crate::{Error, Item, ItemBuilder, Menu, Result};
 
 /// Rebuilds a query route's database: `db-populate <route index> <db>`.
 pub const POPULATE_COMMAND: &str = "db-populate";
+const BUILDING: &str = "Building the index";
+/// How soon a failed database build is retried.
+const BUILD_RETRY: Duration = Duration::from_secs(60);
 
 /// One `[[route]]`. See the crate README for the TOML.
 #[derive(Debug, Clone, Deserialize)]
@@ -253,13 +257,28 @@ impl Routes {
         })
     }
 
-    /// Build a missing database now; rebuild a stale one in the background.
-    async fn prepare(plan: &QueryPlan<'_>, ctx: &Context) -> Result<()> {
-        let Some(populate) = &plan.spec.populate else {
-            return Ok(());
-        };
+    /// The spinner while a missing database builds in the background, else `None`. A stale
+    /// database is rebuilt in the background while it keeps answering.
+    async fn prepare(plan: &QueryPlan<'_>) -> Option<Menu> {
+        let populate = plan.spec.populate.as_ref()?;
+        let job = populate_job(&plan.db);
+        let args = [
+            POPULATE_COMMAND.into(),
+            plan.route.to_string().into(),
+            plan.db.clone().into_os_string(),
+        ];
         let Ok(meta) = tokio::fs::metadata(&plan.db).await else {
-            return populate::build(&populate.with, &plan.db, &ctx.populators).await;
+            let started = job.start(args, BUILD_RETRY, BUILDING).await;
+            let status = job
+                .status()
+                .await
+                .unwrap_or_else(|| Status::running(BUILDING));
+            // A failed build shows its error; it's retried once BUILD_RETRY has passed.
+            return Some(if status.running || started {
+                status.menu("Results appear when it's done")
+            } else {
+                Menu::from_iter([Item::message(&plan.spec.error, status.message)])
+            });
         };
         let age = meta
             .modified()
@@ -269,27 +288,26 @@ impl Routes {
         if let Some(every) = populate.every
             && age >= every
         {
-            let args = [
-                POPULATE_COMMAND.into(),
-                plan.route.to_string().into(),
-                plan.db.clone().into_os_string(),
-            ];
-            spawn_self(args, &with_suffix(&plan.db, ".populate.pid"), every).await;
+            job.start(args, every, "Refreshing the index").await;
         }
-        Ok(())
+        None
     }
 
     async fn query(plan: QueryPlan<'_>, ctx: &Context) -> Menu {
+        if let Some(building) = Self::prepare(&plan).await {
+            return building;
+        }
         let error = plan.spec.error.clone();
-        let rows = async {
-            Self::prepare(&plan, ctx).await?;
-            plan.run().await
-        };
-        match rows.await {
+        match plan.run().await {
             Ok(items) => ctx.live(items).await.or_message("No matches"),
             Err(e) => Menu::from_iter([Item::message(error, e.to_string())]),
         }
     }
+}
+
+/// Progress of building `db`, shown while queries wait for it.
+fn populate_job(db: &Path) -> Job {
+    Job::at(with_suffix(db, ".populate.json"))
 }
 
 impl Feature for Routes {
@@ -312,8 +330,18 @@ impl Feature for Routes {
                         _ => None,
                     })
                     .ok_or(Error::Usage("db-populate <route> <db>"))?;
-                populate::build(&populate.with, Path::new(db), &ctx.populators).await?;
-                Ok(After::Exit)
+                let job = populate_job(Path::new(db));
+                let _ = job.report(&Status::running(BUILDING)).await;
+                match populate::build(&populate.with, Path::new(db), &ctx.populators).await {
+                    Ok(()) => {
+                        job.clear().await;
+                        Ok(After::Exit)
+                    }
+                    Err(e) => {
+                        let _ = job.report(&Status::finished(e.to_string())).await;
+                        Err(e)
+                    }
+                }
             }
             .boxed()
         })

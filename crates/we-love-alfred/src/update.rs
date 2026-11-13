@@ -6,28 +6,28 @@
 //! shows progress for the configured keyword.
 
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use futures_util::future::{BoxFuture, FutureExt};
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-use crate::cache::{atomic_write, cache_dir, spawn_self};
+use crate::cache::{cache_dir, spawn_self};
 use crate::feature::{After, Context, Feature};
+use crate::job::{Job, Status};
 use crate::okta::seconds;
 use crate::shell::{output, tool};
-use crate::{Error, Item, Menu, Result};
+use crate::{Error, Menu, Result};
 
 /// Runs a check, skipping a release that was already offered.
 pub const CHECK_COMMAND: &str = "self-update";
 /// Runs a check that re-offers the latest release.
 pub const FORCE_COMMAND: &str = "self-update-now";
 const STARTED_VARIABLE: &str = "we_love_update_started";
-const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /// The `[update]` config table.
 ///
@@ -72,16 +72,6 @@ fn default_api() -> String {
     "https://api.github.com".into()
 }
 
-/// Progress shared between the updater process and the live view.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Status {
-    pub running: bool,
-    pub message: String,
-    /// Download percentage, shown as a bar in the live view's subtitle.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub progress: Option<u8>,
-}
-
 #[derive(Debug, Deserialize)]
 struct Release {
     tag_name: String,
@@ -113,22 +103,23 @@ impl Updater {
         ))
     }
 
-    async fn report(&self, running: bool, message: impl Into<String>) -> Result<()> {
-        self.write_status(&Status {
-            running,
-            message: message.into(),
-            progress: None,
-        })
-        .await
+    /// Progress shared between the updater process and the live view.
+    fn job(&self) -> Job {
+        Job::at(self.state_path("status"))
     }
 
-    async fn write_status(&self, status: &Status) -> Result<()> {
-        // Atomic: the live view reads it ten times a second.
-        atomic_write(&self.state_path("status"), &serde_json::to_vec(status)?).await
+    async fn report(&self, running: bool, message: impl Into<String>) -> Result<()> {
+        self.job()
+            .report(&Status {
+                running,
+                message: message.into(),
+                progress: None,
+            })
+            .await
     }
 
     pub async fn status(&self) -> Option<Status> {
-        serde_json::from_slice(&fs::read(self.state_path("status")).await.ok()?).ok()
+        self.job().status().await
     }
 
     /// Start a background check unless one started within `check_every`.
@@ -147,41 +138,17 @@ impl Updater {
     }
 
     async fn view_with(&self, started: bool) -> Result<Menu> {
+        let job = self.job();
         if !started {
-            self.report(true, "Starting").await?;
-            spawn_self(
-                [FORCE_COMMAND],
-                &self.state_path("view.pid"),
-                Duration::ZERO,
-            )
-            .await;
+            job.start([FORCE_COMMAND], Duration::ZERO, "Starting").await;
         }
-        let status = self.status().await.unwrap_or(Status {
-            running: true,
-            message: "Starting".into(),
-            progress: None,
-        });
-        let subtitle = status
-            .progress
-            .map_or_else(|| "Workflow update".to_owned(), progress_bar);
-        let title = if status.running {
-            let tick = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis()
-                / 100;
-            format!(
-                "{}  {}",
-                SPINNER[(tick % SPINNER.len() as u128) as usize],
-                status.message
-            )
-        } else {
-            status.message
-        };
+        let status = job
+            .status()
+            .await
+            .unwrap_or_else(|| Status::running("Starting"));
         Ok(Menu {
-            rerun: status.running.then_some(0.1),
             variables: [(STARTED_VARIABLE.to_owned(), "1".to_owned())].into(),
-            ..Menu::from_iter([Item::message(title, subtitle)])
+            ..status.menu("Workflow update")
         })
     }
 
@@ -283,12 +250,13 @@ impl Updater {
             done += chunk.len() as u64;
             let progress = (done * 100).checked_div(total).map(|p| p.min(100) as u8);
             let message = format!("Downloading {tag} ({} MB)", done >> 20);
-            self.write_status(&Status {
-                running: true,
-                message,
-                progress,
-            })
-            .await?;
+            self.job()
+                .report(&Status {
+                    running: true,
+                    message,
+                    progress,
+                })
+                .await?;
         }
         out.flush().await?;
         Ok(())
@@ -364,17 +332,6 @@ impl Feature for Updater {
     }
 }
 
-/// Fifty cells of 2% each: `▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱…▱ 37%`. There is no partial ▰, so cells round down.
-fn progress_bar(percent: u8) -> String {
-    let percent = percent.min(100);
-    let filled = usize::from(percent / 2);
-    format!(
-        "{}{} {percent}%",
-        "▰".repeat(filled),
-        "▱".repeat(50 - filled)
-    )
-}
-
 /// `v1.10.2` → `[1, 10, 2]`; non-numeric parts count as 0.
 fn version_key(version: &str) -> Vec<u64> {
     version
@@ -417,21 +374,6 @@ mod tests {
             token_env: "WE_LOVE_TEST_TOKEN".into(),
             ..Updater::new(repo, "Test.alfredworkflow")
         }
-    }
-
-    #[test]
-    fn progress_bar_has_fifty_two_percent_cells() {
-        assert_eq!(progress_bar(0), format!("{} 0%", "▱".repeat(50)));
-        assert_eq!(
-            progress_bar(37),
-            format!("{}{} 37%", "▰".repeat(18), "▱".repeat(32))
-        );
-        assert_eq!(
-            progress_bar(50),
-            format!("{}{} 50%", "▰".repeat(25), "▱".repeat(25))
-        );
-        assert_eq!(progress_bar(100), format!("{} 100%", "▰".repeat(50)));
-        assert_eq!(progress_bar(250), progress_bar(100));
     }
 
     #[test]
@@ -485,9 +427,9 @@ mod tests {
             message: "Downloading v2 (3 MB)".into(),
             progress: Some(50),
         };
-        updater.write_status(&downloading).await.unwrap();
+        updater.job().report(&downloading).await.unwrap();
         let view = updater.view_with(true).await.unwrap();
-        assert_eq!(view.items[0].subtitle, progress_bar(50));
+        assert!(view.items[0].subtitle.ends_with(" 50%"));
         updater.report(false, "Done").await.unwrap();
         let view = updater.view_with(true).await.unwrap();
         assert_eq!((view.rerun, view.items[0].title.as_str()), (None, "Done"));

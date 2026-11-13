@@ -101,7 +101,8 @@ arg = "copy:{code}"
 copy = "{code}"
 uid = ""                       # no uid: Alfred won't reorder results by past picks
 
-# Build a query route's database when it's missing, and optionally rebuild it in the background:
+# Build a query route's database when it's missing (a spinner shows until it's ready), and
+# optionally rebuild it in the background:
 [[route]]
 keywords = { who = "" }
 db = "~/.cache/alfred/people.db"
@@ -171,6 +172,7 @@ Everything `Workflow` does is available on its own:
 | `Menu::build(items, &icons)` | resolves icons concurrently |
 | `Menu::filter(query)` | Alfred-style ranking |
 | `Cache` | `read`, atomic `write`, throttled background `refresh` |
+| `Job` | a detached run reporting progress; `Status::menu` draws the spinner and progress bar |
 | `github::PullRequestCache` | open PRs from `gh` |
 | `update::Updater` | updates from GitHub releases |
 | `okta::Okta` | Okta app tiles |
