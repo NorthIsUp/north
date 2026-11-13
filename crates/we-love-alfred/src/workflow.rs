@@ -307,12 +307,28 @@ mod tests {
                 .map(|i| i.title)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(titles(answer(&workflow, "who grace").await), ["Grace"]);
+        let populate = |route: &str, db: &str| {
+            let db = dir.path().join(db).display().to_string();
+            workflow.run(["db-populate".to_owned(), route.to_owned(), db])
+        };
+        // A missing database builds in the background while the query shows a spinner.
+        let building = answer(&workflow, "who grace").await.unwrap();
         assert!(
-            dir.path().join("people.db").exists(),
+            building.items[0].title.ends_with("Building the index"),
+            "{building:?}"
+        );
+        assert_eq!(building.rerun, Some(crate::job::RERUN));
+        populate("0", "people.db").await.unwrap();
+        assert_eq!(
+            titles(answer(&workflow, "who grace").await),
+            ["Grace"],
             "built from file + jq"
         );
+        populate("1", "fn.db").await.unwrap();
         assert_eq!(titles(answer(&workflow, "fn").await), ["42"]);
+        // A failed build shows the route's error instead of spinning forever.
+        answer(&workflow, "broken").await.unwrap();
+        assert!(populate("2", "broken.db").await.is_err());
         let broken = answer(&workflow, "broken").await.unwrap();
         assert_eq!(broken.items[0].title, "Broken search failed");
         assert!(
@@ -320,6 +336,7 @@ mod tests {
             "{}",
             broken.items[0].subtitle
         );
+        assert_eq!(broken.rerun, None);
         assert!(
             workflow
                 .run([
