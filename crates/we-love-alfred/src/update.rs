@@ -41,6 +41,7 @@ const STARTED_VARIABLE: &str = "we_love_update_started";
 /// keyword = "update"              # query showing live progress
 /// check_every = 86400             # seconds between background checks
 /// token_env = "update_github_token"
+/// clear_cache = true              # clear every cache once after an update
 /// ```
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +58,9 @@ pub struct Updater {
     pub token_env: String,
     #[serde(default = "default_api")]
     pub api_url: String,
+    /// Clear every cache the first time a new `alfred_workflow_version` runs.
+    #[serde(default)]
+    pub clear_cache: bool,
 }
 
 fn default_keyword() -> String {
@@ -128,6 +132,7 @@ impl Updater {
             check_every: default_interval(),
             token_env: default_token_env(),
             api_url: default_api(),
+            clear_cache: false,
         }
     }
 
