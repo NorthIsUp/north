@@ -3,8 +3,9 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use futures_util::future::{self, FutureExt};
+use futures_util::future::{self, BoxFuture, FutureExt};
 
+use crate::cache::wants_clear;
 use crate::feature::{After, Context, Feature, Items, Keyword, Provider};
 use crate::route::Routes;
 use crate::{Cache, Config, Icons, ItemBuilder, Menu, Result};
@@ -14,8 +15,9 @@ pub const NO_CACHE: &str = "--no-cache";
 
 /// A Script Filter assembled from a [`Config`] and any Rust [`Feature`]s.
 ///
-/// Features answer in order: updates and `clear cache` (alone or after any keyword, so routes never
-/// hide them), the config's routes, yours, then the built-in integrations.
+/// Features answer in order: updates (alone or after any keyword, so routes never hide them), the
+/// config's routes, yours, then the built-in integrations. Any answer gains a "clear cache" row when
+/// the query fuzzily names it (`py clear`, `py cache`).
 ///
 /// ```no_run
 /// use we_love_alfred::{Item, Menu, Workflow};
@@ -155,14 +157,10 @@ impl Workflow {
         self
     }
 
-    /// Updates and "clear cache", then the config's routes and items, then yours, then the
+    /// Updates, then the config's routes and items, then yours, then the
     /// built-in integrations.
     fn features(&self) -> impl Iterator<Item = &dyn Feature> {
-        let system = self
-            .system
-            .iter()
-            .map(AsRef::as_ref)
-            .chain([&self.cache as &dyn Feature]);
+        let system = self.system.iter().map(AsRef::as_ref);
         system.chain(
             self.declared
                 .iter()
@@ -190,7 +188,7 @@ impl Workflow {
         let query = args[usize::from(rebuild)..].join(" ").trim().to_owned();
         if !rebuild {
             future::join_all(self.features().map(|f| f.background(&self.ctx))).await;
-            if let Some(answer) = self.features().find_map(|f| f.answer(&self.ctx, &query)) {
+            if let Some(answer) = self.answer(&query) {
                 println!("{}", answer.await?);
                 return Ok(());
             }
@@ -208,6 +206,23 @@ impl Workflow {
         };
         println!("{}", menu.filter(&query));
         Ok(())
+    }
+
+    /// The first feature's live answer, with "clear cache" appended when the query fuzzily names it.
+    fn answer<'a>(&'a self, query: &'a str) -> Option<BoxFuture<'a, Result<Menu>>> {
+        let answer = self.features().find_map(|f| f.answer(&self.ctx, query))?;
+        Some(
+            async move {
+                let mut menu = answer.await?;
+                if wants_clear(query) {
+                    let icons = &self.ctx.icons;
+                    menu.items
+                        .push(self.cache.clear_item(icons).build(icons).await);
+                }
+                Ok(menu)
+            }
+            .boxed(),
+        )
     }
 
     /// The full menu: every feature's items, gathered concurrently, then "clear cache".
@@ -236,15 +251,9 @@ mod tests {
             .unwrap_or_default()
     }
 
-    /// The first live answer, as `run` would print it.
+    /// The live answer, as `run` would print it.
     async fn answer(workflow: &Workflow, query: &str) -> Option<Menu> {
-        Some(
-            workflow
-                .features()
-                .find_map(|f| f.answer(&workflow.ctx, query))?
-                .await
-                .unwrap(),
-        )
+        Some(workflow.answer(query)?.await.unwrap())
     }
 
     #[tokio::test]
@@ -376,7 +385,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_and_clear_cache_win_over_routes() {
+    async fn update_wins_over_routes_and_clear_cache_joins_them() {
         let _serial = crate::serial().await;
         let config: Config = r#"
             cache = "test"
@@ -399,14 +408,12 @@ mod tests {
             update.variables.contains_key("we_love_update_started"),
             "{update:?}"
         );
-        assert_eq!(
-            titles(answer(&workflow, "py clear cache").await),
-            ["clear cache"]
-        );
-        assert_eq!(
-            titles(answer(&workflow, "Clear Cache").await),
-            ["clear cache"]
-        );
+        for query in ["py clear", "py cache", "py cache clear", "py Clear Cache"] {
+            assert_eq!(
+                titles(answer(&workflow, query).await),
+                [format!("Search {}", &query[3..]), "clear cache".into()]
+            );
+        }
         assert_eq!(titles(answer(&workflow, "py dict").await), ["Search dict"]);
         assert_eq!(
             titles(answer(&workflow, "py update dict").await),

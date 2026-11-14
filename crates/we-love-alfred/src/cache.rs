@@ -12,10 +12,8 @@ use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::process::Command;
 
-use futures_util::future::{BoxFuture, FutureExt};
-
 use crate::cleanup::CacheCleanup;
-use crate::feature::{Context, Feature, is_phrase};
+use crate::feature::split_word;
 use crate::{Error, Icons, Item, ItemBuilder, Menu, Result};
 
 /// Minimum gap between background refresh launches, including failed ones.
@@ -116,16 +114,15 @@ impl Cache {
     }
 }
 
-impl Feature for Cache {
-    /// `clear cache`, alone or after a keyword, shows the item that deletes this workflow's caches.
-    fn answer<'a>(
-        &'a self,
-        ctx: &'a Context,
-        query: &'a str,
-    ) -> Option<BoxFuture<'a, Result<Menu>>> {
-        is_phrase(query, "clear cache")
-            .then(|| async move { Ok(ctx.live(vec![self.clear_item(&ctx.icons)]).await) }.boxed())
-    }
+/// Every word after an optional keyword starts `clear` or `cache` (`py cl`, `cache clear`).
+pub(crate) fn wants_clear(query: &str) -> bool {
+    let words = |q: &str| {
+        let q = q.to_lowercase();
+        !q.trim().is_empty()
+            && q.split_whitespace()
+                .all(|w| "clear".starts_with(w) || "cache".starts_with(w))
+    };
+    words(query) || words(split_word(query.trim()).1)
 }
 
 /// `$XDG_CACHE_HOME/alfred`, else `~/.cache/alfred` when `~/.cache` exists, else `/tmp/alfred`.
