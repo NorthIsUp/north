@@ -12,7 +12,10 @@ use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::process::Command;
 
+use futures_util::future::{BoxFuture, FutureExt};
+
 use crate::cleanup::CacheCleanup;
+use crate::feature::{Context, Feature, is_phrase};
 use crate::{Error, Icons, Item, ItemBuilder, Menu, Result};
 
 /// Minimum gap between background refresh launches, including failed ones.
@@ -110,6 +113,18 @@ impl Cache {
             &environment,
         );
         Item::exec("clear cache", cleanup.command())
+    }
+}
+
+impl Feature for Cache {
+    /// `clear cache`, alone or after a keyword, shows the item that deletes this workflow's caches.
+    fn answer<'a>(
+        &'a self,
+        ctx: &'a Context,
+        query: &'a str,
+    ) -> Option<BoxFuture<'a, Result<Menu>>> {
+        is_phrase(query, "clear cache")
+            .then(|| async move { Ok(ctx.live(vec![self.clear_item(&ctx.icons)]).await) }.boxed())
     }
 }
 
@@ -222,28 +237,40 @@ pub(crate) async fn spawn_throttled(
             return Ok::<_, io::Error>(false);
         }
         let mut file = File::from_std(file);
-        let meta = file.metadata().await?;
-        let age = SystemTime::now()
-            .duration_since(meta.modified()?)
-            .unwrap_or_default();
-        if meta.len() > 0 && age < interval {
-            return Ok(false);
-        }
-        overwrite(&mut file, "pending").await?;
-        let child = command
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            // Own process group, so the refresh outlives Alfred killing the Script Filter.
-            .process_group(0)
-            .spawn();
-        let Some(pid) = child.ok().and_then(|c| c.id()) else {
-            return Ok(false);
-        };
-        overwrite(&mut file, &pid.to_string()).await?;
-        Ok(true)
+        let spawned = spawn_unless_recent(command, &mut file, interval).await;
+        // tokio closes files on a blocking thread, so the lock could outlive this call; release it now.
+        let _ = file.into_std().await.unlock();
+        spawned
     };
     attempt.await.unwrap_or(false)
+}
+
+/// With the marker locked: spawn `command` unless the marker says one started within `interval`.
+async fn spawn_unless_recent(
+    command: &mut Command,
+    file: &mut File,
+    interval: Duration,
+) -> io::Result<bool> {
+    let meta = file.metadata().await?;
+    let age = SystemTime::now()
+        .duration_since(meta.modified()?)
+        .unwrap_or_default();
+    if meta.len() > 0 && age < interval {
+        return Ok(false);
+    }
+    overwrite(file, "pending").await?;
+    let child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        // Own process group, so the refresh outlives Alfred killing the Script Filter.
+        .process_group(0)
+        .spawn();
+    let Some(pid) = child.ok().and_then(|c| c.id()) else {
+        return Ok(false);
+    };
+    overwrite(file, &pid.to_string()).await?;
+    Ok(true)
 }
 
 async fn overwrite(file: &mut File, contents: &str) -> io::Result<()> {

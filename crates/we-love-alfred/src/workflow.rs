@@ -14,7 +14,8 @@ pub const NO_CACHE: &str = "--no-cache";
 
 /// A Script Filter assembled from a [`Config`] and any Rust [`Feature`]s.
 ///
-/// Features answer in order: config routes, then yours, then the built-in integrations.
+/// Features answer in order: updates and `clear cache` (alone or after any keyword, so routes never
+/// hide them), the config's routes, yours, then the built-in integrations.
 ///
 /// ```no_run
 /// use we_love_alfred::{Item, Menu, Workflow};
@@ -33,6 +34,8 @@ pub struct Workflow {
     cache: Cache,
     ctx: Context,
     packs: BTreeMap<String, crate::IconPack>,
+    /// Every workflow's own commands (updates), answered before anything else.
+    system: Vec<Box<dyn Feature>>,
     /// The config's routes and `[[item]]`s.
     declared: Vec<Box<dyn Feature>>,
     custom: Vec<Box<dyn Feature>>,
@@ -69,7 +72,6 @@ impl Workflow {
         }
         builtin.extend(okta.map(|f| Box::new(f) as Box<dyn Feature>));
         builtin.extend(tailscale.map(|f| Box::new(f) as Box<dyn Feature>));
-        builtin.extend(update.map(|f| Box::new(f) as Box<dyn Feature>));
         builtin.extend(github.map(|f| Box::new(f) as Box<dyn Feature>));
         Ok(Self {
             cache,
@@ -78,6 +80,10 @@ impl Workflow {
                 populators: BTreeMap::new(),
             },
             packs: icon_packs,
+            system: update
+                .into_iter()
+                .map(|f| Box::new(f) as Box<dyn Feature>)
+                .collect(),
             declared: vec![Box::new(Routes { routes, vars }), Box::new(Items(items))],
             custom: Vec::new(),
             builtin,
@@ -149,12 +155,21 @@ impl Workflow {
         self
     }
 
+    /// Updates and "clear cache", then the config's routes and items, then yours, then the
+    /// built-in integrations.
     fn features(&self) -> impl Iterator<Item = &dyn Feature> {
-        self.declared
+        let system = self
+            .system
             .iter()
-            .chain(&self.custom)
-            .chain(&self.builtin)
             .map(AsRef::as_ref)
+            .chain([&self.cache as &dyn Feature]);
+        system.chain(
+            self.declared
+                .iter()
+                .chain(&self.custom)
+                .chain(&self.builtin)
+                .map(AsRef::as_ref),
+        )
     }
 
     /// Handle one Script Filter invocation; `args` excludes the program name.
@@ -216,6 +231,11 @@ mod tests {
     use super::*;
     use crate::{Error, Item};
 
+    fn titles(menu: Option<Menu>) -> Vec<String> {
+        menu.map(|m| m.items.into_iter().map(|i| i.title).collect())
+            .unwrap_or_default()
+    }
+
     /// The first live answer, as `run` would print it.
     async fn answer(workflow: &Workflow, query: &str) -> Option<Menu> {
         Some(
@@ -249,6 +269,8 @@ mod tests {
 
     #[tokio::test]
     async fn query_routes_populate_missing_databases() {
+        // Spawns background builds.
+        let _serial = crate::serial().await;
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("people.json"),
@@ -350,6 +372,45 @@ mod tests {
         assert!(
             dir.path().join("again.db").exists(),
             "the background rebuild command"
+        );
+    }
+
+    #[tokio::test]
+    async fn update_and_clear_cache_win_over_routes() {
+        let _serial = crate::serial().await;
+        let config: Config = r#"
+            cache = "test"
+            [update]
+            repo = "owner/repo"
+            asset = "x.alfredworkflow"
+            [[route]]
+            keywords = { py = "" }
+            [[route.item]]
+            title = "Search {rest}"
+            arg = "{rest}"
+        "#
+        .parse()
+        .unwrap();
+        let workflow = Workflow::new(config)
+            .unwrap()
+            .icons(Icons::new("/nonexistent"));
+        let update = answer(&workflow, "py update").await.unwrap();
+        assert!(
+            update.variables.contains_key("we_love_update_started"),
+            "{update:?}"
+        );
+        assert_eq!(
+            titles(answer(&workflow, "py clear cache").await),
+            ["clear cache"]
+        );
+        assert_eq!(
+            titles(answer(&workflow, "Clear Cache").await),
+            ["clear cache"]
+        );
+        assert_eq!(titles(answer(&workflow, "py dict").await), ["Search dict"]);
+        assert_eq!(
+            titles(answer(&workflow, "py update dict").await),
+            ["Search update dict"]
         );
     }
 
