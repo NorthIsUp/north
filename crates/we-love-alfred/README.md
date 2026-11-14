@@ -33,6 +33,9 @@ GitHub). `run` handles one invocation:
 4. Everything else is filtered from the cached menu; a cache miss builds it
    from every feature's items.
 
+Every workflow also answers `update` (with an `[update]` table) and `clear cache`, on their own
+or after any keyword (`py update`, `ruff clear cache`), before any route can claim them.
+
 Implement `Feature` and add it with `.feature(…)` for anything the config
 can't express.
 

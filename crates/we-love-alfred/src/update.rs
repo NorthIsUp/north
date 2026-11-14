@@ -17,7 +17,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use crate::cache::{cache_dir, spawn_self};
-use crate::feature::{After, Context, Feature};
+use crate::feature::{After, Context, Feature, is_phrase};
 use crate::job::{Job, Status};
 use crate::okta::seconds;
 use crate::shell::{output, tool};
@@ -319,9 +319,7 @@ impl Feature for Updater {
         _ctx: &'a Context,
         query: &'a str,
     ) -> Option<BoxFuture<'a, Result<Menu>>> {
-        query
-            .eq_ignore_ascii_case(&self.keyword)
-            .then(|| self.view().boxed())
+        is_phrase(query, &self.keyword).then(|| self.view().boxed())
     }
 
     fn background<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, ()> {

@@ -71,6 +71,13 @@ pub(crate) fn split_word(query: &str) -> (&str, &str) {
     (word, rest.trim())
 }
 
+/// `phrase` on its own or after one leading keyword (`update`, `py update`), case-insensitively,
+/// so a workflow's Script Filter keywords never hide it.
+pub(crate) fn is_phrase(query: &str, phrase: &str) -> bool {
+    let query = query.trim();
+    query.eq_ignore_ascii_case(phrase) || split_word(query).1.eq_ignore_ascii_case(phrase)
+}
+
 /// Answers queries starting with `keyword`; the handler gets the rest.
 pub(crate) struct Keyword<F> {
     pub keyword: String,
