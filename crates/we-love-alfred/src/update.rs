@@ -3,25 +3,28 @@
 //! Alfred can't update workflows outside its Gallery, so this downloads the
 //! release's `.alfredworkflow` asset and opens it; Alfred then offers its own
 //! update dialog. [`crate::Workflow`] runs a throttled background check and
-//! shows progress for the configured keyword.
+//! shows progress for the configured keyword, followed by the changelog: the
+//! notes of every release newer than the installed one, or of the installed
+//! one when it's the latest.
 
+use std::cmp::Reverse;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use futures_util::future::{BoxFuture, FutureExt};
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-use crate::cache::{cache_dir, spawn_self};
+use crate::cache::{atomic_write, cache_dir, spawn_self};
 use crate::feature::{After, Context, Feature, is_phrase};
 use crate::job::{Job, Status};
 use crate::okta::seconds;
 use crate::shell::{output, tool};
-use crate::{Error, Menu, Result};
+use crate::{Error, Item, Menu, Result};
 
 /// Runs a check, skipping a release that was already offered.
 pub const CHECK_COMMAND: &str = "self-update";
@@ -75,7 +78,39 @@ fn default_api() -> String {
 #[derive(Debug, Deserialize)]
 struct Release {
     tag_name: String,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    draft: bool,
+    #[serde(default)]
+    prerelease: bool,
     assets: Vec<Asset>,
+}
+
+/// One changelog line, as the live view shows it.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Change {
+    tag: String,
+    text: String,
+}
+
+impl Release {
+    /// The bullets of GitHub's generated notes (`* Title by @who in url`), as `Title`.
+    fn changes(&self) -> impl Iterator<Item = Change> {
+        self.body
+            .as_deref()
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| {
+                line.trim()
+                    .strip_prefix("* ")
+                    .or(line.trim().strip_prefix("- "))
+            })
+            .map(|line| Change {
+                tag: self.tag_name.clone(),
+                text: line.split(" by @").next().unwrap_or(line).trim().to_owned(),
+            })
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -146,9 +181,20 @@ impl Updater {
             .status()
             .await
             .unwrap_or_else(|| Status::running("Starting"));
+        let mut menu = status.menu("Workflow update");
+        let changes: Vec<Change> = fs::read(self.state_path("changelog"))
+            .await
+            .ok()
+            .and_then(|json| serde_json::from_slice(&json).ok())
+            .unwrap_or_default();
+        menu.items.extend(
+            changes
+                .into_iter()
+                .map(|change| Item::message(change.text, format!("{} changelog", change.tag))),
+        );
         Ok(Menu {
             variables: [(STARTED_VARIABLE.to_owned(), "1".to_owned())].into(),
-            ..status.menu("Workflow update")
+            ..menu
         })
     }
 
@@ -177,7 +223,7 @@ impl Updater {
         let client = self.client().await?;
         let latest = client
             .get(format!(
-                "{}/repos/{}/releases/latest",
+                "{}/repos/{}/releases?per_page=20",
                 self.api_url, self.repo
             ))
             .send()
@@ -193,7 +239,13 @@ impl Updater {
                 )
                 .await;
         }
-        let release: Release = latest.json().await?;
+        let mut releases: Vec<Release> = latest.json().await?;
+        releases.retain(|r| !r.draft && !r.prerelease);
+        releases.sort_by_key(|r| Reverse(version_key(&r.tag_name)));
+        self.write_changelog(&releases, current).await?;
+        let Some(release) = releases.first() else {
+            return self.report(false, "No releases yet").await;
+        };
         if version_key(&release.tag_name) <= version_key(current) {
             return self.report(false, format!("{current} is up to date")).await;
         }
@@ -228,6 +280,29 @@ impl Updater {
                 "Opened the {} installer: accept Alfred's update dialog",
                 release.tag_name
             ),
+        )
+        .await
+    }
+
+    /// Notes of the releases newer than `current`, else of `current` itself.
+    async fn write_changelog(&self, releases: &[Release], current: &str) -> Result<()> {
+        let current = version_key(current);
+        let newer: Vec<&Release> = releases
+            .iter()
+            .filter(|r| version_key(&r.tag_name) > current)
+            .collect();
+        let shown = if newer.is_empty() {
+            releases
+                .iter()
+                .filter(|r| version_key(&r.tag_name) == current)
+                .collect()
+        } else {
+            newer
+        };
+        let changes: Vec<Change> = shown.into_iter().flat_map(Release::changes).collect();
+        atomic_write(
+            &self.state_path("changelog"),
+            &serde_json::to_vec(&changes)?,
         )
         .await
     }
@@ -386,7 +461,13 @@ mod tests {
         let _serial = crate::serial().await;
         let up_to_date = updater(
             "run",
-            releases_api(r#"{"tag_name": "v1.2.0", "assets": []}"#),
+            releases_api(
+                r###"[
+                    {"tag_name": "v1.1.0", "body": "* Old fix by @a in u", "assets": []},
+                    {"tag_name": "v1.3.0", "prerelease": true, "assets": []},
+                    {"tag_name": "v1.2.0", "body": "## What's Changed\n* New thing by @a in u\n\n**Full Changelog**: x", "assets": []}
+                ]"###,
+            ),
         );
         up_to_date.run_with(Some("1.2.0"), false).await.unwrap();
         assert_eq!(
@@ -398,10 +479,28 @@ mod tests {
             }
         );
 
-        up_to_date.run_with(Some("1.1.0"), false).await.unwrap();
+        let changelog = |view: Menu| -> Vec<(String, String)> {
+            view.items[1..]
+                .iter()
+                .map(|i| (i.title.clone(), i.subtitle.clone()))
+                .collect()
+        };
+        assert_eq!(
+            changelog(up_to_date.view_with(true).await.unwrap()),
+            [("New thing".to_owned(), "v1.2.0 changelog".to_owned())]
+        );
+
+        up_to_date.run_with(Some("1.0.0"), false).await.unwrap();
         assert_eq!(
             up_to_date.status().await.unwrap().message,
             "v1.2.0 has no Test.alfredworkflow asset"
+        );
+        assert_eq!(
+            changelog(up_to_date.view_with(true).await.unwrap()),
+            [
+                ("New thing".to_owned(), "v1.2.0 changelog".to_owned()),
+                ("Old fix".to_owned(), "v1.1.0 changelog".to_owned())
+            ]
         );
 
         up_to_date.run_with(None, false).await.unwrap();
@@ -410,6 +509,7 @@ mod tests {
             "Not running inside Alfred"
         );
         let _ = std::fs::remove_file(up_to_date.state_path("status"));
+        let _ = std::fs::remove_file(up_to_date.state_path("changelog"));
     }
 
     #[tokio::test]

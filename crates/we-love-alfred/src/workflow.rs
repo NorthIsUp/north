@@ -215,6 +215,8 @@ impl Workflow {
             async move {
                 let mut menu = answer.await?;
                 if wants_clear(query) {
+                    // A placeholder like "No matches" says nothing once the clear row is there.
+                    menu.items.retain(|item| item.valid != Some(false));
                     let icons = &self.ctx.icons;
                     menu.items
                         .push(self.cache.clear_item(icons).build(icons).await);
