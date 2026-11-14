@@ -111,6 +111,7 @@ impl Cache {
             &environment,
         );
         Item::exec("clear cache", cleanup.command())
+            .subtitle("Delete this workflow's cached menus, icons and data")
     }
 }
 
