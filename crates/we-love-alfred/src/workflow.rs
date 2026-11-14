@@ -34,6 +34,8 @@ pub const NO_CACHE: &str = "--no-cache";
 /// ```
 pub struct Workflow {
     cache: Cache,
+    /// `[update] clear_cache`: clear every cache once per new workflow version.
+    clear_on_update: bool,
     ctx: Context,
     packs: BTreeMap<String, crate::IconPack>,
     /// Every workflow's own commands (updates), answered before anything else.
@@ -77,6 +79,7 @@ impl Workflow {
         builtin.extend(github.map(|f| Box::new(f) as Box<dyn Feature>));
         Ok(Self {
             cache,
+            clear_on_update: update.as_ref().is_some_and(|u| u.clear_cache),
             ctx: Context {
                 icons: Icons::default().with_packs(icon_packs.clone()),
                 populators: BTreeMap::new(),
@@ -178,6 +181,16 @@ impl Workflow {
     /// and I/O errors writing the cache.
     pub async fn run(&self, args: impl IntoIterator<Item = String>) -> Result<()> {
         let args: Vec<String> = args.into_iter().collect();
+        if self.clear_on_update
+            && let Ok(version) = std::env::var("alfred_workflow_version")
+            && !version.is_empty()
+            && let Err(e) = self
+                .cache
+                .clear_on_new_version(&self.ctx.icons, &version)
+                .await
+        {
+            log::warn!("clearing caches for {version} failed: {e}");
+        }
         let rebuild = match self.features().find_map(|f| f.command(&self.ctx, &args)) {
             Some(command) => match command.await? {
                 After::Exit => return Ok(()),

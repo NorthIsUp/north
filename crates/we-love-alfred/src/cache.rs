@@ -103,15 +103,35 @@ impl Cache {
     /// An item that stops a pending refresh and deletes this cache, the icon
     /// cache, and Alfred's cache files for the workflow.
     pub fn clear_item(&self, icons: &Icons) -> ItemBuilder {
-        let environment = env::vars().collect();
-        let cleanup = CacheCleanup::from_environment(
-            self.path.clone(),
-            icons.dir.clone(),
-            &home(),
-            &environment,
-        );
-        Item::exec("clear cache", cleanup.command())
+        Item::exec("clear cache", self.cleanup(icons).command())
             .subtitle("Delete this workflow's cached menus, icons and data")
+    }
+
+    /// Clear every cache the first time `version` runs, so an update never reads what an older
+    /// version wrote. The `<cache>.version` marker is outside what clearing deletes.
+    ///
+    /// # Errors
+    ///
+    /// I/O errors running the cleanup or writing the marker.
+    pub async fn clear_on_new_version(&self, icons: &Icons, version: &str) -> Result<()> {
+        let marker = with_suffix(&self.path, ".version");
+        if fs::read_to_string(&marker)
+            .await
+            .is_ok_and(|seen| seen == version)
+        {
+            return Ok(());
+        }
+        Command::new("/bin/sh")
+            .arg("-c")
+            .arg(self.cleanup(icons).command())
+            .status()
+            .await?;
+        atomic_write(&marker, version.as_bytes()).await
+    }
+
+    fn cleanup(&self, icons: &Icons) -> CacheCleanup {
+        let environment = env::vars().collect();
+        CacheCleanup::from_environment(self.path.clone(), icons.dir.clone(), &home(), &environment)
     }
 }
 
@@ -296,6 +316,19 @@ mod tests {
                 .path()
                 .ends_with("alfred/com.example.workflow.json")
         );
+    }
+
+    #[tokio::test]
+    async fn clears_once_per_new_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let cache = Cache::at(dir.path().join("menu.json"));
+        let icons = Icons::new(dir.path().join("icons"));
+        let menu = Menu::from_iter([Item::message("old", "")]);
+        for (version, cleared) in [("1.0", true), ("1.0", false), ("1.1", true)] {
+            cache.write(&menu).await.unwrap();
+            cache.clear_on_new_version(&icons, version).await.unwrap();
+            assert_eq!(cache.read().await.is_none(), cleared, "{version}");
+        }
     }
 
     #[tokio::test]
