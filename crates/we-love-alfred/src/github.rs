@@ -1,4 +1,4 @@
-//! Open GitHub PRs as Alfred items: `prs [@author] [terms]` and `#<number|text>`.
+//! Open GitHub PRs as Alfred items: `prs [@author] [terms]`, `#<number|text>` and `#1,#2`.
 //!
 //! `gh pr list` output is cached for `ttl` and refreshed by a detached copy of
 //! the current binary once stale, so only the very first lookup waits on `gh`.
@@ -7,12 +7,10 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
-use std::sync::LazyLock;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, FixedOffset};
 use futures_util::future::{BoxFuture, FutureExt};
-use regex::Regex;
 use serde::Deserialize;
 use tokio::fs;
 use tokio::process::Command;
@@ -27,9 +25,29 @@ use crate::{Error, Item, Menu, Result, Text};
 pub const REFRESH_COMMAND: &str = "github-refresh";
 const USAGE: &str = "github-refresh <owner/repo> <cache.json> [--limit N]";
 const GH_TIMEOUT: Duration = Duration::from_secs(25);
-/// A bare PR number, optionally after `pr`.
-static PR_NUMBER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)^(?:pr\s*)?(\d{1,6})$").expect("valid regex"));
+/// PR numbers, optionally after `pr`, each with an optional `#`, separated by spaces or any
+/// punctuation, which may also lead or trail: `#5299.`, `pr 12`, `#5299,#5297`. Duplicates drop.
+fn pr_numbers(query: &str) -> Option<Vec<u64>> {
+    let query = query.trim();
+    let query = match query.get(..2) {
+        Some(pr) if pr.eq_ignore_ascii_case("pr") => &query[2..],
+        _ => query,
+    };
+    let mut numbers = Vec::new();
+    for piece in query
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|p| !p.is_empty())
+    {
+        if piece.len() > 6 || !piece.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let number = piece.parse().ok()?;
+        if !numbers.contains(&number) {
+            numbers.push(number);
+        }
+    }
+    (!numbers.is_empty()).then_some(numbers)
+}
 
 /// Every term's characters appear in order in `text`, case-insensitively.
 pub fn fuzzy_match<S: AsRef<str>>(terms: &[S], text: &str) -> bool {
@@ -281,6 +299,23 @@ impl PullRequestCache {
         items
     }
 
+    /// One row opening every PR in `numbers`, each in its own browser tab.
+    #[must_use]
+    pub fn links_item(&self, numbers: &[u64]) -> Item {
+        let urls: Vec<String> = numbers
+            .iter()
+            .map(|n| format!("https://github.com/{}/pull/{n}", self.repo))
+            .collect();
+        let tags: Vec<String> = numbers.iter().map(|n| format!("#{n}")).collect();
+        Item {
+            title: format!("Open PRs {}", tags.join(", ")),
+            subtitle: format!("{} tabs", urls.len()),
+            arg: format!("open {}", urls.join(" ")),
+            valid: Some(true),
+            ..Item::default()
+        }
+    }
+
     #[must_use]
     pub fn link_item(&self, number: u64) -> Item {
         let url = format!("https://github.com/{}/pull/{number}", self.repo);
@@ -376,11 +411,28 @@ impl Feature for Github {
                 .boxed(),
             );
         }
-        if let Some(needle) = query.strip_prefix('#') {
-            return Some(async move { Ok(Menu::from_iter(prs.number_items(needle).await).or_message(empty)) }.boxed());
-        }
-        let number = PR_NUMBER.captures(query).and_then(|c| c[1].parse().ok())?;
-        Some(async move { Ok(Menu::from_iter([prs.link_item(number)])) }.boxed())
+        let hashed = query.starts_with('#');
+        let needle = match (pr_numbers(query), hashed) {
+            (Some(numbers), _) if numbers.len() > 1 => {
+                let links = numbers.iter().map(|&n| prs.link_item(n));
+                let items: Vec<Item> = [prs.links_item(&numbers)]
+                    .into_iter()
+                    .chain(links)
+                    .collect();
+                return Some(async move { Ok(Menu::from_iter(items)) }.boxed());
+            }
+            (Some(numbers), true) => numbers[0].to_string(),
+            (Some(numbers), false) => {
+                let item = prs.link_item(numbers[0]);
+                return Some(async move { Ok(Menu::from_iter([item])) }.boxed());
+            }
+            (None, true) => query[1..].to_owned(),
+            (None, false) => return None,
+        };
+        Some(
+            async move { Ok(Menu::from_iter(prs.number_items(&needle).await).or_message(empty)) }
+                .boxed(),
+        )
     }
 
     fn background<'a>(&'a self, _ctx: &'a Context) -> BoxFuture<'a, ()> {
@@ -503,6 +555,25 @@ mod tests {
         assert_eq!(item.autocomplete, "#4496");
     }
 
+    #[test]
+    fn pr_numbers_allow_punctuation_and_lists() {
+        for (query, numbers) in [
+            ("#5299.", vec![5299]),
+            ("#5299!", vec![5299]),
+            ("#5299-", vec![5299]),
+            ("(5299)", vec![5299]),
+            ("PR 12", vec![12]),
+            ("pr12", vec![12]),
+            ("#5299,#5297", vec![5299, 5297]),
+            ("5299 5297; 5299", vec![5299, 5297]),
+        ] {
+            assert_eq!(pr_numbers(query), Some(numbers), "{query}");
+        }
+        for query in ["", "#", "labs", "#12 fix", "1234567", "prs"] {
+            assert_eq!(pr_numbers(query), None, "{query}");
+        }
+    }
+
     #[tokio::test]
     async fn search_and_number_items() {
         let dir = tempfile::tempdir().unwrap();
@@ -611,5 +682,17 @@ mod tests {
                 && github.answer(&ctx, "#4").is_some()
                 && github.answer(&ctx, "PRS x").is_some()
         );
+        let tabs = github.answer(&ctx, "#5299,#5297").unwrap().await.unwrap();
+        assert_eq!(tabs.items[0].title, "Open PRs #5299, #5297");
+        assert_eq!(
+            tabs.items[0].arg,
+            format!(
+                "open https://github.com/{0}/pull/5299 https://github.com/{0}/pull/5297",
+                github.repo
+            )
+        );
+        assert_eq!(tabs.items.len(), 3);
+        let single = github.answer(&ctx, "5299!").unwrap().await.unwrap();
+        assert_eq!(single.items[0].title, "Open PR #5299");
     }
 }
