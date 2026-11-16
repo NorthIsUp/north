@@ -532,7 +532,7 @@ mod tests {
         };
         updater.job().report(&downloading).await.unwrap();
         let view = updater.view_with(true).await.unwrap();
-        assert!(view.items[0].subtitle.ends_with(" 50%"));
+        assert!(view.items[0].subtitle.ends_with(" \u{2007}50%"));
         updater.report(false, "Done").await.unwrap();
         let view = updater.view_with(true).await.unwrap();
         assert_eq!((view.rerun, view.items[0].title.as_str()), (None, "Done"));

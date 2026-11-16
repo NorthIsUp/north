@@ -122,11 +122,15 @@ fn spinner() -> char {
 }
 
 /// Fifty cells of 2% each: `▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱…▱ 37%`. There is no partial ▰, so cells round down.
+///
+/// The percent is padded to three digits with figure spaces (U+2007, a digit's width), so the
+/// subtitle keeps one width from 0% to 100%; Alfred reports no width to fit to.
 pub(crate) fn progress_bar(percent: u8) -> String {
     let percent = percent.min(100);
     let filled = usize::from(percent / 2);
+    let pad = "\u{2007}".repeat(3 - percent.to_string().len());
     format!(
-        "{}{} {percent}%",
+        "{}{} {pad}{percent}%",
         "▰".repeat(filled),
         "▱".repeat(50 - filled)
     )
@@ -138,10 +142,13 @@ mod tests {
 
     #[test]
     fn progress_bar_has_fifty_two_percent_cells() {
-        assert_eq!(progress_bar(0), format!("{} 0%", "▱".repeat(50)));
+        assert_eq!(
+            progress_bar(0),
+            format!("{} \u{2007}\u{2007}0%", "▱".repeat(50))
+        );
         assert_eq!(
             progress_bar(37),
-            format!("{}{} 37%", "▰".repeat(18), "▱".repeat(32))
+            format!("{}{} \u{2007}37%", "▰".repeat(18), "▱".repeat(32))
         );
         assert_eq!(progress_bar(100), format!("{} 100%", "▰".repeat(50)));
         assert_eq!(progress_bar(250), progress_bar(100));
