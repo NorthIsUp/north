@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use chrono::{DateTime, FixedOffset};
-use futures_util::future::{BoxFuture, FutureExt};
+use futures_util::future::{self, BoxFuture, FutureExt};
 use serde::Deserialize;
 use tokio::fs;
 use tokio::process::Command;
@@ -25,6 +25,11 @@ use crate::{Error, Item, Menu, Result, Text};
 pub const REFRESH_COMMAND: &str = "github-refresh";
 const USAGE: &str = "github-refresh <owner/repo> <cache.json> [--limit N]";
 const GH_TIMEOUT: Duration = Duration::from_secs(25);
+/// The preview lookup runs on a keystroke, so it gives up quickly.
+const PREVIEW_TIMEOUT: Duration = Duration::from_secs(3);
+const PREVIEW_QUERY: &str = "query($owner: String!, $name: String!, $environment: String!) { \
+    repository(owner: $owner, name: $name) { deployments(environments: [$environment], last: 1) { \
+    nodes { latestStatus { environmentUrl } } } } }";
 /// PR numbers, optionally after `pr`, each with an optional `#`, separated by spaces or any
 /// punctuation, which may also lead or trail: `#5299.`, `pr 12`, `#5299,#5297`. Duplicates drop.
 fn pr_numbers(query: &str) -> Option<Vec<u64>> {
@@ -344,7 +349,8 @@ fn refresh_target(rest: &[String]) -> Result<PullRequestCache> {
     }
 }
 
-/// `[github]`: open PRs via `gh`, searched with `<keyword> [@author] [terms]`, `#<number|text>` or a bare number.
+/// `[github]`: open PRs via `gh`, searched with `<keyword> [@author] [terms]`, `#<number|text>` or a
+/// bare number; with `preview`, a single PR also offers its live preview deployment.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Github {
@@ -353,6 +359,10 @@ pub struct Github {
     pub keyword: String,
     #[serde(default = "default_limit")]
     pub limit: u32,
+    /// The GitHub deployment environment holding a PR's preview, like `preview/pr{number}`; a
+    /// single PR then also offers its preview URL, when that deployment answers.
+    #[serde(default)]
+    pub preview: Option<String>,
 }
 
 fn default_keyword() -> String {
@@ -371,6 +381,53 @@ impl Github {
             limit: self.limit,
             ..PullRequestCache::new(&self.repo, path)
         }
+    }
+
+    /// "Open preview" for PR `number`'s latest deployment, if it has a URL that responds.
+    async fn preview_item(&self, number: u64) -> Option<Item> {
+        let environment = self
+            .preview
+            .as_ref()?
+            .replace("{number}", &number.to_string());
+        let (owner, name) = self.repo.split_once('/')?;
+        let url = output(
+            tool("gh").args([
+                "api",
+                "graphql",
+                "-f",
+                &format!("query={PREVIEW_QUERY}"),
+                "-f",
+                &format!("owner={owner}"),
+                "-f",
+                &format!("name={name}"),
+                "-f",
+                &format!("environment={environment}"),
+                "--jq",
+                ".data.repository.deployments.nodes[0].latestStatus.environmentUrl // empty",
+            ]),
+            PREVIEW_TIMEOUT,
+        )
+        .await
+        .ok()?;
+        let url = url.trim();
+        let status = reqwest::Client::builder()
+            .timeout(PREVIEW_TIMEOUT)
+            .build()
+            .ok()?
+            .head(url)
+            .send()
+            .await
+            .ok()?
+            .status();
+        // A torn-down preview no longer resolves, or its host answers 404 or 5xx.
+        (!url.is_empty() && status != reqwest::StatusCode::NOT_FOUND && !status.is_server_error())
+            .then(|| Item {
+                title: format!("Open preview of #{number}"),
+                subtitle: url.to_owned(),
+                arg: format!("open {url}"),
+                valid: Some(true),
+                ..Item::default()
+            })
     }
 }
 
@@ -412,26 +469,39 @@ impl Feature for Github {
             );
         }
         let hashed = query.starts_with('#');
-        let needle = match (pr_numbers(query), hashed) {
-            (Some(numbers), _) if numbers.len() > 1 => {
-                let links = numbers.iter().map(|&n| prs.link_item(n));
-                let items: Vec<Item> = [prs.links_item(&numbers)]
-                    .into_iter()
-                    .chain(links)
-                    .collect();
-                return Some(async move { Ok(Menu::from_iter(items)) }.boxed());
-            }
-            (Some(numbers), true) => numbers[0].to_string(),
-            (Some(numbers), false) => {
-                let item = prs.link_item(numbers[0]);
-                return Some(async move { Ok(Menu::from_iter([item])) }.boxed());
-            }
-            (None, true) => query[1..].to_owned(),
-            (None, false) => return None,
-        };
+        let numbers = pr_numbers(query);
+        if let Some(numbers) = numbers.as_ref().filter(|n| n.len() > 1) {
+            let links = numbers.iter().map(|&n| prs.link_item(n));
+            let items: Vec<Item> = [prs.links_item(numbers)].into_iter().chain(links).collect();
+            return Some(async move { Ok(Menu::from_iter(items)) }.boxed());
+        }
+        let single = numbers.map(|n| n[0]);
+        if single.is_none() && !hashed {
+            return None;
+        }
         Some(
-            async move { Ok(Menu::from_iter(prs.number_items(&needle).await).or_message(empty)) }
-                .boxed(),
+            async move {
+                let items = async {
+                    match single {
+                        Some(n) if hashed => prs.number_items(&n.to_string()).await,
+                        Some(n) => vec![prs.link_item(n)],
+                        None => prs.number_items(&query[1..]).await,
+                    }
+                };
+                let preview = async {
+                    match single {
+                        Some(n) => self.preview_item(n).await,
+                        None => None,
+                    }
+                };
+                let (mut items, preview) = future::join(items, preview).await;
+                if let Some(preview) = preview {
+                    // Right after the PR itself.
+                    items.insert(items.len().min(1), preview);
+                }
+                Ok(Menu::from_iter(items).or_message(empty))
+            }
+            .boxed(),
         )
     }
 
@@ -665,6 +735,7 @@ mod tests {
             repo: "acme/app".into(),
             keyword: "prs".into(),
             limit: 10,
+            preview: None,
         };
         let ctx = Context {
             icons: crate::Icons::new("/nonexistent"),
